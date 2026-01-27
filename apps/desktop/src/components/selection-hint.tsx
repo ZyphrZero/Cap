@@ -14,8 +14,9 @@ export default function SelectionHint(props: SelectionHintProps) {
 	return (
 		<Show when={props.show}>
 			<div
-				class={`pointer-events-none absolute inset-0 z-40 flex items-center justify-center px-4 ${props.class ?? ""
-					}`}
+				class={`pointer-events-none absolute inset-0 z-40 flex items-center justify-center px-4 ${
+					props.class ?? ""
+				}`}
 			>
 				<div class="flex flex-col items-center gap-5 text-center text-white drop-shadow-md">
 					<div
@@ -38,7 +39,7 @@ export default function SelectionHint(props: SelectionHintProps) {
 						</div>
 					</div>
 					<p class="text-base font-medium max-w-xs">
-						{props.message ?? t('targetSelect.hint')}
+						{props.message ?? t("targetSelect.hint")}
 					</p>
 				</div>
 			</div>

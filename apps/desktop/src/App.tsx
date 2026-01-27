@@ -100,8 +100,6 @@ export default function App() {
 	);
 }
 
-
-
 function Inner() {
 	const currentWindow = getCurrentWebviewWindow();
 	createThemeListener(currentWindow);
@@ -215,7 +213,7 @@ function Inner() {
 
 function createThemeListener(currentWindow: WebviewWindow) {
 	const generalSettings = generalSettingsStore.createQuery();
-	let lastAppliedTheme: AppTheme | null | undefined = undefined;
+	let lastAppliedTheme: AppTheme | null | undefined;
 
 	createEffect(() => {
 		const theme = generalSettings.data?.theme;
@@ -251,7 +249,7 @@ function createThemeListener(currentWindow: WebviewWindow) {
 			} else {
 				localStorage.setItem("cap-theme", appTheme);
 			}
-		} catch { }
+		} catch {}
 
 		commands.setTheme(appTheme).then(() => {
 			document.documentElement.classList.toggle("dark", isDark);

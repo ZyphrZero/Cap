@@ -228,7 +228,11 @@ export function Preview(props: { zoom: number; setZoom: (z: number) => void }) {
 				</div>
 				<Show
 					when={!!latestFrame()}
-					fallback={<div class="text-gray-11">{t("screenshot.editor.loadingPreview")}</div>}
+					fallback={
+						<div class="text-gray-11">
+							{t("screenshot.editor.loadingPreview")}
+						</div>
+					}
 				>
 					{(_) => {
 						const padding = 20;

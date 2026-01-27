@@ -1,8 +1,8 @@
 import { cx } from "cva";
 import { type JSX, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { createOptionsQuery } from "~/utils/queries";
 import { commands, type RecordingMode } from "~/utils/tauri";
-import { t } from "~/components/I18nProvider";
 
 interface ModeOptionProps {
 	mode: RecordingMode;

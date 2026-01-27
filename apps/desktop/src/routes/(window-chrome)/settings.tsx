@@ -2,11 +2,12 @@ import { Button } from "@cap/ui-solid";
 import { A, type RouteSectionProps } from "@solidjs/router";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import * as shell from "@tauri-apps/plugin-shell";
 import "@total-typescript/ts-reset/filter-boolean";
 import { createResource, For, onMount, Show, Suspense } from "solid-js";
 import { CapErrorBoundary } from "~/components/CapErrorBoundary";
-import { SignInButton } from "~/components/SignInButton";
 import { t } from "~/components/I18nProvider";
+import { SignInButton } from "~/components/SignInButton";
 
 import { authStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
@@ -40,22 +41,22 @@ export default function Settings(props: RouteSectionProps) {
 						each={[
 							{
 								href: "general",
-								name: t('nav.general'),
+								name: t("nav.general"),
 								icon: IconCapSettings,
 							},
 							{
 								href: "hotkeys",
-								name: t('nav.shortcuts'),
+								name: t("nav.shortcuts"),
 								icon: IconCapHotkeys,
 							},
 							{
 								href: "recordings",
-								name: t('nav.recordings'),
+								name: t("nav.recordings"),
 								icon: IconLucideSquarePlay,
 							},
 							{
 								href: "screenshots",
-								name: t('nav.screenshots'),
+								name: t("nav.screenshots"),
 								icon: IconLucideImage,
 							},
 							// {
@@ -66,17 +67,17 @@ export default function Settings(props: RouteSectionProps) {
 
 							{
 								href: "experimental",
-								name: t('nav.experimental'),
+								name: t("nav.experimental"),
 								icon: IconCapSettings,
 							},
 							{
 								href: "feedback",
-								name: t('nav.feedback'),
+								name: t("nav.feedback"),
 								icon: IconLucideMessageSquarePlus,
 							},
 							{
 								href: "changelog",
-								name: t('nav.changelog'),
+								name: t("nav.changelog"),
 								icon: IconLucideBell,
 							},
 						].filter(Boolean)}
@@ -97,7 +98,18 @@ export default function Settings(props: RouteSectionProps) {
 				</ul>
 				<div class="p-[0.625rem] text-left flex flex-col">
 					<Show when={version()}>
-						{(v) => <p class="mb-2 text-xs text-gray-11">v{v()}</p>}
+						{(v) => (
+							<div class="mb-2 text-xs text-gray-11 flex flex-col items-start gap-0.5">
+								<span>v{v()}</span>
+								<button
+									type="button"
+									class="text-gray-11 hover:text-gray-12 underline transition-colors"
+									onClick={() => shell.open("https://cap.so/download/versions")}
+								>
+									View previous versions
+								</button>
+							</div>
+						)}
 					</Show>
 					{/* Sign In/Out buttons hidden for local use */}
 				</div>

@@ -390,7 +390,9 @@ export function EditorButton<T extends ValidComponent = "button">(
 			{local.tooltipText || local.comingSoon ? (
 				<Tooltip
 					kbd={local.kbd}
-					content={local.comingSoon ? t("common.comingSoon") : local.tooltipText}
+					content={
+						local.comingSoon ? t("common.comingSoon") : local.tooltipText
+					}
 				>
 					<Polymorphic
 						as="button"

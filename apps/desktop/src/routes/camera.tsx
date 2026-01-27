@@ -20,8 +20,8 @@ import {
 	Show,
 	Suspense,
 } from "solid-js";
-import { t } from "~/components/I18nProvider";
 import { createStore } from "solid-js/store";
+import { t } from "~/components/I18nProvider";
 import { generalSettingsStore } from "~/store";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import { createCameraMutation } from "~/utils/queries";

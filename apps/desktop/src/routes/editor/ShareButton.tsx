@@ -63,6 +63,7 @@ function ShareButton() {
 						y: RESOLUTION_OPTIONS._1080p.height,
 					},
 					compression: "Web",
+					custom_bpp: null,
 				},
 				(msg) => {
 					setUploadState(
@@ -80,22 +81,26 @@ function ShareButton() {
 			// Now proceed with upload
 			const result = meta().sharing
 				? await commands.uploadExportedVideo(
-					projectPath,
-					"Reupload",
-					uploadChannel,
-					null,
-				)
+						projectPath,
+						"Reupload",
+						uploadChannel,
+						null,
+					)
 				: await commands.uploadExportedVideo(
-					projectPath,
-					{
-						Initial: { pre_created_video: null },
-					},
-					uploadChannel,
-					null,
-				);
+						projectPath,
+						{
+							Initial: { pre_created_video: null },
+						},
+						uploadChannel,
+						null,
+					);
 
 			// Result check removed for local use - upload always continues
-			if (result === "NotAuthenticated" || result === "PlanCheckFailed" || result === "UpgradeRequired") {
+			if (
+				result === "NotAuthenticated" ||
+				result === "PlanCheckFailed" ||
+				result === "UpgradeRequired"
+			) {
 				console.log("Upload requires authentication, skipping for local use");
 			}
 
@@ -106,7 +111,9 @@ function ShareButton() {
 		onError: (error) => {
 			console.error(error);
 			commands.globalMessageDialog(
-				error instanceof Error ? error.message : t("editor.share.failedToUpload"),
+				error instanceof Error
+					? error.message
+					: t("editor.share.failedToUpload"),
 			);
 		},
 		onSettled() {
@@ -140,8 +147,8 @@ function ShareButton() {
 					const customUrl = () =>
 						customDomain.data?.custom_domain
 							? new URL(
-								`${customDomain.data?.custom_domain}/s/${meta().sharing?.id}`,
-							)
+									`${customDomain.data?.custom_domain}/s/${meta().sharing?.id}`,
+								)
 							: null;
 
 					const normalLink = `${normalUrl().host}${normalUrl().pathname}`;
@@ -173,7 +180,9 @@ function ShareButton() {
 						<div class="flex gap-3 items-center">
 							<Tooltip
 								content={
-									upload.isPending ? t("editor.share.reuploading") : t("editor.share.reupload")
+									upload.isPending
+										? t("editor.share.reuploading")
+										: t("editor.share.reupload")
 								}
 							>
 								<Button
@@ -287,19 +296,20 @@ function ShareButton() {
 							<div
 								class="bg-blue-9 h-2.5 rounded-full"
 								style={{
-									width: `${uploadState.type === "uploading"
-										? uploadState.progress
-										: uploadState.type === "link-copied"
-											? 100
-											: uploadState.type === "rendering"
-												? Math.min(
-													(uploadState.renderedFrames /
-														uploadState.totalFrames) *
-													100,
-													100,
-												)
-												: 0
-										}%`,
+									width: `${
+										uploadState.type === "uploading"
+											? uploadState.progress
+											: uploadState.type === "link-copied"
+												? 100
+												: uploadState.type === "rendering"
+													? Math.min(
+															(uploadState.renderedFrames /
+																uploadState.totalFrames) *
+																100,
+															100,
+														)
+													: 0
+									}%`,
 								}}
 							/>
 						</div>
@@ -308,9 +318,14 @@ function ShareButton() {
 							{uploadState.type === "idle" || uploadState.type === "starting"
 								? t("editor.share.preparing")
 								: uploadState.type === "rendering"
-									? t("editor.share.rendering", { current: uploadState.renderedFrames, total: uploadState.totalFrames })
+									? t("editor.share.rendering", {
+											current: uploadState.renderedFrames,
+											total: uploadState.totalFrames,
+										})
 									: uploadState.type === "uploading"
-										? t("editor.share.uploading", { progress: Math.floor(uploadState.progress) })
+										? t("editor.share.uploading", {
+												progress: Math.floor(uploadState.progress),
+											})
 										: t("editor.share.copied")}
 						</p>
 					</div>

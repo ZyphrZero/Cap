@@ -15,9 +15,7 @@ export function CapErrorBoundary(props: ParentProps) {
 						<h1 class="text-[--text-primary] text-3xl max-sm:text-xl font-bold">
 							{t("errorPage.title")}
 						</h1>
-						<p class="mb-2 max-sm:text-sm">
-							{t("errorPage.description")}
-						</p>
+						<p class="mb-2 max-sm:text-sm">{t("errorPage.description")}</p>
 						<div class="flex flex-row gap-4 max-sm:flex-col max-sm:gap-2">
 							<Button
 								onClick={() => {

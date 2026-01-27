@@ -13,7 +13,6 @@ import {
 	Show,
 	Switch,
 } from "solid-js";
-import { t } from "~/components/I18nProvider";
 import { Transition } from "solid-transition-group";
 import {
 	CROP_ZERO,
@@ -23,6 +22,7 @@ import {
 	createCropOptionsMenuItems,
 	type Ratio,
 } from "~/components/Cropper";
+import { t } from "~/components/I18nProvider";
 import { composeEventHandlers } from "~/utils/composeEventHandlers";
 import IconCapCircleX from "~icons/cap/circle-x";
 import IconLucideMaximize from "~icons/lucide/maximize";
@@ -218,17 +218,17 @@ function Dialogs() {
 								const existingCrop = cropDialog().currentCrop;
 								const initialBounds = existingCrop
 									? {
-										x: existingCrop.position.x,
-										y: existingCrop.position.y,
-										width: existingCrop.size.x,
-										height: existingCrop.size.y,
-									}
+											x: existingCrop.position.x,
+											y: existingCrop.position.y,
+											width: existingCrop.size.x,
+											height: existingCrop.size.y,
+										}
 									: {
-										x: 0,
-										y: 0,
-										width: originalSize.x,
-										height: originalSize.y,
-									};
+											x: 0,
+											y: 0,
+											width: originalSize.x,
+											height: originalSize.y,
+										};
 
 								const [snapToRatio, setSnapToRatioEnabled] = makePersisted(
 									createSignal(true),

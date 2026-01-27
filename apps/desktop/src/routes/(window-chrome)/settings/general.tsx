@@ -24,9 +24,9 @@ import { createStore, reconcile } from "solid-js/store";
 import themePreviewAuto from "~/assets/theme-previews/auto.jpg";
 import themePreviewDark from "~/assets/theme-previews/dark.jpg";
 import themePreviewLight from "~/assets/theme-previews/light.jpg";
+import { t, useI18n } from "~/components/I18nProvider";
 import { Input } from "~/routes/editor/ui";
 import { authStore, generalSettingsStore } from "~/store";
-import { t, useI18n } from "~/components/I18nProvider";
 import { languages } from "~/utils/i18n";
 import {
 	type AppTheme,

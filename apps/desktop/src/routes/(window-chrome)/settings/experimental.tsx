@@ -1,11 +1,10 @@
 import { type } from "@tauri-apps/plugin-os";
 import { createResource, Show } from "solid-js";
 import { createStore } from "solid-js/store";
-
+import { t } from "~/components/I18nProvider";
 import { generalSettingsStore } from "~/store";
 import type { GeneralSettingsStore } from "~/utils/tauri";
 import { ToggleSettingItem } from "./Setting";
-import { t } from "~/components/I18nProvider";
 
 export default function ExperimentalSettings() {
 	const [store] = createResource(() => generalSettingsStore.get());
@@ -45,18 +44,22 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 			<div class="p-4 space-y-4">
 				<div class="flex flex-col pb-4 border-b border-gray-2">
 					<h2 class="text-lg font-medium text-gray-12">
-						{t('experimentalPage.title')}
+						{t("experimentalPage.title")}
 					</h2>
 					<p class="text-sm text-gray-10">
-						{t('experimentalPage.description')}
+						{t("experimentalPage.description")}
 					</p>
 				</div>
 				<div class="space-y-3">
-					<h3 class="text-sm text-gray-12 w-fit">{t('experimentalPage.recordingFeatures')}</h3>
+					<h3 class="text-sm text-gray-12 w-fit">
+						{t("experimentalPage.recordingFeatures")}
+					</h3>
 					<div class="px-3 rounded-xl border divide-y divide-gray-3 border-gray-3 bg-gray-2">
 						<ToggleSettingItem
-							label={t('experimentalPage.features.customCursor.label')}
-							description={t('experimentalPage.features.customCursor.description')}
+							label={t("experimentalPage.features.customCursor.label")}
+							description={t(
+								"experimentalPage.features.customCursor.description",
+							)}
 							value={!!settings.custom_cursor_capture2}
 							onChange={(value) =>
 								handleChange("custom_cursor_capture2", value)
@@ -64,8 +67,10 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 						/>
 						{type() !== "windows" && (
 							<ToggleSettingItem
-								label={t('experimentalPage.features.nativeCamera.label')}
-								description={t('experimentalPage.features.nativeCamera.description')}
+								label={t("experimentalPage.features.nativeCamera.label")}
+								description={t(
+									"experimentalPage.features.nativeCamera.description",
+								)}
 								value={!!settings.enableNativeCameraPreview}
 								onChange={(value) =>
 									handleChange("enableNativeCameraPreview", value)
@@ -73,8 +78,8 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 							/>
 						)}
 						<ToggleSettingItem
-							label={t('experimentalPage.features.autoZoom.label')}
-							description={t('experimentalPage.features.autoZoom.description')}
+							label={t("experimentalPage.features.autoZoom.label")}
+							description={t("experimentalPage.features.autoZoom.description")}
 							value={!!settings.autoZoomOnClicks}
 							onChange={(value) => {
 								handleChange("autoZoomOnClicks", value);

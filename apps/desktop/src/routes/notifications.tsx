@@ -1,7 +1,7 @@
 import toast, { Toaster } from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import { events } from "~/utils/tauri";
-import { t } from "~/components/I18nProvider";
 
 export default function Page() {
 	let _unlisten: (() => void) | undefined;

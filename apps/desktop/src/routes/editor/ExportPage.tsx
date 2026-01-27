@@ -1,5 +1,4 @@
 import { Button } from "@cap/ui-solid";
-import { t } from "~/components/I18nProvider";
 import { debounce } from "@solid-primitives/scheduled";
 import { makePersisted } from "@solid-primitives/storage";
 import { createMutation } from "@tanstack/solid-query";
@@ -23,6 +22,7 @@ import {
 } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { SignInButton } from "~/components/SignInButton";
 import Tooltip from "~/components/Tooltip";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
@@ -42,45 +42,45 @@ import { type RenderState, useEditorContext } from "./context";
 import { RESOLUTION_OPTIONS } from "./Header";
 import { Dialog, Field } from "./ui";
 
-class SilentError extends Error { }
+class SilentError extends Error {}
 
 export const COMPRESSION_OPTIONS: Array<{
 	label: string;
 	value: ExportCompression;
 	bpp: number;
 }> = [
-		{
-			get label() {
-				return t("editor.export.quality.minimal");
-			},
-			value: "Minimal",
-			bpp: 0.3,
+	{
+		get label() {
+			return t("editor.export.compression.potato");
 		},
-		{
-			get label() {
-				return t("editor.export.quality.social");
-			},
-			value: "Social",
-			bpp: 0.15,
+		value: "Potato",
+		bpp: 0.04,
+	},
+	{
+		get label() {
+			return t("editor.export.compression.web");
 		},
-		{
-			get label() {
-				return t("editor.export.quality.web");
-			},
-			value: "Web",
-			bpp: 0.08,
+		value: "Web",
+		bpp: 0.08,
+	},
+	{
+		get label() {
+			return t("editor.export.compression.social");
 		},
-		{
-			get label() {
-				return t("editor.export.quality.potato");
-			},
-			value: "Potato",
-			bpp: 0.04,
+		value: "Social",
+		bpp: 0.15,
+	},
+	{
+		get label() {
+			return t("editor.export.quality.maximum");
 		},
-	];
+		value: "Maximum",
+		bpp: 0.3,
+	},
+];
 
 const COMPRESSION_TO_BPP: Record<ExportCompression, number> = {
-	Minimal: 0.3,
+	Maximum: 0.3,
 	Social: 0.15,
 	Web: 0.08,
 	Potato: 0.04,
@@ -192,10 +192,17 @@ export function ExportPage() {
 			fps: 30,
 			exportTo: "file",
 			resolution: { label: "720p", value: "720p", width: 1280, height: 720 },
-			compression: "Minimal",
+			compression: "Maximum",
 		}),
 		{ name: "export_settings" },
 	);
+
+	const VALID_COMPRESSIONS: ExportCompression[] = [
+		"Maximum",
+		"Social",
+		"Web",
+		"Potato",
+	];
 
 	const settings = mergeProps(_settings, () => {
 		const ret: Partial<Settings> = {};
@@ -204,6 +211,9 @@ export function ExportPage() {
 		else if (_settings.format === "Gif" && _settings.exportTo === "link")
 			ret.format = "Mp4";
 		else if (!["Mp4", "Gif"].includes(_settings.format)) ret.format = "Mp4";
+
+		if (!VALID_COMPRESSIONS.includes(_settings.compression))
+			ret.compression = "Maximum";
 
 		Object.defineProperty(ret, "organizationId", {
 			get() {
@@ -250,13 +260,29 @@ export function ExportPage() {
 	const [compressionBpp, setCompressionBpp] = createSignal(
 		COMPRESSION_TO_BPP[_settings.compression] ?? 0.15,
 	);
+	const [advancedMode, setAdvancedMode] = createSignal(false);
+	const [forceFfmpegDecoder, setForceFfmpegDecoder] = createSignal(false);
+
+	const isCustomBpp = () => {
+		const currentBpp = compressionBpp();
+		return !COMPRESSION_OPTIONS.some(
+			(opt) => Math.abs(opt.bpp - currentBpp) < 0.001,
+		);
+	};
+
+	const matchingPreset = () => {
+		const currentBpp = compressionBpp();
+		return COMPRESSION_OPTIONS.find(
+			(opt) => Math.abs(opt.bpp - currentBpp) < 0.001,
+		);
+	};
 
 	createEffect(
 		on(
 			() => _settings.compression,
 			(compression) => {
 				const bpp = COMPRESSION_TO_BPP[compression];
-				if (bpp !== undefined) setCompressionBpp(bpp);
+				if (bpp !== undefined && !advancedMode()) setCompressionBpp(bpp);
 			},
 		),
 	);
@@ -368,27 +394,30 @@ export function ExportPage() {
 	const exportWithSettings = (
 		onProgress: (progress: FramesRendered) => void,
 	) => {
+		const customBpp = advancedMode() && isCustomBpp() ? compressionBpp() : null;
 		const { promise, cancel } = createExportTask(
 			projectPath,
 			settings.format === "Mp4"
 				? {
-					format: "Mp4",
-					fps: settings.fps,
-					resolution_base: {
-						x: settings.resolution.width,
-						y: settings.resolution.height,
-					},
-					compression: settings.compression,
-				}
+						format: "Mp4",
+						fps: settings.fps,
+						resolution_base: {
+							x: settings.resolution.width,
+							y: settings.resolution.height,
+						},
+						compression: settings.compression,
+						custom_bpp: customBpp,
+						force_ffmpeg_decoder: forceFfmpegDecoder(),
+					}
 				: {
-					format: "Gif",
-					fps: settings.fps,
-					resolution_base: {
-						x: settings.resolution.width,
-						y: settings.resolution.height,
+						format: "Gif",
+						fps: settings.fps,
+						resolution_base: {
+							x: settings.resolution.width,
+							y: settings.resolution.height,
+						},
+						quality: null,
 					},
-					quality: null,
-				},
 			onProgress,
 		);
 		cancelCurrentExport = cancel;
@@ -516,7 +545,9 @@ export function ExportPage() {
 			commands.globalMessageDialog(
 				error instanceof Error
 					? error.message
-					: t("editor.export.messages.errorExporting", { error: String(error) }),
+					: t("editor.export.messages.errorExporting", {
+							error: String(error),
+						}),
 			);
 			setExportState({ type: "idle" });
 		},
@@ -585,17 +616,17 @@ export function ExportPage() {
 
 			const result = meta().sharing
 				? await commands.uploadExportedVideo(
-					projectPath,
-					"Reupload",
-					uploadChannel,
-					settings.organizationId ?? null,
-				)
+						projectPath,
+						"Reupload",
+						uploadChannel,
+						settings.organizationId ?? null,
+					)
 				: await commands.uploadExportedVideo(
-					projectPath,
-					{ Initial: { pre_created_video: null } },
-					uploadChannel,
-					settings.organizationId ?? null,
-				);
+						projectPath,
+						{ Initial: { pre_created_video: null } },
+						uploadChannel,
+						settings.organizationId ?? null,
+					);
 
 			if (result === "NotAuthenticated")
 				throw new Error(t("editor.export.messages.authRequired"));
@@ -669,7 +700,9 @@ export function ExportPage() {
 			<div class="flex-1 min-h-0 flex relative">
 				<div class="flex-1 min-h-0 p-5 flex flex-col">
 					<div class="flex items-center gap-1.5 mb-2">
-						<span class="text-sm font-medium text-gray-11">{t("editor.export.preview")}</span>
+						<span class="text-sm font-medium text-gray-11">
+							{t("editor.export.preview")}
+						</span>
 						<Tooltip content={t("editor.export.previewNote")}>
 							<IconLucideInfo class="size-3.5 text-gray-9 hover:text-gray-11 cursor-help transition-colors" />
 						</Tooltip>
@@ -684,7 +717,9 @@ export function ExportPage() {
 										fallback={
 											<div class="flex flex-col items-center gap-3 text-gray-10">
 												<IconLucideImage class="size-12 text-gray-8" />
-												<span class="text-sm">{t("editor.export.generatingPreview")}</span>
+												<span class="text-sm">
+													{t("editor.export.generatingPreview")}
+												</span>
 											</div>
 										}
 									>
@@ -789,7 +824,10 @@ export function ExportPage() {
 
 				<div class="w-[400px] border-l border-gray-3 flex flex-col bg-gray-1 dark:bg-gray-2">
 					<div class="flex-1 overflow-y-auto p-4 space-y-5">
-						<Field name={t("editor.export.destination")} icon={<IconCapUpload class="size-4" />}>
+						<Field
+							name={t("editor.export.destination")}
+							icon={<IconCapUpload class="size-4" />}
+						>
 							<div class="flex gap-1.5">
 								<For each={EXPORT_TO_OPTIONS}>
 									{(option) => {
@@ -858,7 +896,9 @@ export function ExportPage() {
 											menu.popup();
 										}}
 									>
-										<span class="text-gray-11">{t("editor.export.organization")}</span>
+										<span class="text-gray-11">
+											{t("editor.export.organization")}
+										</span>
 										<span class="flex items-center gap-1 text-gray-12">
 											{
 												(
@@ -874,7 +914,10 @@ export function ExportPage() {
 							</Suspense>
 						</Field>
 
-						<Field name={t("editor.export.format")} icon={<IconLucideVideo class="size-4" />}>
+						<Field
+							name={t("editor.export.format")}
+							icon={<IconLucideVideo class="size-4" />}
+						>
 							<div class="flex gap-1.5">
 								<For each={FORMAT_OPTIONS}>
 									{(option) => {
@@ -956,10 +999,10 @@ export function ExportPage() {
 										settings.format === "Gif"
 											? [RESOLUTION_OPTIONS._720p, RESOLUTION_OPTIONS._1080p]
 											: [
-												RESOLUTION_OPTIONS._720p,
-												RESOLUTION_OPTIONS._1080p,
-												RESOLUTION_OPTIONS._4k,
-											]
+													RESOLUTION_OPTIONS._720p,
+													RESOLUTION_OPTIONS._1080p,
+													RESOLUTION_OPTIONS._4k,
+												]
 									}
 								>
 									{(option) => (
@@ -980,7 +1023,10 @@ export function ExportPage() {
 							</div>
 						</Field>
 
-						<Field name={t("editor.export.frameRate")} icon={<IconLucideGauge class="size-4" />}>
+						<Field
+							name={t("editor.export.frameRate")}
+							icon={<IconLucideGauge class="size-4" />}
+						>
 							<div class="flex gap-1.5">
 								<For
 									each={
@@ -1043,6 +1089,103 @@ export function ExportPage() {
 									<span>{t("editor.export.smallerFile")}</span>
 									<span>{t("editor.export.largerFile")}</span>
 								</div>
+
+								<button
+									type="button"
+									class="flex items-center gap-2 mt-3 text-xs text-gray-11 hover:text-gray-12 transition-colors"
+									onClick={() => setAdvancedMode(!advancedMode())}
+								>
+									<div
+										class={cx(
+											"w-8 h-4 rounded-full transition-colors relative",
+											advancedMode() ? "bg-blue-9" : "bg-gray-5",
+										)}
+									>
+										<div
+											class={cx(
+												"absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform",
+												advancedMode() ? "translate-x-4" : "translate-x-0.5",
+											)}
+										/>
+									</div>
+									<span>Advanced</span>
+								</button>
+
+								<Show when={advancedMode()}>
+									<div class="mt-3 space-y-2">
+										<div class="flex items-center justify-between text-xs">
+											<span class="text-gray-11">Bits per pixel</span>
+											<span class="text-gray-12 font-medium tabular-nums">
+												{compressionBpp().toFixed(2)}
+											</span>
+										</div>
+										<input
+											type="range"
+											min="0.02"
+											max="0.5"
+											step="0.01"
+											value={compressionBpp()}
+											onInput={(e) => {
+												const value = Number.parseFloat(e.currentTarget.value);
+												setPreviewLoading(true);
+												setCompressionBpp(value);
+												const preset = COMPRESSION_OPTIONS.find(
+													(opt) => Math.abs(opt.bpp - value) < 0.001,
+												);
+												if (preset) {
+													setSettings("compression", preset.value);
+												}
+											}}
+											class="w-full h-1.5 bg-gray-4 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-9 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+										/>
+										<div class="flex justify-between text-[10px] text-gray-9">
+											<span>0.02 (tiny)</span>
+											<span>0.50 (huge)</span>
+										</div>
+										<Show when={isCustomBpp()}>
+											<p class="text-[10px] text-amber-11 mt-1">
+												Using custom bitrate
+											</p>
+										</Show>
+
+										<Show when={ostype() === "macos"}>
+											<div class="mt-4 pt-3 border-t border-gray-4">
+												<button
+													type="button"
+													role="switch"
+													aria-checked={forceFfmpegDecoder()}
+													aria-label="Force FFmpeg decoder"
+													class="flex items-center gap-2 text-xs text-gray-11 hover:text-gray-12 transition-colors w-full"
+													onClick={() =>
+														setForceFfmpegDecoder(!forceFfmpegDecoder())
+													}
+												>
+													<div
+														class={cx(
+															"w-8 h-4 rounded-full transition-colors relative flex-shrink-0",
+															forceFfmpegDecoder() ? "bg-blue-9" : "bg-gray-5",
+														)}
+													>
+														<div
+															class={cx(
+																"absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform",
+																forceFfmpegDecoder()
+																	? "translate-x-4"
+																	: "translate-x-0.5",
+															)}
+														/>
+													</div>
+													<div class="text-left">
+														<span class="block">Force FFmpeg decoder</span>
+														<span class="text-[10px] text-gray-9">
+															Skip hardware decoder (auto-fallback enabled)
+														</span>
+													</div>
+												</button>
+											</div>
+										</Show>
+									</div>
+								</Show>
 							</Field>
 						</Show>
 					</div>
@@ -1096,7 +1239,9 @@ export function ExportPage() {
 			>
 				<div class="p-4">
 					<div class="flex items-center justify-between mb-4">
-						<h2 class="text-gray-12 font-medium">{t("editor.export.qualityPreview")}</h2>
+						<h2 class="text-gray-12 font-medium">
+							{t("editor.export.qualityPreview")}
+						</h2>
 						<button
 							type="button"
 							onClick={() => setPreviewDialogOpen(false)}
@@ -1225,8 +1370,12 @@ export function ExportPage() {
 																			? t("editor.export.status.renderingGif")
 																			: t("editor.export.status.renderingVideo")
 																		: saveState.type === "copying"
-																			? t("editor.export.status.exportingToFile")
-																			: t("editor.export.status.exportCompleted")}
+																			? t(
+																					"editor.export.status.exportingToFile",
+																				)
+																			: t(
+																					"editor.export.status.exportCompleted",
+																				)}
 															</h1>
 															<Show
 																when={
@@ -1267,7 +1416,10 @@ export function ExportPage() {
 																</h1>
 																<p class="text-sm text-gray-11">
 																	{t("editor.export.status.ready", {
-																		type: settings.format === "Gif" ? t("editor.export.gif") : t("editor.export.recording")
+																		type:
+																			settings.format === "Gif"
+																				? t("editor.export.gif")
+																				: t("editor.export.recording"),
 																	})}
 																</p>
 															</div>
@@ -1305,7 +1457,14 @@ export function ExportPage() {
 																	{(uploadState) => (
 																		<ProgressView
 																			amount={uploadState.progress}
-																			label={t("editor.export.status.uploadingProgress", { progress: Math.floor(uploadState.progress) })}
+																			label={t(
+																				"editor.export.status.uploadingProgress",
+																				{
+																					progress: Math.floor(
+																						uploadState.progress,
+																					),
+																				},
+																			)}
 																		/>
 																	)}
 																</Match>
@@ -1436,8 +1595,11 @@ export function ExportPage() {
 														await commands.copyVideoToClipboard(path);
 														toast.success(
 															t("editor.export.messages.exportedToClipboard", {
-																type: settings.format === "Gif" ? t("editor.export.gif") : t("editor.export.recording")
-															})
+																type:
+																	settings.format === "Gif"
+																		? t("editor.export.gif")
+																		: t("editor.export.recording"),
+															}),
 														);
 													}
 												}}
@@ -1480,17 +1642,20 @@ function RenderProgress(props: { state: RenderState; format?: ExportFormat }) {
 			amount={
 				props.state.type === "rendering"
 					? (props.state.progress.renderedCount /
-						props.state.progress.totalFrames) *
-					100
+							props.state.progress.totalFrames) *
+						100
 					: 0
 			}
 			label={
 				props.state.type === "rendering"
 					? t("editor.export.status.renderingFrames", {
-						type: props.format === "Gif" ? t("editor.export.gif") : t("editor.export.recording"),
-						current: props.state.progress.renderedCount,
-						total: props.state.progress.totalFrames
-					})
+							type:
+								props.format === "Gif"
+									? t("editor.export.gif")
+									: t("editor.export.recording"),
+							current: props.state.progress.renderedCount,
+							total: props.state.progress.totalFrames,
+						})
 					: t("editor.export.status.preparingRender")
 			}
 		/>

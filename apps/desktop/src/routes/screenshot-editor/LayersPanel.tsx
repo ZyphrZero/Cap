@@ -1,5 +1,6 @@
 import { cx } from "cva";
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import IconLucideArrowUpRight from "~icons/lucide/arrow-up-right";
 import IconLucideCircle from "~icons/lucide/circle";
 import IconLucideEyeOff from "~icons/lucide/eye-off";
@@ -8,7 +9,6 @@ import IconLucideLayers from "~icons/lucide/layers";
 import IconLucideSquare from "~icons/lucide/square";
 import IconLucideType from "~icons/lucide/type";
 import IconLucideX from "~icons/lucide/x";
-import { t } from "~/components/I18nProvider";
 import { type Annotation, useScreenshotEditorContext } from "./context";
 
 const ANNOTATION_TYPE_ICONS = {
@@ -219,7 +219,9 @@ export function LayersPanel() {
 					fallback={
 						<div class="flex flex-col items-center justify-center h-full px-4 text-center">
 							<IconLucideLayers class="size-8 text-gray-7 mb-2" />
-							<p class="text-xs text-gray-10">{t("screenshotEditor.layers.empty")}</p>
+							<p class="text-xs text-gray-10">
+								{t("screenshotEditor.layers.empty")}
+							</p>
 							<p class="text-[10px] text-gray-8 mt-1">
 								{t("screenshotEditor.layers.instruction")}
 							</p>

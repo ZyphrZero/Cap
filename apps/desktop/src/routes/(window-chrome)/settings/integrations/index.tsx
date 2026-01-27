@@ -4,9 +4,9 @@ import { For, onMount } from "solid-js";
 import IconLucideDatabase from "~icons/lucide/database";
 
 import "@total-typescript/ts-reset/filter-boolean";
+import { t } from "~/components/I18nProvider";
 import { authStore } from "~/store";
 import { commands } from "~/utils/tauri";
-import { t } from "~/components/I18nProvider";
 
 export default function AppsTab() {
 	const navigate = useNavigate();
@@ -20,8 +20,8 @@ export default function AppsTab() {
 
 	const apps = [
 		{
-			name: t('integrationsPage.apps.s3Config.name'),
-			description: t('integrationsPage.apps.s3Config.description'),
+			name: t("integrationsPage.apps.s3Config.name"),
+			description: t("integrationsPage.apps.s3Config.description"),
 			icon: IconLucideDatabase,
 			url: "/settings/integrations/s3-config",
 		},
@@ -38,10 +38,10 @@ export default function AppsTab() {
 	return (
 		<div class="p-4 space-y-4">
 			<div class="flex flex-col pb-4 border-b border-gray-2">
-				<h2 class="text-lg font-medium text-gray-12">{t('integrationsPage.title')}</h2>
-				<p class="text-sm text-gray-10">
-					{t('integrationsPage.description')}
-				</p>
+				<h2 class="text-lg font-medium text-gray-12">
+					{t("integrationsPage.title")}
+				</h2>
+				<p class="text-sm text-gray-10">{t("integrationsPage.description")}</p>
 			</div>
 			<For each={apps}>
 				{(app) => (
@@ -56,7 +56,7 @@ export default function AppsTab() {
 								variant="primary"
 								onClick={() => handleAppClick(app)}
 							>
-								{t('integrationsPage.buttons.configure')}
+								{t("integrationsPage.buttons.configure")}
 							</Button>
 						</div>
 						<p class="text-[13px] text-gray-11">{app.description}</p>

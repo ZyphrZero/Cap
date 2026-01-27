@@ -1,9 +1,9 @@
 import { Collapsible as KCollapsible } from "@kobalte/core/collapsible";
 import { cx } from "cva";
 import { createSignal } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import IconCapChevronDown from "~icons/cap/chevron-down";
 import { Field, Slider } from "../ui";
-import { t } from "~/components/I18nProvider";
 
 interface Props {
 	size: {
@@ -43,7 +43,9 @@ const ShadowSettings = (props: Props) => {
 				onClick={handleToggle}
 				class="flex gap-1 items-center w-full font-medium text-left transition duration-200 text-gray-12 hover:text-gray-10"
 			>
-				<span class="text-sm">{t("screenshotEditor.appearance.shadow.advanced")}</span>
+				<span class="text-sm">
+					{t("screenshotEditor.appearance.shadow.advanced")}
+				</span>
 				<IconCapChevronDown
 					class={cx(
 						"size-5",

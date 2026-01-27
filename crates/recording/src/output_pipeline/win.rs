@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::AtomicBool,
         mpsc::{RecvTimeoutError, SyncSender, TrySendError, sync_channel},
     },
     time::Duration,
@@ -96,76 +96,10 @@ use windows::{
     },
 };
 
-struct PauseTracker {
-    flag: Arc<AtomicBool>,
-    paused_at: Option<Duration>,
-    offset: Duration,
-}
-
-impl PauseTracker {
-    fn new(flag: Arc<AtomicBool>) -> Self {
-        Self {
-            flag,
-            paused_at: None,
-            offset: Duration::ZERO,
-        }
-    }
-
-    fn adjust(&mut self, timestamp: Duration) -> anyhow::Result<Option<Duration>> {
-        if self.flag.load(Ordering::Acquire) {
-            if self.paused_at.is_none() {
-                self.paused_at = Some(timestamp);
-            }
-            return Ok(None);
-        }
-
-        if let Some(start) = self.paused_at.take() {
-            let delta = match timestamp.checked_sub(start) {
-                Some(d) => d,
-                None => {
-                    warn!(
-                        resume_at = ?start,
-                        current = ?timestamp,
-                        "Timestamp anomaly: frame timestamp went backward during unpause (clock skew?), treating as zero delta"
-                    );
-                    Duration::ZERO
-                }
-            };
-
-            self.offset = match self.offset.checked_add(delta) {
-                Some(o) => o,
-                None => {
-                    warn!(
-                        offset = ?self.offset,
-                        delta = ?delta,
-                        "Timestamp anomaly: pause offset overflow, clamping to MAX"
-                    );
-                    Duration::MAX
-                }
-            };
-        }
-
-        let adjusted = match timestamp.checked_sub(self.offset) {
-            Some(t) => t,
-            None => {
-                warn!(
-                    timestamp = ?timestamp,
-                    offset = ?self.offset,
-                    "Timestamp anomaly: adjusted timestamp underflow (clock skew?), using zero"
-                );
-                Duration::ZERO
-            }
-        };
-
-        Ok(Some(adjusted))
-    }
-}
-
 pub struct WindowsMuxer {
     video_tx: SyncSender<Option<(scap_direct3d::Frame, Duration)>>,
     output: Arc<Mutex<ffmpeg::format::context::Output>>,
     audio_encoder: Option<AACEncoder>,
-    pause: PauseTracker,
     frame_drops: FrameDropTracker,
 }
 
@@ -188,7 +122,7 @@ impl Muxer for WindowsMuxer {
         output_path: PathBuf,
         video_config: Option<VideoInfo>,
         audio_config: Option<AudioInfo>,
-        pause_flag: Arc<AtomicBool>,
+        _pause_flag: Arc<AtomicBool>,
         tasks: &mut TaskPool,
     ) -> anyhow::Result<Self>
     where
@@ -468,7 +402,6 @@ impl Muxer for WindowsMuxer {
                         let mut last_ffmpeg_frame: Option<ffmpeg::frame::Video> = None;
                         let mut first_timestamp: Option<Duration> = None;
                         let mut last_timestamp: Option<Duration> = None;
-                        let mut _frame_count: u64 = 0;
 
                         use scap_ffmpeg::AsFFmpeg;
 
@@ -514,7 +447,6 @@ impl Muxer for WindowsMuxer {
                             };
 
                             let normalized_ts = normalize_timestamp(ts, &mut first_timestamp);
-                            _frame_count += 1;
 
                             let Ok(mut output) = output.lock() else {
                                 continue;
@@ -541,7 +473,6 @@ impl Muxer for WindowsMuxer {
             video_tx,
             output,
             audio_encoder,
-            pause: PauseTracker::new(pause_flag),
             frame_drops: FrameDropTracker::new(),
         })
     }
@@ -575,17 +506,15 @@ impl VideoMuxer for WindowsMuxer {
         frame: Self::VideoFrame,
         timestamp: Duration,
     ) -> anyhow::Result<()> {
-        if let Some(timestamp) = self.pause.adjust(timestamp)? {
-            match self.video_tx.try_send(Some((frame.frame, timestamp))) {
-                Ok(()) => {
-                    self.frame_drops.record_frame();
-                }
-                Err(TrySendError::Full(_)) => {
-                    self.frame_drops.record_drop();
-                }
-                Err(TrySendError::Disconnected(_)) => {
-                    trace!("Windows MP4 encoder channel disconnected");
-                }
+        match self.video_tx.try_send(Some((frame.frame, timestamp))) {
+            Ok(()) => {
+                self.frame_drops.record_frame();
+            }
+            Err(TrySendError::Full(_)) => {
+                self.frame_drops.record_drop();
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                trace!("Windows MP4 encoder channel disconnected");
             }
         }
 
@@ -595,11 +524,9 @@ impl VideoMuxer for WindowsMuxer {
 
 impl AudioMuxer for WindowsMuxer {
     fn send_audio_frame(&mut self, frame: AudioFrame, timestamp: Duration) -> anyhow::Result<()> {
-        if let Some(timestamp) = self.pause.adjust(timestamp)? {
-            if let Some(encoder) = self.audio_encoder.as_mut() {
-                if let Ok(mut output) = self.output.lock() {
-                    encoder.send_frame(frame.inner, timestamp, &mut output)?;
-                }
+        if let Some(encoder) = self.audio_encoder.as_mut() {
+            if let Ok(mut output) = self.output.lock() {
+                encoder.send_frame(frame.inner, timestamp, &mut output)?;
             }
         }
 
@@ -628,6 +555,7 @@ pub struct NativeCameraFrame {
     pub pixel_format: cap_camera_windows::PixelFormat,
     pub width: u32,
     pub height: u32,
+    pub is_bottom_up: bool,
     pub timestamp: Timestamp,
 }
 
@@ -660,7 +588,6 @@ pub struct WindowsCameraMuxer {
     video_tx: SyncSender<Option<(NativeCameraFrame, Duration)>>,
     output: Arc<Mutex<ffmpeg::format::context::Output>>,
     audio_encoder: Option<AACEncoder>,
-    pause: PauseTracker,
     frame_drops: FrameDropTracker,
 }
 
@@ -702,7 +629,7 @@ impl Muxer for WindowsCameraMuxer {
         output_path: PathBuf,
         video_config: Option<VideoInfo>,
         audio_config: Option<AudioInfo>,
-        pause_flag: Arc<AtomicBool>,
+        _pause_flag: Arc<AtomicBool>,
         tasks: &mut TaskPool,
     ) -> anyhow::Result<Self>
     where
@@ -895,6 +822,7 @@ impl Muxer for WindowsCameraMuxer {
                         let mut first_timestamp: Option<Duration> = None;
                         let mut last_timestamp: Option<Duration> = None;
                         let mut frame_count = 0u64;
+                        let mut camera_buffers = CameraBuffers::new();
 
                         let result = encoder.run(
                             Arc::new(AtomicBool::default()),
@@ -929,7 +857,7 @@ impl Muxer for WindowsCameraMuxer {
                                             frame_count
                                         );
                                     }
-                                    let texture = upload_mf_buffer_to_texture(&d3d_device, frame)?;
+                                    let texture = upload_mf_buffer_to_texture(&d3d_device, frame, &mut camera_buffers)?;
                                     Ok(Some((texture, duration_to_timespan(normalized_ts))))
                                 } else {
                                     match video_rx.recv() {
@@ -938,7 +866,7 @@ impl Muxer for WindowsCameraMuxer {
                                             last_timestamp = Some(timestamp);
                                             let normalized_ts = normalize_camera_timestamp(timestamp, &mut first_timestamp);
                                             frame_count = 1;
-                                            let texture = upload_mf_buffer_to_texture(&d3d_device, &frame)?;
+                                            let texture = upload_mf_buffer_to_texture(&d3d_device, &frame, &mut camera_buffers)?;
                                             Ok(Some((texture, duration_to_timespan(normalized_ts))))
                                         }
                                         Ok(None) | Err(_) => Ok(None),
@@ -1074,7 +1002,6 @@ impl Muxer for WindowsCameraMuxer {
             video_tx,
             output,
             audio_encoder,
-            pause: PauseTracker::new(pause_flag),
             frame_drops: FrameDropTracker::new(),
         })
     }
@@ -1108,17 +1035,15 @@ impl VideoMuxer for WindowsCameraMuxer {
         frame: Self::VideoFrame,
         timestamp: Duration,
     ) -> anyhow::Result<()> {
-        if let Some(timestamp) = self.pause.adjust(timestamp)? {
-            match self.video_tx.try_send(Some((frame, timestamp))) {
-                Ok(()) => {
-                    self.frame_drops.record_frame();
-                }
-                Err(TrySendError::Full(_)) => {
-                    self.frame_drops.record_drop();
-                }
-                Err(TrySendError::Disconnected(_)) => {
-                    trace!("Windows MP4 camera encoder channel disconnected");
-                }
+        match self.video_tx.try_send(Some((frame, timestamp))) {
+            Ok(()) => {
+                self.frame_drops.record_frame();
+            }
+            Err(TrySendError::Full(_)) => {
+                self.frame_drops.record_drop();
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                trace!("Windows MP4 camera encoder channel disconnected");
             }
         }
 
@@ -1128,11 +1053,9 @@ impl VideoMuxer for WindowsCameraMuxer {
 
 impl AudioMuxer for WindowsCameraMuxer {
     fn send_audio_frame(&mut self, frame: AudioFrame, timestamp: Duration) -> anyhow::Result<()> {
-        if let Some(timestamp) = self.pause.adjust(timestamp)? {
-            if let Some(encoder) = self.audio_encoder.as_mut() {
-                if let Ok(mut output) = self.output.lock() {
-                    encoder.send_frame(frame.inner, timestamp, &mut output)?;
-                }
+        if let Some(encoder) = self.audio_encoder.as_mut() {
+            if let Ok(mut output) = self.output.lock() {
+                encoder.send_frame(frame.inner, timestamp, &mut output)?;
             }
         }
 
@@ -1140,23 +1063,55 @@ impl AudioMuxer for WindowsCameraMuxer {
     }
 }
 
-fn convert_uyvy_to_yuyv(src: &[u8], width: u32, height: u32) -> Vec<u8> {
+pub struct CameraBuffers {
+    uyvy_buffer: Vec<u8>,
+    flip_buffer: Vec<u8>,
+}
+
+impl CameraBuffers {
+    pub fn new() -> Self {
+        Self {
+            uyvy_buffer: Vec::new(),
+            flip_buffer: Vec::new(),
+        }
+    }
+
+    fn ensure_uyvy_capacity(&mut self, size: usize) -> &mut [u8] {
+        if self.uyvy_buffer.len() < size {
+            self.uyvy_buffer.resize(size, 0);
+        }
+        &mut self.uyvy_buffer[..size]
+    }
+
+    fn ensure_flip_capacity(&mut self, size: usize) -> &mut [u8] {
+        if self.flip_buffer.len() < size {
+            self.flip_buffer.resize(size, 0);
+        }
+        &mut self.flip_buffer[..size]
+    }
+}
+
+impl Default for CameraBuffers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn convert_uyvy_to_yuyv_into(src: &[u8], dst: &mut [u8], width: u32, height: u32) {
     let total_bytes = (width * height * 2) as usize;
-    let src_len = src.len().min(total_bytes);
-    let mut dst = vec![0u8; total_bytes];
+    let src_len = src.len().min(total_bytes).min(dst.len());
 
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("ssse3") {
             unsafe {
-                convert_uyvy_to_yuyv_ssse3(src, &mut dst, src_len);
+                convert_uyvy_to_yuyv_ssse3(src, dst, src_len);
             }
-            return dst;
+            return;
         }
     }
 
-    convert_uyvy_to_yuyv_scalar(src, &mut dst, src_len);
-    dst
+    convert_uyvy_to_yuyv_scalar(src, dst, src_len);
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -1190,6 +1145,13 @@ fn convert_uyvy_to_yuyv_scalar(src: &[u8], dst: &mut [u8], len: usize) {
             dst[i + 3] = src[i + 2];
         }
     }
+}
+
+fn convert_uyvy_to_yuyv(src: &[u8], width: u32, height: u32) -> Vec<u8> {
+    let total_bytes = (width * height * 2) as usize;
+    let mut dst = vec![0u8; total_bytes];
+    convert_uyvy_to_yuyv_into(src, &mut dst, width, height);
+    dst
 }
 
 pub fn camera_frame_to_ffmpeg(frame: &NativeCameraFrame) -> anyhow::Result<ffmpeg::frame::Video> {
@@ -1236,51 +1198,112 @@ pub fn camera_frame_to_ffmpeg(frame: &NativeCameraFrame) -> anyhow::Result<ffmpe
         };
 
     let mut ffmpeg_frame = ffmpeg::frame::Video::new(final_format, frame.width, frame.height);
+    let flip = frame.is_bottom_up;
+    let width = frame.width as usize;
+    let height = frame.height as usize;
 
     match frame.pixel_format {
         cap_camera_windows::PixelFormat::NV12 => {
-            let y_size = (frame.width * frame.height) as usize;
+            let y_size = width * height;
             let uv_size = y_size / 2;
             if final_data.len() >= y_size + uv_size {
-                ffmpeg_frame.data_mut(0)[..y_size].copy_from_slice(&final_data[..y_size]);
-                ffmpeg_frame.data_mut(1)[..uv_size].copy_from_slice(&final_data[y_size..]);
+                let stride_y = ffmpeg_frame.stride(0);
+                let stride_uv = ffmpeg_frame.stride(1);
+                copy_plane(
+                    &final_data[..y_size],
+                    ffmpeg_frame.data_mut(0),
+                    width,
+                    height,
+                    stride_y,
+                    flip,
+                );
+                copy_plane(
+                    &final_data[y_size..y_size + uv_size],
+                    ffmpeg_frame.data_mut(1),
+                    width,
+                    height / 2,
+                    stride_uv,
+                    flip,
+                );
             }
         }
         cap_camera_windows::PixelFormat::NV21 => {
-            let y_size = (frame.width * frame.height) as usize;
+            let y_size = width * height;
             let uv_size = y_size / 2;
             if final_data.len() >= y_size + uv_size {
-                ffmpeg_frame.data_mut(0)[..y_size].copy_from_slice(&final_data[..y_size]);
+                let stride_y = ffmpeg_frame.stride(0);
+                let stride_uv = ffmpeg_frame.stride(1);
+                copy_plane(
+                    &final_data[..y_size],
+                    ffmpeg_frame.data_mut(0),
+                    width,
+                    height,
+                    stride_y,
+                    flip,
+                );
                 let uv_data = &final_data[y_size..y_size + uv_size];
+                let uv_height = height / 2;
                 let dest = ffmpeg_frame.data_mut(1);
-                for i in (0..uv_size).step_by(2) {
-                    if i + 1 < uv_data.len() && i + 1 < dest.len() {
-                        dest[i] = uv_data[i + 1];
-                        dest[i + 1] = uv_data[i];
+                for row in 0..uv_height {
+                    let src_row = if flip { uv_height - 1 - row } else { row };
+                    for x in 0..width / 2 {
+                        let src_idx = src_row * width + x * 2;
+                        let dst_idx = row * stride_uv + x * 2;
+                        if src_idx + 1 < uv_data.len() && dst_idx + 1 < dest.len() {
+                            dest[dst_idx] = uv_data[src_idx + 1];
+                            dest[dst_idx + 1] = uv_data[src_idx];
+                        }
                     }
                 }
             }
         }
         cap_camera_windows::PixelFormat::YUYV422 | cap_camera_windows::PixelFormat::UYVY422 => {
-            let size = (frame.width * frame.height * 2) as usize;
+            let row_bytes = width * 2;
+            let size = row_bytes * height;
             if final_data.len() >= size {
-                ffmpeg_frame.data_mut(0)[..size].copy_from_slice(&final_data[..size]);
+                let stride = ffmpeg_frame.stride(0);
+                copy_plane(
+                    final_data,
+                    ffmpeg_frame.data_mut(0),
+                    row_bytes,
+                    height,
+                    stride,
+                    flip,
+                );
             }
         }
         cap_camera_windows::PixelFormat::ARGB | cap_camera_windows::PixelFormat::RGB32 => {
-            let size = (frame.width * frame.height * 4) as usize;
+            let row_bytes = width * 4;
+            let size = row_bytes * height;
             if final_data.len() >= size {
-                ffmpeg_frame.data_mut(0)[..size].copy_from_slice(&final_data[..size]);
+                let stride = ffmpeg_frame.stride(0);
+                copy_plane(
+                    final_data,
+                    ffmpeg_frame.data_mut(0),
+                    row_bytes,
+                    height,
+                    stride,
+                    flip,
+                );
             }
         }
         cap_camera_windows::PixelFormat::RGB24 | cap_camera_windows::PixelFormat::BGR24 => {
-            let size = (frame.width * frame.height * 3) as usize;
+            let row_bytes = width * 3;
+            let size = row_bytes * height;
             if final_data.len() >= size {
-                ffmpeg_frame.data_mut(0)[..size].copy_from_slice(&final_data[..size]);
+                let stride = ffmpeg_frame.stride(0);
+                copy_plane(
+                    final_data,
+                    ffmpeg_frame.data_mut(0),
+                    row_bytes,
+                    height,
+                    stride,
+                    flip,
+                );
             }
         }
         cap_camera_windows::PixelFormat::YUV420P => {
-            let y_size = (frame.width * frame.height) as usize;
+            let y_size = width * height;
             let uv_size = y_size / 4;
             if final_data.len() >= y_size + uv_size * 2 {
                 let stride_y = ffmpeg_frame.stride(0);
@@ -1289,28 +1312,31 @@ pub fn camera_frame_to_ffmpeg(frame: &NativeCameraFrame) -> anyhow::Result<ffmpe
                 copy_plane(
                     &final_data[..y_size],
                     ffmpeg_frame.data_mut(0),
-                    frame.width as usize,
-                    frame.height as usize,
+                    width,
+                    height,
                     stride_y,
+                    flip,
                 );
                 copy_plane(
                     &final_data[y_size..y_size + uv_size],
                     ffmpeg_frame.data_mut(1),
-                    (frame.width / 2) as usize,
-                    (frame.height / 2) as usize,
+                    width / 2,
+                    height / 2,
                     stride_u,
+                    flip,
                 );
                 copy_plane(
                     &final_data[y_size + uv_size..],
                     ffmpeg_frame.data_mut(2),
-                    (frame.width / 2) as usize,
-                    (frame.height / 2) as usize,
+                    width / 2,
+                    height / 2,
                     stride_v,
+                    flip,
                 );
             }
         }
         cap_camera_windows::PixelFormat::YV12 => {
-            let y_size = (frame.width * frame.height) as usize;
+            let y_size = width * height;
             let uv_size = y_size / 4;
             if final_data.len() >= y_size + uv_size * 2 {
                 let stride_y = ffmpeg_frame.stride(0);
@@ -1319,23 +1345,26 @@ pub fn camera_frame_to_ffmpeg(frame: &NativeCameraFrame) -> anyhow::Result<ffmpe
                 copy_plane(
                     &final_data[..y_size],
                     ffmpeg_frame.data_mut(0),
-                    frame.width as usize,
-                    frame.height as usize,
+                    width,
+                    height,
                     stride_y,
+                    flip,
                 );
                 copy_plane(
                     &final_data[y_size + uv_size..],
                     ffmpeg_frame.data_mut(1),
-                    (frame.width / 2) as usize,
-                    (frame.height / 2) as usize,
+                    width / 2,
+                    height / 2,
                     stride_u,
+                    flip,
                 );
                 copy_plane(
                     &final_data[y_size..y_size + uv_size],
                     ffmpeg_frame.data_mut(2),
-                    (frame.width / 2) as usize,
-                    (frame.height / 2) as usize,
+                    width / 2,
+                    height / 2,
                     stride_v,
+                    flip,
                 );
             }
         }
@@ -1345,9 +1374,10 @@ pub fn camera_frame_to_ffmpeg(frame: &NativeCameraFrame) -> anyhow::Result<ffmpe
     Ok(ffmpeg_frame)
 }
 
-fn copy_plane(src: &[u8], dst: &mut [u8], width: usize, height: usize, stride: usize) {
+fn copy_plane(src: &[u8], dst: &mut [u8], width: usize, height: usize, stride: usize, flip: bool) {
     for row in 0..height {
-        let src_start = row * width;
+        let src_row = if flip { height - 1 - row } else { row };
+        let src_start = src_row * width;
         let dst_start = row * stride;
         let copy_len = width.min(src.len().saturating_sub(src_start));
         if copy_len > 0 && dst_start + copy_len <= dst.len() {
@@ -1391,9 +1421,145 @@ fn decode_mjpeg_frame(frame: &NativeCameraFrame) -> anyhow::Result<ffmpeg::frame
     Ok(decoded_frame)
 }
 
+fn flip_buffer_size(
+    width: usize,
+    height: usize,
+    pixel_format: cap_camera_windows::PixelFormat,
+) -> usize {
+    use cap_camera_windows::PixelFormat;
+
+    match pixel_format {
+        PixelFormat::NV12 | PixelFormat::NV21 => {
+            let y_size = width * height;
+            let uv_size = y_size / 2;
+            y_size + uv_size
+        }
+        PixelFormat::YUV420P | PixelFormat::YV12 => {
+            let y_size = width * height;
+            let uv_plane_size = (width / 2) * (height / 2);
+            y_size + uv_plane_size * 2
+        }
+        PixelFormat::P010 => {
+            let y_size = width * height * 2;
+            let uv_size = width * (height / 2) * 2;
+            y_size + uv_size
+        }
+        PixelFormat::YUYV422 | PixelFormat::UYVY422 | PixelFormat::GRAY16 | PixelFormat::RGB565 => {
+            width * 2 * height
+        }
+        PixelFormat::ARGB | PixelFormat::RGB32 => width * 4 * height,
+        PixelFormat::RGB24 | PixelFormat::BGR24 => width * 3 * height,
+        PixelFormat::GRAY8 => width * height,
+        PixelFormat::MJPEG | PixelFormat::H264 => 0,
+    }
+}
+
+fn flip_rows_into(data: &[u8], dst: &mut [u8], row_size: usize, height: usize) {
+    for row in 0..height {
+        let src_row = height - 1 - row;
+        let src_start = src_row * row_size;
+        let dst_start = row * row_size;
+        if src_start + row_size <= data.len() && dst_start + row_size <= dst.len() {
+            dst[dst_start..dst_start + row_size]
+                .copy_from_slice(&data[src_start..src_start + row_size]);
+        }
+    }
+}
+
+fn flip_camera_buffer_into(
+    data: &[u8],
+    dst: &mut [u8],
+    width: usize,
+    height: usize,
+    pixel_format: cap_camera_windows::PixelFormat,
+) {
+    use cap_camera_windows::PixelFormat;
+
+    match pixel_format {
+        PixelFormat::NV12 | PixelFormat::NV21 => {
+            let y_size = width * height;
+
+            flip_rows_into(data, dst, width, height);
+
+            let uv_height = height / 2;
+            let uv_row_size = width;
+            for row in 0..uv_height {
+                let src_row = uv_height - 1 - row;
+                let src_start = y_size + src_row * uv_row_size;
+                let dst_start = y_size + row * uv_row_size;
+                if src_start + uv_row_size <= data.len() && dst_start + uv_row_size <= dst.len() {
+                    dst[dst_start..dst_start + uv_row_size]
+                        .copy_from_slice(&data[src_start..src_start + uv_row_size]);
+                }
+            }
+        }
+        PixelFormat::YUV420P | PixelFormat::YV12 => {
+            let y_size = width * height;
+            let uv_width = width / 2;
+            let uv_height = height / 2;
+            let uv_plane_size = uv_width * uv_height;
+
+            flip_rows_into(data, dst, width, height);
+
+            let u_offset = y_size;
+            let v_offset = y_size + uv_plane_size;
+            for row in 0..uv_height {
+                let src_row = uv_height - 1 - row;
+                let src_u_start = u_offset + src_row * uv_width;
+                let dst_u_start = u_offset + row * uv_width;
+                if src_u_start + uv_width <= data.len() && dst_u_start + uv_width <= dst.len() {
+                    dst[dst_u_start..dst_u_start + uv_width]
+                        .copy_from_slice(&data[src_u_start..src_u_start + uv_width]);
+                }
+                let src_v_start = v_offset + src_row * uv_width;
+                let dst_v_start = v_offset + row * uv_width;
+                if src_v_start + uv_width <= data.len() && dst_v_start + uv_width <= dst.len() {
+                    dst[dst_v_start..dst_v_start + uv_width]
+                        .copy_from_slice(&data[src_v_start..src_v_start + uv_width]);
+                }
+            }
+        }
+        PixelFormat::P010 => {
+            let y_size = width * height * 2;
+            let y_row_size = width * 2;
+
+            flip_rows_into(data, dst, y_row_size, height);
+
+            let uv_height = height / 2;
+            let uv_row_size = width * 2;
+            for row in 0..uv_height {
+                let src_row = uv_height - 1 - row;
+                let src_start = y_size + src_row * uv_row_size;
+                let dst_start = y_size + row * uv_row_size;
+                if src_start + uv_row_size <= data.len() && dst_start + uv_row_size <= dst.len() {
+                    dst[dst_start..dst_start + uv_row_size]
+                        .copy_from_slice(&data[src_start..src_start + uv_row_size]);
+                }
+            }
+        }
+        PixelFormat::YUYV422 | PixelFormat::UYVY422 | PixelFormat::GRAY16 | PixelFormat::RGB565 => {
+            flip_rows_into(data, dst, width * 2, height);
+        }
+        PixelFormat::ARGB | PixelFormat::RGB32 => {
+            flip_rows_into(data, dst, width * 4, height);
+        }
+        PixelFormat::RGB24 | PixelFormat::BGR24 => {
+            flip_rows_into(data, dst, width * 3, height);
+        }
+        PixelFormat::GRAY8 => {
+            flip_rows_into(data, dst, width, height);
+        }
+        PixelFormat::MJPEG | PixelFormat::H264 => {
+            let copy_len = data.len().min(dst.len());
+            dst[..copy_len].copy_from_slice(&data[..copy_len]);
+        }
+    }
+}
+
 pub fn upload_mf_buffer_to_texture(
     device: &ID3D11Device,
     frame: &NativeCameraFrame,
+    buffers: &mut CameraBuffers,
 ) -> windows::core::Result<windows::Win32::Graphics::Direct3D11::ID3D11Texture2D> {
     use cap_mediafoundation_utils::IMFMediaBufferExt;
     use windows::Win32::Graphics::Direct3D11::{
@@ -1418,12 +1584,64 @@ pub fn upload_mf_buffer_to_texture(
     let lock = buffer_guard.lock()?;
     let original_data = &*lock;
 
-    let converted_buffer_storage;
-    let data: &[u8] = if frame.pixel_format == cap_camera_windows::PixelFormat::UYVY422 {
-        converted_buffer_storage = convert_uyvy_to_yuyv(original_data, frame.width, frame.height);
-        converted_buffer_storage.as_slice()
-    } else {
-        original_data
+    let needs_uyvy_conversion = frame.pixel_format == cap_camera_windows::PixelFormat::UYVY422;
+    let needs_flip = frame.is_bottom_up;
+
+    let data: &[u8] = match (needs_uyvy_conversion, needs_flip) {
+        (false, false) => original_data,
+        (true, false) => {
+            let uyvy_size = (frame.width * frame.height * 2) as usize;
+            let dst = buffers.ensure_uyvy_capacity(uyvy_size);
+            convert_uyvy_to_yuyv_into(original_data, dst, frame.width, frame.height);
+            dst
+        }
+        (false, true) => {
+            let flip_size = flip_buffer_size(
+                frame.width as usize,
+                frame.height as usize,
+                frame.pixel_format,
+            );
+            let dst = buffers.ensure_flip_capacity(flip_size);
+            flip_camera_buffer_into(
+                original_data,
+                dst,
+                frame.width as usize,
+                frame.height as usize,
+                frame.pixel_format,
+            );
+            dst
+        }
+        (true, true) => {
+            let uyvy_size = (frame.width * frame.height * 2) as usize;
+            let flip_size = flip_buffer_size(
+                frame.width as usize,
+                frame.height as usize,
+                frame.pixel_format,
+            );
+
+            if buffers.uyvy_buffer.len() < uyvy_size {
+                buffers.uyvy_buffer.resize(uyvy_size, 0);
+            }
+            if buffers.flip_buffer.len() < flip_size {
+                buffers.flip_buffer.resize(flip_size, 0);
+            }
+
+            convert_uyvy_to_yuyv_into(
+                original_data,
+                &mut buffers.uyvy_buffer[..uyvy_size],
+                frame.width,
+                frame.height,
+            );
+
+            flip_camera_buffer_into(
+                &buffers.uyvy_buffer[..uyvy_size],
+                &mut buffers.flip_buffer[..flip_size],
+                frame.width as usize,
+                frame.height as usize,
+                frame.pixel_format,
+            );
+            &buffers.flip_buffer[..flip_size]
+        }
     };
 
     let row_pitch = frame.width * bytes_per_pixel;

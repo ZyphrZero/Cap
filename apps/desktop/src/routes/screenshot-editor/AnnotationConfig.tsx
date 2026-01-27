@@ -1,9 +1,9 @@
 import { Popover } from "@kobalte/core/popover";
 import { cx } from "cva";
 import { createMemo, For, type JSX, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import Tooltip from "~/components/Tooltip";
 import { BACKGROUND_COLORS, hexToRgb, RgbInput, rgbToHex } from "./ColorPicker";
-import { t } from "~/components/I18nProvider";
 import { type Annotation, useScreenshotEditorContext } from "./context";
 import { Slider } from "./ui";
 
@@ -45,7 +45,13 @@ export function AnnotationConfigBar() {
 					>
 						<div class="flex items-center justify-center gap-6 px-4 h-11">
 							<Show when={!isMask()}>
-								<ConfigItem label={type() === "text" ? t("screenshotEditor.config.color") : t("screenshotEditor.config.stroke")}>
+								<ConfigItem
+									label={
+										type() === "text"
+											? t("screenshotEditor.config.color")
+											: t("screenshotEditor.config.stroke")
+									}
+								>
 									<ColorPickerButton
 										value={ann().strokeColor}
 										onChange={(c) => update("strokeColor", c)}

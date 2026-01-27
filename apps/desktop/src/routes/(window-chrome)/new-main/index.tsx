@@ -25,6 +25,7 @@ import {
 } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { Transition } from "solid-transition-group";
+import { t } from "~/components/I18nProvider";
 import Mode from "~/components/Mode";
 import { RecoveryToast } from "~/components/RecoveryToast";
 import Tooltip from "~/components/Tooltip";
@@ -33,7 +34,6 @@ import { authStore } from "~/store";
 import { createSignInMutation } from "~/utils/auth";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import { createDevicesQuery } from "~/utils/devices";
-import { t } from "~/components/I18nProvider";
 import {
 	createCameraMutation,
 	createCurrentRecordingQuery,
@@ -64,6 +64,7 @@ import IconLucideAppWindowMac from "~icons/lucide/app-window-mac";
 import IconLucideArrowLeft from "~icons/lucide/arrow-left";
 import IconLucideBug from "~icons/lucide/bug";
 import IconLucideImage from "~icons/lucide/image";
+import IconLucideImport from "~icons/lucide/import";
 import IconLucideSearch from "~icons/lucide/search";
 import IconLucideSquarePlay from "~icons/lucide/square-play";
 import IconMaterialSymbolsScreenshotFrame2Rounded from "~icons/material-symbols/screenshot-frame-2-rounded";
@@ -189,6 +190,32 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 					? t("recording.search.noRecordings")
 					: t("recording.search.noScreenshots");
 
+	const handleImport = async () => {
+		const result = await dialog.open({
+			filters: [
+				{
+					name: "Video Files",
+					extensions: ["mp4", "mov", "avi", "mkv", "webm", "wmv", "m4v", "flv"],
+				},
+			],
+			multiple: false,
+		});
+
+		if (result) {
+			try {
+				const projectPath = await commands.startVideoImport(result as string);
+				await commands.showWindow({ Editor: { project_path: projectPath } });
+				getCurrentWindow().hide();
+			} catch (e) {
+				console.error("Failed to import video:", e);
+				await dialog.message(
+					`Failed to import video: ${e instanceof Error ? e.message : String(e)}`,
+					{ title: "Import Error", kind: "error" },
+				);
+			}
+		}
+	};
+
 	const filteredDisplayTargets = createMemo<CaptureDisplayWithThumbnail[]>(
 		() => {
 			if (props.variant !== "display") return [];
@@ -258,26 +285,39 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 					<IconLucideArrowLeft class="size-3 text-gray-11" />
 					<span class="font-medium text-gray-12">{t('common.back')}</span>
 				</div>
-				<div class="relative flex-1 min-w-0 h-[36px] flex items-center">
-					<IconLucideSearch class="absolute left-2 top-[48%] -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
-					<Input
-						type="search"
-						class="py-2 pl-6 h-full"
-						value={search()}
-						onInput={(event) => setSearch(event.currentTarget.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Escape" && search()) {
-								event.preventDefault();
-								setSearch("");
-							}
-						}}
-						placeholder={placeholder}
-						autoCapitalize="off"
-						autocorrect="off"
-						autocomplete="off"
-						spellcheck={false}
-						aria-label={placeholder}
-					/>
+				<div class="flex gap-2 flex-1 min-w-0">
+					<div class="relative flex-1 min-w-0 h-[36px] flex items-center">
+						<IconLucideSearch class="absolute left-2 top-[48%] -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
+						<Input
+							type="search"
+							class="py-2 pl-6 h-full w-full"
+							value={search()}
+							onInput={(event) => setSearch(event.currentTarget.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Escape" && search()) {
+									event.preventDefault();
+									setSearch("");
+								}
+							}}
+							placeholder={placeholder}
+							autoCapitalize="off"
+							autocorrect="off"
+							autocomplete="off"
+							spellcheck={false}
+							aria-label={placeholder}
+						/>
+					</div>
+					<Show when={props.variant === "recording"}>
+						<Button
+							variant="gray"
+							size="sm"
+							class="h-[36px] px-3 shrink-0 flex items-center gap-1.5"
+							onClick={handleImport}
+						>
+							<IconLucideImport class="size-3.5" />
+							<span>Import</span>
+						</Button>
+					</Show>
 				</div>
 			</div>
 			<div class="flex flex-col flex-1 min-h-0 pt-4">
@@ -359,17 +399,35 @@ function createUpdateCheck() {
 
 		await new Promise((res) => setTimeout(res, 1000));
 
-		const update = await updater.check();
+		let update: updater.Update | undefined;
+		try {
+			const result = await updater.check();
+			if (result) update = result;
+		} catch (e) {
+			console.error("Failed to check for updates:", e);
+			await dialog.message(
+				"Unable to check for updates. Please download the latest version manually from cap.so/download. Your data will not be lost.\n\nIf this issue persists, please contact support.",
+				{ title: "Update Error", kind: "error" },
+			);
+			return;
+		}
+
 		if (!update) return;
 
-		const shouldUpdate = await dialog.confirm(
-			t("app.update.message", { version: update.version }),
-			{
-				title: t("app.update.title"),
-				okLabel: t("app.update.ok"),
-				cancelLabel: t("app.update.ignore"),
-			},
-		);
+		let shouldUpdate: boolean | undefined;
+		try {
+			shouldUpdate = await dialog.confirm(
+				t("app.update.message", { version: update.version }),
+				{
+					title: t("app.update.title"),
+					okLabel: t("app.update.ok"),
+					cancelLabel: t("app.update.ignore"),
+				},
+			);
+		} catch (e) {
+			console.error("Failed to show update dialog:", e);
+			return;
+		}
 
 		if (!shouldUpdate) return;
 		navigate("/update");

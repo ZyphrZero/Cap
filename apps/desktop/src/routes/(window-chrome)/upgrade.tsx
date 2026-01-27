@@ -256,7 +256,9 @@ export default function Page() {
 			{upgradeComplete() && (
 				<div class="flex justify-center items-center h-full bg-opacity-75">
 					<div class="relative z-10 p-6 text-center bg-white rounded-lg shadow-lg">
-						<h2 class="mb-4 text-2xl font-bold">{t("upgrade.completeTitle")}</h2>
+						<h2 class="mb-4 text-2xl font-bold">
+							{t("upgrade.completeTitle")}
+						</h2>
 						<p class="mb-4 text-sm text-gray-10">
 							{t("upgrade.completeMessage")}
 						</p>
@@ -279,7 +281,9 @@ export default function Page() {
 					<div class="p-8 mx-auto w-full max-w-[700px] rounded-xl border shadow-sm bg-gray-2 border-gray-3">
 						<div class="space-y-6">
 							<div class="flex flex-col items-center mb-6 text-center">
-								<h3 class="text-2xl font-medium">{t("upgrade.commercialLicense")}</h3>
+								<h3 class="text-2xl font-medium">
+									{t("upgrade.commercialLicense")}
+								</h3>
 								<p class="text-sm text-gray-11">
 									{t("upgrade.commercialDescription")}
 								</p>
@@ -298,7 +302,9 @@ export default function Page() {
 								<Show when={license.data.expiryDate}>
 									{(expiryDate) => (
 										<div class="space-y-1">
-											<label class="text-sm text-gray-12">{t("upgrade.expires")}</label>
+											<label class="text-sm text-gray-12">
+												{t("upgrade.expires")}
+											</label>
 											<p class="text-gray-10">
 												{new Date(expiryDate()).toLocaleDateString(undefined, {
 													year: "numeric",
@@ -388,8 +394,10 @@ export default function Page() {
 										>
 											<p class="text-xs text-gray-12">
 												{t("upgrade.switchTo", {
-													mode: isCommercialAnnual() ? t("upgrade.lifetime") : t("upgrade.yearly"),
-													price: isCommercialAnnual() ? "$58" : "$29"
+													mode: isCommercialAnnual()
+														? t("upgrade.lifetime")
+														: t("upgrade.yearly"),
+													price: isCommercialAnnual() ? "$58" : "$29",
 												})}
 											</p>
 										</div>
@@ -492,11 +500,13 @@ export default function Page() {
 										>
 											<p class="text-xs text-solid-white">
 												{t("upgrade.switchTo", {
-													mode: isProAnnual() ? t("upgrade.monthly") : t("upgrade.yearly"), // monthly is not in upgrade keys, let's reuse setup? No, add to upgrade or common. Actually, monthly is in CaptionsTab for other things. Let's add common keys?
+													mode: isProAnnual()
+														? t("upgrade.monthly")
+														: t("upgrade.yearly"), // monthly is not in upgrade keys, let's reuse setup? No, add to upgrade or common. Actually, monthly is in CaptionsTab for other things. Let's add common keys?
 													// For now, let's check if update or upgrade keys are enough.
 													price: isProAnnual()
 														? t("upgrade.perUserBilledMonthly")
-														: t("upgrade.perUserBilledAnnually")
+														: t("upgrade.perUserBilledAnnually"),
 												})}
 											</p>
 										</div>
@@ -516,7 +526,9 @@ export default function Page() {
 										class="!rounded-full !text-lg w-full mx-auto"
 										onClick={openCheckoutInExternalBrowser}
 									>
-										{loading() ? t("upgrade.loading") : t("upgrade.upgradeToPro")}
+										{loading()
+											? t("upgrade.loading")
+											: t("upgrade.upgradeToPro")}
 									</Button>
 								</div>
 							</div>

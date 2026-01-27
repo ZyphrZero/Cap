@@ -6,6 +6,7 @@ import {
 	createEffect,
 	createSignal,
 } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { trackEvent } from "~/utils/analytics";
 import { createCurrentRecordingQuery } from "~/utils/queries";
 import {
@@ -16,7 +17,6 @@ import {
 import InfoPill from "./InfoPill";
 import TargetSelectInfoPill from "./TargetSelectInfoPill";
 import useRequestPermission from "./useRequestPermission";
-import { t } from "~/components/I18nProvider";
 
 const NO_CAMERA = "No Camera";
 
@@ -117,7 +117,7 @@ export function CameraSelectBase(props: {
 
 					Promise.all([
 						CheckMenuItem.new({
-							text: t('recordingOverlay.menu.noWebcam'),
+							text: t("recordingOverlay.menu.noWebcam"),
 							checked: props.value === null,
 							action: () => onChange(null),
 						}),
@@ -139,7 +139,7 @@ export function CameraSelectBase(props: {
 			>
 				<IconCapCamera class={props.iconClass} />
 				<p class="flex-1 text-sm text-left truncate">
-					{props.value?.display_name ?? t('recordingOverlay.menu.noWebcam')}
+					{props.value?.display_name ?? t("recordingOverlay.menu.noWebcam")}
 				</p>
 				<div class="flex items-center gap-1">
 					{showHiddenIndicator() && (
@@ -148,7 +148,7 @@ export function CameraSelectBase(props: {
 							onClick={openCameraWindow}
 							onPointerDown={(e) => e.stopPropagation()}
 							class="flex items-center justify-center px-2 py-1 rounded-full bg-gray-6 text-gray-11 hover:bg-gray-7 transition-colors"
-							title={t('recordingOverlay.menu.cameraPreview')}
+							title={t("recordingOverlay.menu.cameraPreview")}
 						>
 							<IconLucideEyeOff class="size-3.5" />
 						</button>

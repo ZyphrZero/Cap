@@ -1,5 +1,4 @@
 import { Button } from "@cap/ui-solid";
-import { t } from "~/components/I18nProvider";
 import { Select as KSelect } from "@kobalte/core/select";
 import { createWritableMemo } from "@solid-primitives/memo";
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
@@ -15,6 +14,7 @@ import {
 	Show,
 } from "solid-js";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { Toggle } from "~/components/Toggle";
 import { defaultCaptionSettings } from "~/store/captions";
 import type { CaptionSettings } from "~/utils/tauri";
@@ -646,7 +646,8 @@ export function CaptionsTab() {
 											);
 											return (
 												<span>
-													{language?.label || t("editor.captions.selectLanguage")}
+													{language?.label ||
+														t("editor.captions.selectLanguage")}
 												</span>
 											);
 										}}

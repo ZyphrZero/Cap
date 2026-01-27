@@ -3,10 +3,10 @@ import { createEventBus } from "@solid-primitives/event-bus";
 import { createWritableMemo } from "@solid-primitives/memo";
 import { useMutation } from "@tanstack/solid-query";
 import { createResource, Suspense } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { Input } from "~/routes/editor/ui";
 import { commands } from "~/utils/tauri";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
-import { t } from "~/components/I18nProvider";
 
 interface S3Config {
 	provider: string;
@@ -32,7 +32,7 @@ export default function S3ConfigPage() {
 			headers: await protectedHeaders(),
 		});
 
-		if (response.status !== 200) throw new Error(t('s3ConfigPage.error.fetch'));
+		if (response.status !== 200) throw new Error(t("s3ConfigPage.error.fetch"));
 
 		return response.body.config;
 	});
@@ -46,12 +46,13 @@ export default function S3ConfigPage() {
 				headers: await protectedHeaders(),
 			});
 
-			if (response.status !== 200) throw new Error(t('s3ConfigPage.error.save'));
+			if (response.status !== 200)
+				throw new Error(t("s3ConfigPage.error.save"));
 			return response;
 		},
 		onSuccess: async () => {
 			await refetch();
-			await commands.globalMessageDialog(t('s3ConfigPage.success.save'));
+			await commands.globalMessageDialog(t("s3ConfigPage.success.save"));
 		},
 	}));
 
@@ -62,14 +63,12 @@ export default function S3ConfigPage() {
 			});
 
 			if (response.status !== 200)
-				throw new Error(t('s3ConfigPage.error.delete'));
+				throw new Error(t("s3ConfigPage.error.delete"));
 			return response;
 		},
 		onSuccess: async () => {
 			await refetch();
-			await commands.globalMessageDialog(
-				t('s3ConfigPage.success.delete'),
-			);
+			await commands.globalMessageDialog(t("s3ConfigPage.success.delete"));
 		},
 	}));
 
@@ -88,9 +87,7 @@ export default function S3ConfigPage() {
 				clearTimeout(timeoutId);
 
 				if (response.status !== 200)
-					throw new Error(
-						t('s3ConfigPage.error.test'),
-					);
+					throw new Error(t("s3ConfigPage.error.test"));
 
 				return response;
 			} catch (error) {
@@ -98,18 +95,14 @@ export default function S3ConfigPage() {
 
 				if (error instanceof Error) {
 					if (error.name === "AbortError")
-						throw new Error(
-							t('s3ConfigPage.error.timeout'),
-						);
+						throw new Error(t("s3ConfigPage.error.timeout"));
 				}
 
 				throw error;
 			}
 		},
 		onSuccess: async () => {
-			await commands.globalMessageDialog(
-				t('s3ConfigPage.success.test'),
-			);
+			await commands.globalMessageDialog(t("s3ConfigPage.success.test"));
 		},
 	}));
 
@@ -169,22 +162,22 @@ export default function S3ConfigPage() {
 								<div class="p-4 space-y-4 animate-in fade-in">
 									<div class="pb-4 border-b border-gray-3">
 										<p class="text-sm text-gray-11">
-											{t('s3ConfigPage.guideTextPre')}
+											{t("s3ConfigPage.guideTextPre")}
 											<a
 												href="https://cap.so/docs/s3-config"
 												target="_blank"
 												class="underline text-gray-12"
 												rel="noopener"
 											>
-												{t('s3ConfigPage.guideLink')}
+												{t("s3ConfigPage.guideLink")}
 											</a>{" "}
-											{t('s3ConfigPage.guideTextPost')}
+											{t("s3ConfigPage.guideTextPost")}
 										</p>
 									</div>
 
 									<div class="space-y-2">
 										<label class="text-[13px] text-gray-12">
-											{t('s3ConfigPage.storageProvider')}
+											{t("s3ConfigPage.storageProvider")}
 										</label>
 										<div class="relative">
 											<select
@@ -197,11 +190,21 @@ export default function S3ConfigPage() {
 												}
 												class="px-3 py-2 pr-10 w-full rounded-lg border border-transparent transition-all duration-200 appearance-none outline-none bg-gray-3 focus:border-gray-8"
 											>
-												<option value="aws">{t('s3ConfigPage.providers.aws')}</option>
-												<option value="cloudflare">{t('s3ConfigPage.providers.cloudflare')}</option>
-												<option value="supabase">{t('s3ConfigPage.providers.supabase')}</option>
-												<option value="minio">{t('s3ConfigPage.providers.minio')}</option>
-												<option value="other">{t('s3ConfigPage.providers.other')}</option>
+												<option value="aws">
+													{t("s3ConfigPage.providers.aws")}
+												</option>
+												<option value="cloudflare">
+													{t("s3ConfigPage.providers.cloudflare")}
+												</option>
+												<option value="supabase">
+													{t("s3ConfigPage.providers.supabase")}
+												</option>
+												<option value="minio">
+													{t("s3ConfigPage.providers.minio")}
+												</option>
+												<option value="other">
+													{t("s3ConfigPage.providers.other")}
+												</option>
 											</select>
 											<div class="flex absolute inset-y-0 right-0 items-center px-2 pointer-events-none">
 												<svg
@@ -221,24 +224,32 @@ export default function S3ConfigPage() {
 									</div>
 
 									{renderInput(
-										t('s3ConfigPage.labels.accessKeyId'),
+										t("s3ConfigPage.labels.accessKeyId"),
 										"accessKeyId",
 										"PL31OADSQNK",
 										"password",
 									)}
 									{renderInput(
-										t('s3ConfigPage.labels.secretAccessKey'),
+										t("s3ConfigPage.labels.secretAccessKey"),
 										"secretAccessKey",
 										"PL31OADSQNK",
 										"password",
 									)}
 									{renderInput(
-										t('s3ConfigPage.labels.endpoint'),
+										t("s3ConfigPage.labels.endpoint"),
 										"endpoint",
 										"https://s3.amazonaws.com",
 									)}
-									{renderInput(t('s3ConfigPage.labels.bucketName'), "bucketName", "my-bucket")}
-									{renderInput(t('s3ConfigPage.labels.region'), "region", "us-east-1")}
+									{renderInput(
+										t("s3ConfigPage.labels.bucketName"),
+										"bucketName",
+										"my-bucket",
+									)}
+									{renderInput(
+										t("s3ConfigPage.labels.region"),
+										"region",
+										"us-east-1",
+									)}
 								</div>
 							);
 						})()}
@@ -261,11 +272,15 @@ export default function S3ConfigPage() {
 								variant="destructive"
 								onClick={() => deleteConfig.mutate()}
 							>
-								{deleteConfig.isPending ? t('s3ConfigPage.buttons.removing') : t('s3ConfigPage.buttons.remove')}
+								{deleteConfig.isPending
+									? t("s3ConfigPage.buttons.removing")
+									: t("s3ConfigPage.buttons.remove")}
 							</Button>
 						)}
 						<Button variant="gray" onClick={() => events.emit("test")}>
-							{testConfig.isPending ? t('s3ConfigPage.buttons.testing') : t('s3ConfigPage.buttons.test')}
+							{testConfig.isPending
+								? t("s3ConfigPage.buttons.testing")
+								: t("s3ConfigPage.buttons.test")}
 						</Button>
 					</div>
 					<Button
@@ -273,7 +288,9 @@ export default function S3ConfigPage() {
 						variant="primary"
 						onClick={() => events.emit("save")}
 					>
-						{saveConfig.isPending ? t('s3ConfigPage.buttons.saving') : t('s3ConfigPage.buttons.save')}
+						{saveConfig.isPending
+							? t("s3ConfigPage.buttons.saving")
+							: t("s3ConfigPage.buttons.save")}
 					</Button>
 				</fieldset>
 			</div>

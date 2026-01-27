@@ -399,7 +399,7 @@ export function ClipTrack(
 
 					const segmentRecording = (s = i()) =>
 						editorInstance.recordings.segments[
-						segments()[s].recordingSegment ?? 0
+							segments()[s].recordingSegment ?? 0
 						];
 
 					const marker = useSectionMarker(() => ({
@@ -689,8 +689,8 @@ export function ClipTrack(
 											const newStart =
 												initialStart +
 												(event.clientX - downEvent.clientX) *
-												secsPerPixel() *
-												seg.timescale;
+													secsPerPixel() *
+													seg.timescale;
 
 											const clampedStart = Math.min(
 												Math.max(

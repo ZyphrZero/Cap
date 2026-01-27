@@ -104,7 +104,7 @@ export default function () {
 
 	const [showStartup, showStartupActions] = createResource(() =>
 		// 每次启动都显示欢迎界面
-		Promise.resolve(true)
+		Promise.resolve(true),
 	);
 
 	const handleContinue = () => {
@@ -142,7 +142,8 @@ export default function () {
 									<li class="flex flex-row items-center gap-4">
 										<div class="flex flex-col flex-[2]">
 											<span class="font-[500] text-[0.875rem] text-[--text-primary]">
-												{permission.name()} {t("nav.license")} {/* Reusing license for Permission as it sounds okay, but maybe setup.permissions.suffix is better? No, setup.permissionsRequired covers it. Actually, setup.granted handles the button. Let's just use the name from permission.name() */}
+												{permission.name()} {t("nav.license")}{" "}
+												{/* Reusing license for Permission as it sounds okay, but maybe setup.permissions.suffix is better? No, setup.permissionsRequired covers it. Actually, setup.granted handles the button. Let's just use the name from permission.name() */}
 												{/* Wait, the original was `{permission.name} Permission`. I should add a suffix or just use the name if it's descriptive enough. In Chinese "权限" is usually appended. */}
 												{permission.name()}
 											</span>
@@ -154,7 +155,7 @@ export default function () {
 											class="flex-1 shrink-0"
 											onClick={() =>
 												permission.requiresManualGrant ||
-													permissionCheck() === "denied"
+												permissionCheck() === "denied"
 													? openSettings(permission.key)
 													: requestPermission(permission.key)
 											}
@@ -163,7 +164,7 @@ export default function () {
 											{permissionCheck() === "granted"
 												? t("setup.granted")
 												: permission.requiresManualGrant ||
-													permissionCheck() === "denied"
+														permissionCheck() === "denied"
 													? t("setup.openSettings")
 													: t("setup.grantPermission")}
 										</Button>
@@ -479,8 +480,9 @@ function Startup(props: { onClose: () => void }) {
 					{/* Floating clouds */}
 					<div
 						id="cloud-1"
-						class={`absolute top-0 right-0 opacity-70 pointer-events-none cloud-transition cloud-1 ${isExiting() ? "exiting" : ""
-							}`}
+						class={`absolute top-0 right-0 opacity-70 pointer-events-none cloud-transition cloud-1 ${
+							isExiting() ? "exiting" : ""
+						}`}
 					>
 						<img
 							class="cloud-image w-[100vw] md:w-[80vw] -mr-40"
@@ -490,8 +492,9 @@ function Startup(props: { onClose: () => void }) {
 					</div>
 					<div
 						id="cloud-2"
-						class={`absolute top-0 left-0 opacity-70 pointer-events-none cloud-transition cloud-2 ${isExiting() ? "exiting" : ""
-							}`}
+						class={`absolute top-0 left-0 opacity-70 pointer-events-none cloud-transition cloud-2 ${
+							isExiting() ? "exiting" : ""
+						}`}
 					>
 						<img
 							class="cloud-image w-[100vw] md:w-[80vw] -ml-40"
@@ -501,8 +504,9 @@ function Startup(props: { onClose: () => void }) {
 					</div>
 					<div
 						id="cloud-3"
-						class={`absolute -bottom-[15%] left-1/2 -translate-x-1/2 opacity-70 pointer-events-none cloud-transition cloud-3 ${isExiting() ? "exiting" : ""
-							}`}
+						class={`absolute -bottom-[15%] left-1/2 -translate-x-1/2 opacity-70 pointer-events-none cloud-transition cloud-3 ${
+							isExiting() ? "exiting" : ""
+						}`}
 					>
 						<img
 							class="cloud-image w-[180vw] md:w-[180vw]"
@@ -513,8 +517,9 @@ function Startup(props: { onClose: () => void }) {
 
 					{/* Main content */}
 					<div
-						class={`content-container flex flex-col items-center justify-center flex-1 relative px-4 ${isExiting() ? "exiting" : ""
-							}`}
+						class={`content-container flex flex-col items-center justify-center flex-1 relative px-4 ${
+							isExiting() ? "exiting" : ""
+						}`}
 					>
 						<div class="text-center mb-8">
 							<div

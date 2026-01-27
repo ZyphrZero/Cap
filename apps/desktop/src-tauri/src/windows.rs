@@ -325,7 +325,6 @@ impl ShowCapWindow {
                     .always_on_top(true)
                     .visible_on_all_workspaces(true)
                     .content_protected(should_protect)
-                    .center()
                     .initialization_script(format!(
                         "
                         window.__CAP__ = window.__CAP__ ?? {{}};
@@ -335,6 +334,13 @@ impl ShowCapWindow {
                             .expect("Failed to serialize initial target mode")
                     ))
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center Main window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(target_os = "macos")]
                 crate::platform::set_window_level(window.as_ref().window(), 50);
@@ -458,8 +464,14 @@ impl ShowCapWindow {
                     .min_inner_size(600.0, 465.0)
                     .resizable(true)
                     .maximized(false)
-                    .center()
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center Settings window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(windows)]
                 {
@@ -482,13 +494,24 @@ impl ShowCapWindow {
                     let _ = camera.close();
                 };
 
+                #[cfg(target_os = "macos")]
+                app.set_activation_policy(tauri::ActivationPolicy::Regular)
+                    .ok();
+
                 let window = self
                     .window_builder(app, "/editor")
                     .maximizable(true)
                     .inner_size(1275.0, 800.0)
                     .min_inner_size(1275.0, 800.0)
-                    .center()
+                    .focused(true)
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center Editor window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(windows)]
                 {
@@ -511,13 +534,24 @@ impl ShowCapWindow {
                     let _ = camera.close();
                 };
 
+                #[cfg(target_os = "macos")]
+                app.set_activation_policy(tauri::ActivationPolicy::Regular)
+                    .ok();
+
                 let window = self
                     .window_builder(app, "/screenshot-editor")
                     .maximizable(true)
                     .inner_size(1240.0, 800.0)
                     .min_inner_size(800.0, 600.0)
-                    .center()
+                    .focused(true)
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center ScreenshotEditor window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(windows)]
                 {
@@ -549,8 +583,14 @@ impl ShowCapWindow {
                     .always_on_top(true)
                     .maximized(false)
                     .shadow(true)
-                    .center()
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center Upgrade window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(windows)]
                 {
@@ -577,10 +617,16 @@ impl ShowCapWindow {
                     .resizable(false)
                     .maximized(false)
                     .maximizable(false)
-                    .center()
                     .focused(true)
                     .shadow(true)
                     .build()?;
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = window.center() {
+                        warn!("Failed to center ModeSelect window on macOS: {}", e);
+                    }
+                }
 
                 #[cfg(windows)]
                 {

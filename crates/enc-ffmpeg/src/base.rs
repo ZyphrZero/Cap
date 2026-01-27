@@ -11,6 +11,7 @@ pub struct EncoderBase {
     packet: ffmpeg::Packet,
     stream_index: usize,
     first_pts: Option<i64>,
+    last_pts: Option<i64>,
 }
 
 impl EncoderBase {
@@ -18,6 +19,7 @@ impl EncoderBase {
         Self {
             packet: Packet::empty(),
             first_pts: None,
+            last_pts: None,
             stream_index,
         }
     }
@@ -35,7 +37,19 @@ impl EncoderBase {
             let pts = (timestamp.as_secs_f64() * rate).round() as i64;
             let first_pts = self.first_pts.get_or_insert(pts);
 
-            frame.set_pts(Some(pts - *first_pts));
+            let relative_pts = pts - *first_pts;
+            
+            if let Some(last_pts) = self.last_pts {
+                if relative_pts <= last_pts {
+                    let adjusted_pts = last_pts + 1;
+                    frame.set_pts(Some(adjusted_pts));
+                    self.last_pts = Some(adjusted_pts);
+                    return;
+                }
+            }
+            
+            frame.set_pts(Some(relative_pts));
+            self.last_pts = Some(relative_pts);
         } else {
             let Some(pts) = frame.pts() else {
                 tracing::error!("Frame has no pts");
@@ -43,8 +57,19 @@ impl EncoderBase {
             };
 
             let first_pts = self.first_pts.get_or_insert(pts);
-
-            frame.set_pts(Some(pts - *first_pts));
+            let relative_pts = pts - *first_pts;
+            
+            if let Some(last_pts) = self.last_pts {
+                if relative_pts <= last_pts {
+                    let adjusted_pts = last_pts + 1;
+                    frame.set_pts(Some(adjusted_pts));
+                    self.last_pts = Some(adjusted_pts);
+                    return;
+                }
+            }
+            
+            frame.set_pts(Some(relative_pts));
+            self.last_pts = Some(relative_pts);
         }
     }
 

@@ -40,6 +40,7 @@ import {
 	createCropOptionsMenuItems,
 	type Ratio,
 } from "~/components/Cropper";
+import { t } from "~/components/I18nProvider";
 import ModeSelect from "~/components/ModeSelect";
 import SelectionHint from "~/components/selection-hint";
 import { authStore, generalSettingsStore } from "~/store";
@@ -58,7 +59,6 @@ import {
 	type ScreenCaptureTarget,
 	type TargetUnderCursor,
 } from "~/utils/tauri";
-import { t } from "~/components/I18nProvider";
 import CameraSelect from "./(window-chrome)/new-main/CameraSelect";
 import MicrophoneSelect from "./(window-chrome)/new-main/MicrophoneSelect";
 import {
@@ -254,13 +254,14 @@ function Inner() {
 								<div class="flex flex-col items-center text-white">
 									<IconCapMonitor class="size-20 mb-3" />
 									<span class="mb-2 text-3xl font-semibold">
-										{display.name || t('targetSelect.monitor')}
+										{display.name || t("targetSelect.monitor")}
 									</span>
 									<Show when={display.physical_size}>
 										{(size) => (
 											<span class="mb-2 text-xs">
-												{`${size().width}x${size().height} · ${display.refresh_rate
-													}FPS`}
+												{`${size().width}x${size().height} · ${
+													display.refresh_rate
+												}FPS`}
 											</span>
 										)}
 									</Show>
@@ -384,7 +385,7 @@ function Inner() {
 										commands.openTargetSelectOverlays(null);
 									}}
 								>
-									{t('targetSelect.adjustArea')}
+									{t("targetSelect.adjustArea")}
 								</Button>
 								<ShowCapFreeWarning
 									isInstantMode={options.mode === "instant"}
@@ -611,7 +612,7 @@ function Inner() {
 						e.preventDefault();
 						const items = [
 							{
-								text: t('targetSelect.resetSelection'),
+								text: t("targetSelect.resetSelection"),
 								action: () => {
 									cropperRef?.reset();
 									setAspect(null);
@@ -803,11 +804,17 @@ function Inner() {
 									<Show when={!isValid()}>
 										<div class="flex flex-col gap-1 items-center p-2.5 my-2 rounded-xl border min-w-fit w-fit bg-red-2 shadow-sm border-red-4 text-sm">
 											<p>
-												{t('targetSelect.minSize', { width: minSize().width, height: minSize().height })}
+												{t("targetSelect.minSize", {
+													width: minSize().width,
+													height: minSize().height,
+												})}
 											</p>
 											<small>
 												<code>
-													{t('targetSelect.tooSmall', { width: crop().width, height: crop().height })}
+													{t("targetSelect.tooSmall", {
+														width: crop().width,
+														height: crop().height,
+													})}
 												</code>{" "}
 											</small>
 										</div>
@@ -876,7 +883,7 @@ function RecordingControls(props: {
 		await Menu.new({
 			items: [
 				await CheckMenuItem.new({
-					text: t('targetSelect.modes.studio'),
+					text: t("targetSelect.modes.studio"),
 					action: () => {
 						setOptions("mode", "studio");
 						commands.setRecordingMode("studio");
@@ -884,7 +891,7 @@ function RecordingControls(props: {
 					checked: rawOptions.mode === "studio",
 				}),
 				await CheckMenuItem.new({
-					text: t('targetSelect.modes.instant'),
+					text: t("targetSelect.modes.instant"),
 					action: () => {
 						setOptions("mode", "instant");
 						commands.setRecordingMode("instant");
@@ -892,7 +899,7 @@ function RecordingControls(props: {
 					checked: rawOptions.mode === "instant",
 				}),
 				await CheckMenuItem.new({
-					text: t('targetSelect.modes.screenshot'),
+					text: t("targetSelect.modes.screenshot"),
 					action: () => {
 						setOptions("mode", "screenshot");
 						commands.setRecordingMode("screenshot");
@@ -904,24 +911,24 @@ function RecordingControls(props: {
 
 	const countdownItems = async () => [
 		await CheckMenuItem.new({
-			text: t('targetSelect.countdown.off'),
+			text: t("targetSelect.countdown.off"),
 			action: () => generalSettingsStore.set({ recordingCountdown: 0 }),
 			checked:
 				!generalSetings.data?.recordingCountdown ||
 				generalSetings.data?.recordingCountdown === 0,
 		}),
 		await CheckMenuItem.new({
-			text: t('targetSelect.countdown.3s'),
+			text: t("targetSelect.countdown.3s"),
 			action: () => generalSettingsStore.set({ recordingCountdown: 3 }),
 			checked: generalSetings.data?.recordingCountdown === 3,
 		}),
 		await CheckMenuItem.new({
-			text: t('targetSelect.countdown.5s'),
+			text: t("targetSelect.countdown.5s"),
 			action: () => generalSettingsStore.set({ recordingCountdown: 5 }),
 			checked: generalSetings.data?.recordingCountdown === 5,
 		}),
 		await CheckMenuItem.new({
-			text: t('targetSelect.countdown.10s'),
+			text: t("targetSelect.countdown.10s"),
 			action: () => generalSettingsStore.set({ recordingCountdown: 10 }),
 			checked: generalSetings.data?.recordingCountdown === 10,
 		}),
@@ -931,7 +938,7 @@ function RecordingControls(props: {
 		return await Menu.new({
 			items: [
 				await MenuItem.new({
-					text: t('targetSelect.countdown.title'),
+					text: t("targetSelect.countdown.title"),
 					enabled: false,
 				}),
 				...(await countdownItems()),
@@ -1033,8 +1040,8 @@ function RecordingControls(props: {
 									<span class="text-[0.95rem] font-medium text-white text-nowrap">
 										{(() => {
 											if (rawOptions.mode === "screenshot")
-												return t('targetSelect.actions.takeScreenshot');
-											return t('targetSelect.actions.startRecording');
+												return t("targetSelect.actions.takeScreenshot");
+											return t("targetSelect.actions.startRecording");
 										})()}
 									</span>
 									<span class="text-[11px] flex items-center text-nowrap gap-1 transition-opacity duration-200 text-white/90 font-light -mt-0.5">
@@ -1097,7 +1104,9 @@ function RecordingControls(props: {
 				>
 					<IconCapInfo class="opacity-70 will-change-transform size-3" />
 					<p class="text-sm text-white drop-shadow-md">
-						{t('targetSelect.whatIsMode', { mode: t(`targetSelect.modes.${rawOptions.mode}` as any) })}
+						{t("targetSelect.whatIsMode", {
+							mode: t(`targetSelect.modes.${rawOptions.mode}` as any),
+						})}
 					</p>
 				</div>
 			</div>

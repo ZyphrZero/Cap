@@ -6,6 +6,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import { createEffect, createMemo, onCleanup, Show, Suspense } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import IconCapCrop from "~icons/cap/crop";
 import IconCapTrash from "~icons/cap/trash";
@@ -21,7 +22,6 @@ import { BorderPopover } from "./popovers/BorderPopover";
 import { PaddingPopover } from "./popovers/PaddingPopover";
 import { RoundingPopover } from "./popovers/RoundingPopover";
 import { ShadowPopover } from "./popovers/ShadowPopover";
-import { t } from "~/components/I18nProvider";
 
 import {
 	DropdownItem,
@@ -182,9 +182,7 @@ export function Header() {
 									<DropdownItem
 										onSelect={async () => {
 											if (
-												await ask(
-													t("screenshotEditor.header.confirmDelete"),
-												)
+												await ask(t("screenshotEditor.header.confirmDelete"))
 											) {
 												await remove(path());
 												await getCurrentWindow().close();

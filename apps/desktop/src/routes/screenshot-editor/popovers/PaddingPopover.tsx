@@ -23,7 +23,9 @@ export function PaddingPopover() {
 			<Popover.Portal>
 				<Popover.Content class="z-50 w-[200px] overflow-hidden rounded-xl border border-gray-3 bg-gray-1 shadow-xl animate-in fade-in zoom-in-95 p-4">
 					<div class="flex flex-col gap-2">
-						<span class="text-xs font-medium text-gray-11">{t("screenshotEditor.config.padding")}</span>
+						<span class="text-xs font-medium text-gray-11">
+							{t("screenshotEditor.config.padding")}
+						</span>
 						<Slider
 							value={[project.background.padding]}
 							onChange={(v) => setProject("background", "padding", v[0])}

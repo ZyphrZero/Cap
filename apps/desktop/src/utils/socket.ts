@@ -27,6 +27,24 @@ const FRAME_BUFFER_CONFIG: SharedFrameBufferConfig = {
 let mainThreadNv12Buffer: Uint8ClampedArray | null = null;
 let mainThreadNv12BufferSize = 0;
 
+export type FpsStats = {
+	fps: number;
+	renderFps: number;
+	avgFrameMs: number;
+	minFrameMs: number;
+	maxFrameMs: number;
+	mbPerSec: number;
+};
+
+let globalFpsStatsGetter: (() => FpsStats) | null = null;
+
+export function getFpsStats(): FpsStats | null {
+	if (globalFpsStatsGetter) {
+		return globalFpsStatsGetter();
+	}
+	return null;
+}
+
 function convertNv12ToRgbaMainThread(
 	nv12Data: Uint8ClampedArray,
 	width: number,
@@ -92,6 +110,7 @@ export type CanvasControls = {
 	hasRenderedFrame: () => boolean;
 	initDirectCanvas: (canvas: HTMLCanvasElement) => void;
 	resetFrameState: () => void;
+	captureFrame: () => Promise<Blob | null>;
 };
 
 interface ReadyMessage {
@@ -190,6 +209,44 @@ export function createImageDataWS(
 	let mainThreadWebGPUInitializing = false;
 	let pendingNv12Frame: ArrayBuffer | null = null;
 
+	let lastRenderedFrameData: {
+		data: Uint8ClampedArray;
+		width: number;
+		height: number;
+		yStride: number;
+		isNv12: boolean;
+	} | null = null;
+
+	function storeRenderedFrame(
+		frameData: Uint8ClampedArray,
+		width: number,
+		height: number,
+		yStride: number,
+		isNv12: boolean,
+	) {
+		if (
+			lastRenderedFrameData &&
+			lastRenderedFrameData.data.length === frameData.length
+		) {
+			lastRenderedFrameData.data.set(frameData);
+			lastRenderedFrameData.width = width;
+			lastRenderedFrameData.height = height;
+			lastRenderedFrameData.yStride = yStride;
+			lastRenderedFrameData.isNv12 = isNv12;
+		} else {
+			lastRenderedFrameData = {
+				data: new Uint8ClampedArray(frameData),
+				width,
+				height,
+				yStride,
+				isNv12,
+			};
+		}
+		if (!hasRenderedFrame()) {
+			setHasRenderedFrame(true);
+		}
+	}
+
 	function cleanup() {
 		if (isCleanedUp) return;
 		isCleanedUp = true;
@@ -224,6 +281,8 @@ export function createImageDataWS(
 		cachedStrideImageData = null;
 		cachedStrideWidth = 0;
 		cachedStrideHeight = 0;
+
+		lastRenderedFrameData = null;
 
 		setIsConnected(false);
 	}
@@ -266,9 +325,7 @@ export function createImageDataWS(
 				yStride,
 			);
 
-			if (!hasRenderedFrame()) {
-				setHasRenderedFrame(true);
-			}
+			storeRenderedFrame(frameData, width, height, yStride, true);
 			onmessage({ width, height });
 		}
 	}
@@ -309,12 +366,14 @@ export function createImageDataWS(
 				height,
 				yStride,
 			);
-			const imageData = new ImageData(rgba, width, height);
+			const imageData = new ImageData(
+				new Uint8ClampedArray(rgba),
+				width,
+				height,
+			);
 			directCtx.putImageData(imageData, 0, 0);
 
-			if (!hasRenderedFrame()) {
-				setHasRenderedFrame(true);
-			}
+			storeRenderedFrame(frameData, width, height, yStride, true);
 			onmessage({ width, height });
 		}
 	}
@@ -399,14 +458,42 @@ export function createImageDataWS(
 				cachedStrideImageData.data.set(frameData);
 				directCtx.putImageData(cachedStrideImageData, 0, 0);
 
-				if (!hasRenderedFrame()) {
-					setHasRenderedFrame(true);
-				}
+				storeRenderedFrame(
+					cachedStrideImageData.data,
+					width,
+					height,
+					width * 4,
+					false,
+				);
 				onmessage({ width, height });
 			};
 		},
 		resetFrameState: () => {
 			worker.postMessage({ type: "reset-frame-state" });
+		},
+		captureFrame: async () => {
+			if (!lastRenderedFrameData) {
+				return null;
+			}
+			const { data, width, height, yStride, isNv12 } = lastRenderedFrameData;
+			let imageData: ImageData;
+			if (isNv12) {
+				const rgba = convertNv12ToRgbaMainThread(data, width, height, yStride);
+				imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
+			} else {
+				imageData = new ImageData(new Uint8ClampedArray(data), width, height);
+			}
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				return null;
+			}
+			ctx.putImageData(imageData, 0, 0);
+			return new Promise<Blob | null>((resolve) => {
+				canvas.toBlob((blob) => resolve(blob), "image/png");
+			});
 		},
 	};
 
@@ -503,7 +590,7 @@ export function createImageDataWS(
 	let minFrameTime = Number.MAX_VALUE;
 	let maxFrameTime = 0;
 
-	const getFpsStats = () => ({
+	const getLocalFpsStats = (): FpsStats => ({
 		fps:
 			frameCount > 0 && frameTimeSum > 0
 				? 1000 / (frameTimeSum / frameCount)
@@ -515,7 +602,8 @@ export function createImageDataWS(
 		mbPerSec: totalBytesReceived / 1_000_000,
 	});
 
-	(globalThis as Record<string, unknown>).__capFpsStats = getFpsStats;
+	globalFpsStatsGetter = getLocalFpsStats;
+	(globalThis as Record<string, unknown>).__capFpsStats = getLocalFpsStats;
 
 	const NV12_MAGIC = 0x4e563132;
 
@@ -600,9 +688,7 @@ export function createImageDataWS(
 					actualRendersCount++;
 					renderFrameCount++;
 
-					if (!hasRenderedFrame()) {
-						setHasRenderedFrame(true);
-					}
+					storeRenderedFrame(frameData, width, height, yStride, true);
 					onmessage({ width, height });
 				}
 				return;
@@ -675,12 +761,11 @@ export function createImageDataWS(
 					}
 					cachedDirectImageData.data.set(rgbaData);
 					directCtx.putImageData(cachedDirectImageData, 0, 0);
+
+					storeRenderedFrame(nv12Data, width, height, yStride, true);
 					actualRendersCount++;
 					renderFrameCount++;
 
-					if (!hasRenderedFrame()) {
-						setHasRenderedFrame(true);
-					}
 					onmessage({ width, height });
 				}
 				return;
@@ -761,11 +846,16 @@ export function createImageDataWS(
 						}
 						cachedDirectImageData.data.set(frameData);
 						directCtx.putImageData(cachedDirectImageData, 0, 0);
+
+						storeRenderedFrame(
+							cachedDirectImageData.data,
+							width,
+							height,
+							width * 4,
+							false,
+						);
 						renderFrameCount++;
 
-						if (!hasRenderedFrame()) {
-							setHasRenderedFrame(true);
-						}
 						onmessage({ width, height });
 					} else {
 						strideWorker.postMessage(

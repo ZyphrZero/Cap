@@ -206,59 +206,106 @@ impl FfmpegDecoder {
             };
             let _ = ready_tx.send(Ok(init_result));
 
-            while let Ok(r) = rx.recv() {
+            loop {
+                let r = match rx.try_recv() {
+                    Ok(msg) => Some(msg),
+                    Err(mpsc::TryRecvError::Empty) => {
+                        match rx.recv() {
+                            Ok(msg) => Some(msg),
+                            Err(_) => break,
+                        }
+                    }
+                    Err(mpsc::TryRecvError::Disconnected) => break,
+                };
+
+                let r = match r {
+                    Some(msg) => msg,
+                    None => continue,
+                };
+
                 match r {
                     VideoDecoderMessage::GetFrame(requested_time, sender) => {
                         if sender.is_closed() {
                             continue;
                         }
 
-                        let requested_frame = (requested_time * fps as f32).floor() as u32;
-                        // sender.send(black_frame.clone()).ok();
-                        // continue;
+                        let mut latest_time = requested_time;
+                        let mut latest_sender = sender;
 
-                        let mut sender = if let Some(cached) = cache.get_mut(&requested_frame) {
+                        let fallback_frame = last_sent_frame
+                            .borrow()
+                            .as_ref()
+                            .map(|f| f.to_decoded_frame())
+                            .or_else(|| {
+                                first_ever_frame
+                                    .borrow()
+                                    .as_ref()
+                                    .map(|f| f.to_decoded_frame())
+                            })
+                            .unwrap_or_else(|| {
+                                DecodedFrame::new(
+                                    vec![0u8; (video_width * video_height * 4) as usize],
+                                    video_width,
+                                    video_height,
+                                )
+                            });
+
+                        while let Ok(VideoDecoderMessage::GetFrame(new_time, new_sender)) =
+                            rx.try_recv()
+                        {
+                            if !new_sender.is_closed() {
+                                let prev_sender = latest_sender;
+                                let _ = prev_sender.send(fallback_frame.clone());
+                                latest_time = new_time;
+                                latest_sender = new_sender;
+                            }
+                        }
+
+                        let requested_frame = (latest_time * fps as f32).floor() as u32;
+                        let mut respond_sender = Some(latest_sender);
+
+                        if let Some(cached) = cache.get_mut(&requested_frame) {
                             let data = cached.process(&mut converter);
 
-                            if sender.send(data.to_decoded_frame()).is_err() {
-                                log::warn!(
-                                    "Failed to send cached frame {requested_frame}: receiver dropped"
-                                );
+                            if let Some(sender) = respond_sender.take() {
+                                if sender.send(data.to_decoded_frame()).is_err() {
+                                    tracing::debug!(
+                                        "Failed to send cached frame {requested_frame}: receiver dropped"
+                                    );
+                                }
                             }
                             *last_sent_frame.borrow_mut() = Some(data);
                             continue;
-                        } else {
-                            let last_sent_frame = last_sent_frame.clone();
-                            Some(move |data: ProcessedFrame| {
-                                let frame_number = data.number;
-                                *last_sent_frame.borrow_mut() = Some(data.clone());
-                                if sender.send(data.to_decoded_frame()).is_err() {
-                                    log::warn!(
-                                        "Failed to send decoded frame {frame_number}: receiver dropped"
-                                    );
-                                }
-                            })
-                        };
+                        }
 
                         let cache_min = requested_frame.saturating_sub(FRAME_CACHE_SIZE as u32 / 2);
                         let cache_max = requested_frame + FRAME_CACHE_SIZE as u32 / 2;
 
-                        if requested_frame == 0
+                        let needs_seek = requested_frame == 0
                             || last_sent_frame
                                 .borrow()
                                 .as_ref()
                                 .map(|last| {
-                                    requested_frame < last.number
-                                        || requested_frame - last.number > FRAME_CACHE_SIZE as u32
+                                    requested_frame < last.number.saturating_sub(5)
+                                        || requested_frame > last.number + FRAME_CACHE_SIZE as u32
                                 })
-                                .unwrap_or(true)
-                        {
+                                .unwrap_or(true);
+
+                        if needs_seek {
                             debug!("seeking to {requested_frame}");
 
-                            let _ = this.reset(requested_time);
+                            let _ = this.reset(latest_time);
                             frames = this.frames();
                             *last_sent_frame.borrow_mut() = None;
-                            cache.clear();
+                            
+                            let keys_to_remove: Vec<u32> = cache
+                                .keys()
+                                .filter(|&k| *k < cache_min || *k > cache_max)
+                                .copied()
+                                .collect();
+                            for key in keys_to_remove {
+                                cache.remove(&key);
+                            }
                         }
 
                         last_active_frame = Some(requested_frame);
@@ -291,8 +338,17 @@ impl FfmpegDecoder {
                             if let Some(most_recent_prev_frame) =
                                 cache.iter_mut().rev().find(|v| *v.0 < requested_frame)
                             {
-                                if let Some(sender) = sender.take() {
-                                    (sender)(most_recent_prev_frame.1.process(&mut converter));
+                                if respond_sender.is_some() {
+                                    let data =
+                                        most_recent_prev_frame.1.process(&mut converter);
+                                    if let Some(sender) = respond_sender.take() {
+                                        if sender.send(data.to_decoded_frame()).is_err() {
+                                            tracing::debug!(
+                                                "Failed to send decoded frame {requested_frame}: receiver dropped"
+                                            );
+                                        }
+                                    }
+                                    *last_sent_frame.borrow_mut() = Some(data);
                                 }
                             }
 
@@ -301,11 +357,16 @@ impl FfmpegDecoder {
 
                             let cache_frame = if !too_small_for_cache_bounds {
                                 if current_frame == requested_frame {
-                                    if let Some(sender) = sender.take() {
+                                    if respond_sender.is_some() {
                                         let data = cache_frame.process(&mut converter);
-                                        // info!("sending frame {requested_frame}");
-
-                                        (sender)(data);
+                                        if let Some(sender) = respond_sender.take() {
+                                            if sender.send(data.to_decoded_frame()).is_err() {
+                                                tracing::debug!(
+                                                    "Failed to send decoded frame {requested_frame}: receiver dropped"
+                                                );
+                                            }
+                                        }
+                                        *last_sent_frame.borrow_mut() = Some(data);
 
                                         break;
                                     }
@@ -336,25 +397,25 @@ impl FfmpegDecoder {
                                 &mut cache_frame
                             };
 
-                            if current_frame > requested_frame && sender.is_some() {
-                                // not inlining this is important so that last_sent_frame is dropped before the sender is invoked
-                                let last_sent_frame = last_sent_frame.borrow().clone();
+                            if current_frame > requested_frame && respond_sender.is_some() {
+                                let last_sent_frame_clone = last_sent_frame.borrow().clone();
 
-                                if let Some((sender, last_sent_frame)) =
-                                    last_sent_frame.and_then(|l| Some((sender.take()?, l)))
+                                let data_to_send = if let Some(last_sent_frame_data) =
+                                    last_sent_frame_clone
                                 {
-                                    // info!(
-                                    //     "sending previous frame {} for {requested_frame}",
-                                    //     last_sent_frame.0
-                                    // );
+                                    last_sent_frame_data.to_decoded_frame()
+                                } else {
+                                    let data = cache_frame.process(&mut converter);
+                                    *last_sent_frame.borrow_mut() = Some(data.clone());
+                                    data.to_decoded_frame()
+                                };
 
-                                    (sender)(last_sent_frame);
-                                } else if let Some(sender) = sender.take() {
-                                    // info!(
-                                    //     "sending forward frame {current_frame} for {requested_frame}",
-                                    // );
-
-                                    (sender)(cache_frame.process(&mut converter));
+                                if let Some(sender) = respond_sender.take() {
+                                    if sender.send(data_to_send).is_err() {
+                                        tracing::debug!(
+                                            "Failed to send frame for {requested_frame}: receiver dropped"
+                                        );
+                                    }
                                 }
                             }
 
@@ -365,31 +426,36 @@ impl FfmpegDecoder {
                             }
                         }
 
-                        let last_sent_frame = last_sent_frame.borrow().clone();
-                        if let Some(sender) = sender.take() {
-                            if let Some(last_sent_frame) = last_sent_frame {
-                                (sender)(last_sent_frame);
+                        if respond_sender.is_some() {
+                            let last_sent_frame_clone = last_sent_frame.borrow().clone();
+                            let fallback = if let Some(last_sent_frame_data) = last_sent_frame_clone
+                            {
+                                Some(last_sent_frame_data.to_decoded_frame())
                             } else if let Some(first_frame) = first_ever_frame.borrow().clone() {
                                 debug!(
                                     "Returning first decoded frame as fallback for request {requested_frame}"
                                 );
-                                (sender)(first_frame);
+                                Some(first_frame.to_decoded_frame())
                             } else {
                                 debug!(
                                     "No frames available for request {requested_frame}, sending black frame"
                                 );
                                 let black_frame_data =
                                     vec![0u8; (video_width * video_height * 4) as usize];
-                                let black_frame = ProcessedFrame {
-                                    number: requested_frame,
-                                    data: Arc::new(black_frame_data),
-                                    width: video_width,
-                                    height: video_height,
-                                    format: PixelFormat::Rgba,
-                                    y_stride: video_width * 4,
-                                    uv_stride: 0,
-                                };
-                                (sender)(black_frame);
+                                let black_frame = DecodedFrame::new(
+                                    black_frame_data,
+                                    video_width,
+                                    video_height,
+                                );
+                                Some(black_frame)
+                            };
+
+                            if let (Some(sender), Some(frame)) = (respond_sender.take(), fallback) {
+                                if sender.send(frame).is_err() {
+                                    tracing::debug!(
+                                        "Failed to send fallback frame for {requested_frame}: receiver dropped"
+                                    );
+                                }
                             }
                         }
                     }

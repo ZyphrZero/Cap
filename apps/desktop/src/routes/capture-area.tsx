@@ -19,16 +19,16 @@ import {
 	createCropOptionsMenuItems,
 	type Ratio,
 } from "~/components/Cropper";
+import { t } from "~/components/I18nProvider";
 import SelectionHint from "~/components/selection-hint";
 import { createOptionsQuery } from "~/utils/queries";
 import type { DisplayId } from "~/utils/tauri";
 import { emitTo } from "~/utils/tauriSpectaHack";
-import IconLucideExpand from "~icons/lucide/expand";
 import IconLucideCheck from "~icons/lucide/check";
+import IconLucideExpand from "~icons/lucide/expand";
+import IconLucideRatio from "~icons/lucide/ratio";
 import IconLucideRotateCcw from "~icons/lucide/rotate-ccw";
 import IconLucideX from "~icons/lucide/x";
-import IconLucideRatio from "~icons/lucide/ratio";
-import { t } from "~/components/I18nProvider";
 
 const MIN_SIZE = { width: 150, height: 150 };
 
@@ -268,7 +268,9 @@ export default function CaptureArea() {
 											}}
 										>
 											<IconLucideCheck class="size-5 *:pointer-events-none" />
-											<span class="font-medium text-sm">{t("recording.captureArea.confirm")}</span>
+											<span class="font-medium text-sm">
+												{t("recording.captureArea.confirm")}
+											</span>
 										</div>
 									</button>
 								</div>
@@ -278,7 +280,10 @@ export default function CaptureArea() {
 				</Transition>
 			</div>
 
-			<SelectionHint show={showSelectionHint()} message={t("recording.captureArea.selectionHint")} />
+			<SelectionHint
+				show={showSelectionHint()}
+				message={t("recording.captureArea.selectionHint")}
+			/>
 
 			<Transition
 				appear

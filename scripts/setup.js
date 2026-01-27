@@ -152,27 +152,27 @@ async function main() {
 
 		// Try to find LLVM - first check Visual Studio, then standalone installation
 		let libclangPath = "";
-		
+
 		try {
 			const { stdout: vcInstallDir } = await exec(
 				// biome-ignore lint/suspicious/noTemplateCurlyInString: PowerShell syntax, not JS template literal
 				'$(& "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath)',
 				{ shell: "powershell.exe" },
 			);
-			
+
 			const vsLlvmPath = path.join(
 				vcInstallDir.trim(),
 				"VC/Tools/LLVM/x64/bin/libclang.dll",
 			);
-			
-			if (vcInstallDir.trim() && await fileExists(vsLlvmPath)) {
+
+			if (vcInstallDir.trim() && (await fileExists(vsLlvmPath))) {
 				libclangPath = vsLlvmPath;
 				console.log("Found LLVM in Visual Studio");
 			}
 		} catch (e) {
 			// Visual Studio not found, will try standalone LLVM
 		}
-		
+
 		// Fallback to standalone LLVM installation
 		if (!libclangPath) {
 			const standaloneLlvm = "C:/Program Files/LLVM/bin";
@@ -180,7 +180,9 @@ async function main() {
 				libclangPath = standaloneLlvm;
 				console.log("Found standalone LLVM installation");
 			} else {
-				console.warn("WARNING: LLVM not found! Please install LLVM or Visual Studio with C++ tools.");
+				console.warn(
+					"WARNING: LLVM not found! Please install LLVM or Visual Studio with C++ tools.",
+				);
 				libclangPath = standaloneLlvm; // Use default path anyway
 			}
 		}

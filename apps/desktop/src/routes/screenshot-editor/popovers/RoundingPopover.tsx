@@ -2,9 +2,9 @@ import { Popover } from "@kobalte/core/popover";
 import { Select as KSelect } from "@kobalte/core/select";
 import { cx } from "cva";
 import { Show, type ValidComponent } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import IconCapChevronDown from "~icons/cap/chevron-down";
 import IconCapCorners from "~icons/cap/corners";
-import { t } from "~/components/I18nProvider";
 import { useScreenshotEditorContext } from "../context";
 import {
 	EditorButton,
@@ -16,10 +16,17 @@ import {
 } from "../ui";
 
 export type CornerRoundingType = "rounded" | "squircle";
-const CORNER_STYLE_OPTIONS = () => [
-	{ name: t("screenshotEditor.appearance.rounding.cornerStyle.squircle"), value: "squircle" },
-	{ name: t("screenshotEditor.appearance.rounding.cornerStyle.rounded"), value: "rounded" },
-] satisfies Array<{ name: string; value: CornerRoundingType }>;
+const CORNER_STYLE_OPTIONS = () =>
+	[
+		{
+			name: t("screenshotEditor.appearance.rounding.cornerStyle.squircle"),
+			value: "squircle",
+		},
+		{
+			name: t("screenshotEditor.appearance.rounding.cornerStyle.rounded"),
+			value: "rounded",
+		},
+	] satisfies Array<{ name: string; value: CornerRoundingType }>;
 
 export function RoundingPopover() {
 	const { project, setProject, activePopover, setActivePopover } =
@@ -54,7 +61,9 @@ export function RoundingPopover() {
 							/>
 						</div>
 						<CornerStyleSelect
-							label={t("screenshotEditor.appearance.rounding.cornerStyle.label")}
+							label={t(
+								"screenshotEditor.appearance.rounding.cornerStyle.label",
+							)}
 							value={project.background.roundingType || "squircle"}
 							onChange={(v) => setProject("background", "roundingType", v)}
 						/>
@@ -85,9 +94,7 @@ function CornerStyleSelect(props: {
 				options={options()}
 				optionValue="value"
 				optionTextValue="name"
-				value={options().find(
-					(option) => option.value === props.value,
-				)}
+				value={options().find((option) => option.value === props.value)}
 				onChange={(option) => option && props.onChange(option.value)}
 				disallowEmptySelection
 				itemComponent={(itemProps) => (

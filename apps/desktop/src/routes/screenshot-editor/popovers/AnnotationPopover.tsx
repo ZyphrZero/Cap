@@ -1,11 +1,11 @@
 import { Popover } from "@kobalte/core/popover";
 import { createMemo, For, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { Toggle } from "~/components/Toggle";
 import IconLucidePencil from "~icons/lucide/pencil";
 import IconLucideTrash from "~icons/lucide/trash-2";
 import { BACKGROUND_COLORS, hexToRgb, RgbInput } from "../ColorPicker";
 import { type Annotation, useScreenshotEditorContext } from "../context";
-import { t } from "~/components/I18nProvider";
 import { EditorButton, Slider } from "../ui";
 
 export function AnnotationPopover() {
@@ -89,63 +89,63 @@ export function AnnotationPopover() {
 
 									{(annotation().type === "rectangle" ||
 										annotation().type === "circle") && (
-											<div class="flex flex-col gap-2">
-												<div class="flex flex-row justify-between items-center">
-													<span class="text-xs font-medium text-gray-11">
-														{t("screenshotEditor.annotation.fillColor")}
-													</span>
-													<Toggle
-														size="sm"
-														checked={annotation().fillColor !== "transparent"}
-														onChange={(checked) =>
+										<div class="flex flex-col gap-2">
+											<div class="flex flex-row justify-between items-center">
+												<span class="text-xs font-medium text-gray-11">
+													{t("screenshotEditor.annotation.fillColor")}
+												</span>
+												<Toggle
+													size="sm"
+													checked={annotation().fillColor !== "transparent"}
+													onChange={(checked) =>
+														updateSelected(
+															"fillColor",
+															checked ? "#000000" : "transparent",
+														)
+													}
+												/>
+											</div>
+
+											{annotation().fillColor !== "transparent" && (
+												<>
+													<RgbInput
+														value={
+															(hexToRgb(
+																annotation().fillColor === "transparent"
+																	? "#000000"
+																	: annotation().fillColor,
+															)?.slice(0, 3) as [number, number, number]) || [
+																0, 0, 0,
+															]
+														}
+														onChange={(rgb) =>
 															updateSelected(
 																"fillColor",
-																checked ? "#000000" : "transparent",
+																`#${rgb
+																	.map((c) => c.toString(16).padStart(2, "0"))
+																	.join("")
+																	.toUpperCase()}`,
 															)
 														}
 													/>
-												</div>
-
-												{annotation().fillColor !== "transparent" && (
-													<>
-														<RgbInput
-															value={
-																(hexToRgb(
-																	annotation().fillColor === "transparent"
-																		? "#000000"
-																		: annotation().fillColor,
-																)?.slice(0, 3) as [number, number, number]) || [
-																	0, 0, 0,
-																]
-															}
-															onChange={(rgb) =>
-																updateSelected(
-																	"fillColor",
-																	`#${rgb
-																		.map((c) => c.toString(16).padStart(2, "0"))
-																		.join("")
-																		.toUpperCase()}`,
-																)
-															}
-														/>
-														<div class="flex flex-wrap gap-2 mt-1">
-															<For each={BACKGROUND_COLORS.slice(0, 8)}>
-																{(color) => (
-																	<button
-																		type="button"
-																		class="size-5 rounded-full border border-gray-4 hover:scale-110 transition-transform"
-																		style={{ background: color }}
-																		onClick={() =>
-																			updateSelected("fillColor", color)
-																		}
-																	/>
-																)}
-															</For>
-														</div>
-													</>
-												)}
-											</div>
-										)}
+													<div class="flex flex-wrap gap-2 mt-1">
+														<For each={BACKGROUND_COLORS.slice(0, 8)}>
+															{(color) => (
+																<button
+																	type="button"
+																	class="size-5 rounded-full border border-gray-4 hover:scale-110 transition-transform"
+																	style={{ background: color }}
+																	onClick={() =>
+																		updateSelected("fillColor", color)
+																	}
+																/>
+															)}
+														</For>
+													</div>
+												</>
+											)}
+										</div>
+									)}
 
 									<div class="flex flex-col gap-2">
 										<span class="text-xs font-medium text-gray-11">

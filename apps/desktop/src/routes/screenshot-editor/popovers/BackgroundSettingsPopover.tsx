@@ -27,12 +27,13 @@ import { useScreenshotEditorContext } from "../context";
 import { EditorButton, Field, Slider } from "../ui";
 
 // Constants
-const BACKGROUND_SOURCES = () => ({
-	wallpaper: t("screenshotEditor.background.sources.wallpaper"),
-	image: t("screenshotEditor.background.sources.image"),
-	color: t("screenshotEditor.background.sources.color"),
-	gradient: t("screenshotEditor.background.sources.gradient"),
-} satisfies Record<BackgroundSource["type"], string>);
+const BACKGROUND_SOURCES = () =>
+	({
+		wallpaper: t("screenshotEditor.background.sources.wallpaper"),
+		image: t("screenshotEditor.background.sources.image"),
+		color: t("screenshotEditor.background.sources.color"),
+		gradient: t("screenshotEditor.background.sources.gradient"),
+	}) satisfies Record<BackgroundSource["type"], string>;
 
 const BACKGROUND_SOURCES_LIST = [
 	"wallpaper",
@@ -171,17 +172,14 @@ export function BackgroundSettingsPopover() {
 		setProject("background", "source", source);
 	};
 
-	// Debounced set project for history
-	const debouncedSetProject = (wallpaperPath: string) => {
+	const setWallpaperSource = (wallpaperPath: string) => {
 		const resumeHistory = projectHistory.pause();
-		queueMicrotask(() => {
-			batch(() => {
-				setProject("background", "source", {
-					type: "wallpaper",
-					path: wallpaperPath,
-				} as const);
-				resumeHistory();
-			});
+		batch(() => {
+			setProject("background", "source", {
+				type: "wallpaper",
+				path: wallpaperPath,
+			} as const);
+			resumeHistory();
 		});
 	};
 
@@ -292,7 +290,9 @@ export function BackgroundSettingsPopover() {
 													<KTabs.Trigger
 														onClick={() =>
 															setBackgroundTab(
-																key as keyof ReturnType<typeof BACKGROUND_THEMES>,
+																key as keyof ReturnType<
+																	typeof BACKGROUND_THEMES
+																>,
 															)
 														}
 														value={key}
@@ -309,10 +309,10 @@ export function BackgroundSettingsPopover() {
 										value={
 											project.background.source.type === "wallpaper"
 												? (wallpapers()?.find((w) =>
-													(
-														project.background.source as { path?: string }
-													).path?.includes(w.id),
-												)?.url ?? undefined)
+														(
+															project.background.source as { path?: string }
+														).path?.includes(w.id),
+													)?.url ?? undefined)
 												: undefined
 										}
 										onChange={(photoUrl) => {
@@ -320,7 +320,7 @@ export function BackgroundSettingsPopover() {
 												(w) => w.url === photoUrl,
 											);
 											if (wallpaper) {
-												debouncedSetProject(wallpaper.rawPath);
+												setWallpaperSource(wallpaper.rawPath);
 												ensurePaddingForBackground();
 											}
 										}}
@@ -526,7 +526,10 @@ export function BackgroundSettingsPopover() {
 							</KTabs>
 						</Field>
 
-						<Field name={t("screenshotEditor.background.blur")} icon={<IconCapBgBlur />}>
+						<Field
+							name={t("screenshotEditor.background.blur")}
+							icon={<IconCapBgBlur />}
+						>
 							<Slider
 								value={[project.background.blur]}
 								onChange={(v) => setProject("background", "blur", v[0])}

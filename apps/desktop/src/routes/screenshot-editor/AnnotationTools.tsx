@@ -1,5 +1,6 @@
 import { cx } from "cva";
 import type { Component } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import Tooltip from "~/components/Tooltip";
 import IconLucideArrowUpRight from "~icons/lucide/arrow-up-right";
 import IconLucideCircle from "~icons/lucide/circle";
@@ -8,7 +9,6 @@ import IconLucideLayers from "~icons/lucide/layers";
 import IconLucideMousePointer2 from "~icons/lucide/mouse-pointer-2";
 import IconLucideSquare from "~icons/lucide/square";
 import IconLucideType from "~icons/lucide/type";
-import { t } from "~/components/I18nProvider";
 import { type AnnotationType, useScreenshotEditorContext } from "./context";
 
 export function AnnotationTools() {
@@ -61,7 +61,12 @@ export function AnnotationTools() {
 				label={t("screenshotEditor.tools.circle")}
 				shortcut="C"
 			/>
-			<ToolButton tool="text" icon={IconLucideType} label={t("screenshotEditor.tools.text")} shortcut="T" />
+			<ToolButton
+				tool="text"
+				icon={IconLucideType}
+				label={t("screenshotEditor.tools.text")}
+				shortcut="T"
+			/>
 		</div>
 	);
 }

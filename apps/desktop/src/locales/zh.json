@@ -1,1133 +1,1134 @@
 {
-  "common": {
-    "back": "返回",
-    "search": "搜索",
-    "noResults": "没有找到结果",
-    "settings": "设置",
-    "general": "通用",
-    "appearance": "外观",
-    "system": "系统",
-    "light": "浅色",
-    "dark": "深色",
-    "select": "选择",
-    "cancel": "取消",
-    "save": "保存",
-    "delete": "删除",
-    "confirm": "确认",
-    "yes": "是",
-    "no": "否",
-    "close": "关闭",
-    "done": "完成",
-    "loading": "加载中...",
-    "error": "错误",
-    "success": "成功",
-    "warning": "警告",
-    "info": "信息",
-    "reset": "重置",
-    "size": "大小",
-    "position": "位置",
-    "full": "全屏",
-    "update": "更新",
-    "comingSoon": "敬请期待",
-    "off": "关",
-    "on": "开",
-    "unknown": "未知"
-  },
-  "nav": {
-    "general": "通用",
-    "shortcuts": "快捷键",
-    "recordings": "录制",
-    "screenshots": "截图",
-    "integrations": "集成",
-    "license": "许可证",
-    "experimental": "实验性功能",
-    "feedback": "反馈",
-    "changelog": "赞助我们",
-    "signIn": "登录",
-    "signOut": "退出登录"
-  },
-  "app": {
-    "title": "Cap",
-    "subtitle": "精美的屏幕录制，完全属于你。",
-    "update": {
-      "title": "更新 Cap",
-      "message": "Cap 版本 {{version}} 已发布，是否现在更新？",
-      "ok": "安装更新",
-      "ignore": "以后再说"
-    }
-  },
-  "recording": {
-    "start": "开始录制",
-    "stop": "停止录制",
-    "pause": "暂停",
-    "resume": "继续",
-    "restart": "重新开始",
-    "delete": "删除录制",
-    "saved": "录制已保存",
-    "failed": "录制失败",
-    "preparing": "正在准备录制...",
-    "countdown": "录制倒计时",
-    "countdownDescription": "录制开始前的倒计时",
-    "instantModeMaxResolution": "即时模式最大分辨率",
-    "instantModeMaxResolutionDescription": "选择即时模式录制的最大分辨率",
-    "mainWindowStartBehaviour": "主窗口录制开始行为",
-    "mainWindowStartBehaviourDescription": "录制开始时主窗口的行为",
-    "studioFinishBehaviour": "工作室录制完成行为",
-    "studioFinishBehaviourDescription": "工作室录制完成时的行为",
-    "afterDeleteBehaviour": "删除录制后的行为",
-    "afterDeleteBehaviourDescription": "删除正在进行的录制后，Cap 是否应该重新打开？",
-    "deleteAfterUpload": "上传后删除即时录制",
-    "deleteAfterUploadDescription": "完成即时录制后，Cap 是否应该从您的设备中删除它？",
-    "crashRecovery": "崩溃恢复录制",
-    "crashRecoveryDescription": "以分段方式录制，如果应用崩溃或系统断电可以恢复。录制期间可能会占用稍多的存储空间。",
-    "maxFramerate": "最大捕获帧率",
-    "maxFramerateDescription": "屏幕捕获的最大帧率。较高的值可能会在某些系统上导致不稳定。",
-    "highFramerateWarning": "⚠️ 较高的帧率可能会在某些系统上导致丢帧或增加 CPU 使用率。",
-    "search": {
-      "displays": "搜索显示器",
-      "windows": "搜索窗口",
-      "recordings": "搜索录制",
-      "screenshots": "搜索截图",
-      "noDisplays": "未找到匹配的显示器",
-      "noWindows": "未找到匹配的窗口",
-      "noRecordings": "未找到匹配的录制",
-      "noScreenshots": "未找到匹配的截图",
-      "errorLoadingDisplays": "无法加载显示器。请尝试点击“显示器”按钮。",
-      "errorLoadingWindows": "无法加载窗口。请尝试点击“窗口”按钮。"
-    },
-    "modeSelect": {
-      "title": "选择录制模式",
-      "subtitle": "选择您想要捕获屏幕的方式",
-      "instant": {
-        "title": "即时模式",
-        "description": "通过链接即时分享。录制内容会边录边传，录制完成后可立即分享。"
-      },
-      "studio": {
-        "title": "工作室模式",
-        "description": "以最高质量进行本地录制，方便后期编辑。非常适合制作带有特效和转场的精美内容。"
-      },
-      "screenshot": {
-        "title": "截图模式",
-        "description": "立即捕获并标注截图。非常适合快速捕获、错误报告和视觉交流。"
-      }
-    },
-    "defaultName": "Cap 录制",
-    "captureArea": {
-      "title": "捕获区域",
-      "close": "关闭",
-      "reset": "重置",
-      "fill": "填充",
-      "aspectRatio": "纵横比",
-      "confirm": "确认",
-      "selectionHint": "拖动以选择录制区域"
-    },
-    "camera": {
-      "loading": "正在加载摄像头...",
-      "disconnected": "摄像头已断开连接"
-    },
-    "systemAudio": {
-      "record": "录制系统音频",
-      "noAudio": "不录制系统音频",
-      "notSupported": "系统音频录制需要 macOS 13.0 或更高版本"
-    },
-    "back": "返回"
-  },
-  "recordingsPage": {
-    "title": "录制历史",
-    "description": "管理您的录制。在这里您可以查看、编辑、分享或删除您的录制。",
-    "notFound": "未找到任何录制",
-    "noCategoryRecordings": "未找到 {{category}} 录制",
-    "tabs": {
-      "all": "全部",
-      "instant": "即时",
-      "studio": "工作室"
-    },
-    "status": {
-      "inProgress": "正在录制",
-      "failed": "录制失败",
-      "uploadFailed": "上传失败",
-      "loadFailed": "加载录制失败",
-      "renderingVideo": "正在渲染视频",
-      "renderingImage": "正在渲染图片",
-      "copyingToClipboard": "正在复制到剪贴板",
-      "copiedToClipboard": "已复制到剪贴板",
-      "choosingLocation": "正在准备",
-      "creatingLink": "正在创建链接",
-      "linkCopied": "链接已复制",
-      "savingVideo": "正在保存视频",
-      "savedVideo": "视频已保存",
-      "savingImage": "正在保存图片",
-      "savedImage": "图片已保存"
-    },
-    "actions": {
-      "openLink": "打开链接",
-      "edit": "编辑",
-      "view": "预览",
-      "reupload": "重新上传",
-      "retryUpload": "重试上传",
-      "openBundle": "在文件夹中打开",
-      "delete": "删除",
-      "copyToClipboard": "复制到剪贴板",
-      "copyingToClipboard": "正在复制...",
-      "saveAs": "另存为...",
-      "export": "导出",
-      "close": "关闭",
-      "copyLink": "复制链接",
-      "createLink": "创建链接"
-    },
-    "confirm": {
-      "corruptedTitle": "录制可能已损坏",
-      "corruptedMessage": "此录制可能已损坏或某些片段丢失。是否仍要尝试打开？",
-      "deleteMessage": "确定要永久删除此录制吗？此操作无法撤销。"
-    }
-  },
-  "screenshot": {
-    "copied": "截图已复制到剪贴板",
-    "messages": {
-      "saveSuccess": "截图已保存！",
-      "copySuccess": "截图已复制到剪贴板！",
-      "saveFailed": "保存截图失败",
-      "copyFailed": "复制截图失败",
-      "exportFailed": "导出失败",
-      "loadFailed": "加载截图失败"
-    },
-    "editor": {
-      "loadingPreview": "正在加载预览..."
-    }
-  },
-  "modes": {
-    "screen": "屏幕",
-    "window": "窗口",
-    "camera": "摄像头",
-    "audio": "音频",
-    "screenshot": "截图",
-    "recording": "录制"
-  },
-  "settings": {
-    "general": "通用设置",
-    "theme": "主题",
-    "language": "语言",
-    "appearance": "外观",
-    "behavior": "行为",
-    "audio": "音频",
-    "camera": "摄像头",
-    "hotkeys": "快捷键",
-    "shortcuts": "快捷键",
-    "advanced": "高级",
-    "reset": "恢复默认设置",
-    "recordings": "录制",
-    "screenshots": "截图",
-    "integrations": "集成",
-    "license": "许可证",
-    "experimental": "实验性",
-    "feedback": "反馈",
-    "changelog": "赞助我们"
-  },
-  "settingsPage": {
-    "capPro": "Cap Pro",
-    "autoOpenShareableLinks": "自动打开可分享链接",
-    "autoOpenShareableLinksDescription": "Cap 是否应该自动在浏览器中打开即时录制",
-    "app": "应用",
-    "alwaysShowDockIcon": "始终显示 Dock 图标",
-    "alwaysShowDockIconDescription": "即使没有可关闭的窗口，也在 Dock 中显示 Cap。",
-    "enableSystemNotifications": "启用系统通知",
-    "enableSystemNotificationsDescription": "显示系统通知，例如复制到剪贴板、保存文件等。您可能需要通过系统通知设置手动允许 Cap 访问。",
-    "defaultProjectName": "默认项目名称",
-    "defaultProjectNameDescription": "选择用作默认项目和文件名的模板。",
-    "howToCustomize": "如何自定义？",
-    "customizePlaceholders": "在模板中使用占位符，它们会被自动填充。",
-    "recordingMode": "录制模式",
-    "excludedWindows": "排除的窗口",
-    "excludedWindowsDescription": "从录制和截图中排除的窗口列表。",
-    "excludedWindowsDescriptionWindows": "Cap 在录制时应该隐藏的窗口列表。",
-    "addWindow": "添加窗口",
-    "resetToDefaults": "重置为默认",
-    "noExclusions": "没有排除项",
-    "selfHost": "自托管",
-    "capServerUrl": "Cap 服务器 URL",
-    "capServerUrlDescription": "只有在您自托管 Cap Web 实例时才应更改此设置。",
-    "confirmServerChange": "您确定要将服务器 URL 更改为 '{{origin}}' 吗？您需要重新登录。",
-    "target": "目标",
-    "dateAndTime": "日期和时间",
-    "customFormats": "自定义格式",
-    "windowsExclusionNote": "注意：由于技术限制，在 Windows 上只能排除 Cap 相关的窗口。"
-  },
-  "hotkeysPage": {
-    "title": "快捷键",
-    "description": "配置系统全局快捷键以控制 Cap。",
-    "setHotkeys": "设置快捷键...",
-    "none": "无"
-  },
-  "actions": {
-    "startStudioRecording": "开始工作室录制",
-    "startInstantRecording": "开始即时录制",
-    "restartRecording": "重新开始录制",
-    "stopRecording": "停止录制",
-    "togglePauseRecording": "暂停/继续录制",
-    "cycleRecordingMode": "切换录制模式",
-    "openRecordingPicker": "打开录制选择器",
-    "openRecordingPickerDisplay": "选择显示器录制",
-    "openRecordingPickerWindow": "选择窗口录制",
-    "openRecordingPickerArea": "录制区域",
-    "chooseDisplay": "选择显示器",
-    "chooseWindow": "选择窗口",
-    "signingIn": "正在登录...",
-    "cancelSignIn": "取消登录"
-  },
-  "screenshotsPage": {
-    "title": "截图",
-    "description": "管理您的截图并执行操作。",
-    "notFound": "未找到截图",
-    "tabs": {
-      "all": "全部显示"
-    },
-    "actions": {
-      "openFolder": "打开文件夹",
-      "openInEditor": "在编辑器中打开",
-      "copyImage": "复制图片",
-      "delete": "删除"
-    },
-    "confirm": {
-      "deleteMessage": "您确定要删除此截图吗？"
-    }
-  },
-  "licensePage": {
-    "proTitle": "Cap Pro 许可证",
-    "proDescriptionPrefix": "您的账户已升级到 ",
-    "proDescriptionSuffix": " 并已包含商业许可证。",
-    "commercialTitle": "商业许可证",
-    "licenseKey": "许可证密钥",
-    "expires": "过期时间",
-    "deactivate": "停用许可证",
-    "haveKey": "已有许可证密钥？",
-    "keyPlaceholder": "许可证密钥",
-    "activate": "激活许可证",
-    "activating": "正在激活...",
-    "forCommercialUse": "供商业使用",
-    "billedAnnually": "按年付费",
-    "oneTimePayment": "一次性付费",
-    "switchTo": "切换到 {{type}}: {{price}}",
-    "yearly": "年度",
-    "lifetime": "终身",
-    "purchase": "购买许可证",
-    "loading": "加载中...",
-    "features": {
-      "commercialUse": "Cap 录制器 + 编辑器的商业使用",
-      "communitySupport": "社区支持",
-      "localFeatures": "仅本地功能",
-      "perpetualOption": "永久许可证选项"
-    }
-  },
-  "experimentalPage": {
-    "title": "实验性功能",
-    "description": "这些功能仍在开发中，可能无法按预期工作。",
-    "recordingFeatures": "录制功能",
-    "features": {
-      "customCursor": {
-        "label": "工作室模式下的自定义光标捕获",
-        "description": "工作室模式录制将单独捕获光标状态以在编辑器中进行自定义（大小、平滑）。目前处于实验阶段，因为光标事件可能无法准确捕获。"
-      },
-      "nativeCamera": {
-        "label": "原生摄像头预览",
-        "description": "使用原生 GPU 表面而不是在 webview 中渲染摄像头预览。这在某些 Windows 系统上不可用，因此效果可能因人而异。"
-      },
-      "autoZoom": {
-        "label": "点击时自动缩放",
-        "description": "在工作室模式录制期间，围绕鼠标点击自动生成缩放片段。这有助于突出显示录制中的重要交互。"
-      }
-    }
-  },
-  "feedbackPage": {
-    "title": "问题反馈",
-    "description": "遇到问题？扫码添加微信直接联系我"
-  },
-  "integrationsPage": {
-    "title": "集成",
-    "description": "配置集成以扩展 Cap 的功能并连接第三方服务。",
-    "apps": {
-      "s3Config": {
-        "name": "S3 配置",
-        "description": "连接您自己的 S3 存储桶以完全控制数据存储。所有新的共享链接上传将自动上传到您配置的 S3 存储桶，确保您对内容保持完全的所有权和控制权。非常适合需要数据主权和自定义存储策略的组织。"
-      }
-    },
-    "buttons": {
-      "upgradeToPro": "升级到 Pro",
-      "configure": "配置"
-    }
-  },
-  "s3ConfigPage": {
-    "error": {
-      "fetch": "获取 S3 配置失败",
-      "save": "保存 S3 配置失败",
-      "delete": "删除 S3 配置失败",
-      "test": "S3 连接测试失败。请检查您的配置和网络连接。",
-      "timeout": "连接测试在 5 秒后超时。请检查您的端点 URL 和网络连接。"
-    },
-    "success": {
-      "save": "S3 配置保存成功",
-      "delete": "S3 配置删除成功",
-      "test": "S3 配置测试成功！连接正常。"
-    },
-    "guideTextPre": "设置并将存储桶连接到 Cap 只需不到 10 分钟。查看 ",
-    "guideLink": "存储配置指南",
-    "guideTextPost": " 开始。",
-    "storageProvider": "存储提供商",
-    "labels": {
-      "accessKeyId": "访问密钥 ID",
-      "secretAccessKey": "秘密访问密钥",
-      "endpoint": "端点",
-      "bucketName": "存储桶名称",
-      "region": "区域"
-    },
-    "providers": {
-      "aws": "AWS S3",
-      "cloudflare": "Cloudflare R2",
-      "supabase": "Supabase",
-      "minio": "MinIO",
-      "other": "其他 S3 兼容"
-    },
-    "buttons": {
-      "remove": "移除配置",
-      "removing": "正在移除...",
-      "test": "测试连接",
-      "testing": "正在测试...",
-      "save": "保存",
-      "saving": "正在保存..."
-    }
-  },
-  "recordingsOverlay": {
-    "action": {
-      "renderingVideo": "正在渲染视频",
-      "copyingToClipboard": "正在复制到剪贴板",
-      "copiedToClipboard": "已复制到剪贴板",
-      "preparing": "正在准备",
-      "renderingImage": "正在渲染图片",
-      "savingVideo": "正在保存视频",
-      "savedVideo": "视频已保存",
-      "savingImage": "正在保存图片",
-      "savedImage": "图片已保存",
-      "choosingLocation": "选择{{type}}保存位置...",
-      "creatingLink": "正在创建分享链接",
-      "linkCopied": "分享链接已复制"
-    },
-    "tooltips": {
-      "close": "关闭",
-      "edit": "编辑",
-      "view": "查看",
-      "copyToClipboard": "复制到剪贴板",
-      "copyingToClipboard": "正在复制到剪贴板",
-      "copyLink": "复制分享链接",
-      "createLink": "创建分享链接"
-    },
-    "export": "导出"
-  },
-  "recordingOverlay": {
-    "issues": {
-      "micDisconnected": "麦克风已断开。重新连接以继续录制。",
-      "cameraDisconnected": "摄像头已断开。重新连接以继续录制。",
-      "dismiss": "关闭录制问题提示"
-    },
-    "controls": {
-      "stop": "停止录制",
-      "starting": "正在启动",
-      "resume": "恢复录制",
-      "pause": "暂停录制",
-      "restart": "重新录制",
-      "delete": "删除录制",
-      "settings": "录制设置"
-    },
-    "menu": {
-      "cameraPreview": "显示摄像头预览",
-      "mic": "麦克风",
-      "micLocked": "麦克风 (在此次录制中已锁定)",
-      "noMic": "无麦克风",
-      "systemAudio": {
-        "record": "录制系统音频",
-        "noAudio": "不录制系统音频",
-        "notSupported": "系统音频录制需要 macOS 13.0 或更高版本"
-      },
-      "webcam": "网络摄像头",
-      "webcamLocked": "网络摄像头 (在此次录制中已锁定)",
-      "noWebcam": "无网络摄像头"
-    },
-    "confirm": {
-      "restartTitle": "确认重新录制",
-      "restartMessage": "您确定要重新录制吗？当前的录制将被丢弃。",
-      "restartOk": "重新录制",
-      "deleteTitle": "确认删除",
-      "deleteMessage": "您确定要删除此录制吗？",
-      "deleteOk": "删除",
-      "cancel": "取消"
-    },
-    "errors": {
-      "authRequiredTitle": "需要身份验证",
-      "authRequiredMessage": "您必须登录才能开始即时模式录制。请登录或切换到工作室模式。",
-      "login": "登录",
-      "switchToStudio": "切换到工作室模式",
-      "startErrorTitle": "开始录制时出错",
-      "signInToShare": "您需要登录才能分享录像",
-      "upgradeRequired": "分享超过 5 分钟的录像需要升级"
-    }
-  },
-  "targetSelect": {
-    "monitor": "显示器",
-    "adjustArea": "调整录制区域",
-    "resetSelection": "重置选择",
-    "minSize": "最小尺寸为 {{width}} x {{height}}",
-    "tooSmall": "{{width}} x {{height}} 太小了",
-    "hint": "点击并拖拽以选择区域",
-    "modes": {
-      "studio": "工作室模式",
-      "instant": "即时模式",
-      "screenshot": "截图模式"
-    },
-    "countdown": {
-      "title": "录制倒计时",
-      "off": "关闭",
-      "3s": "3 秒",
-      "5s": "5 秒",
-      "10s": "10 秒"
-    },
-    "actions": {
-      "signInToUse": "登录后使用",
-      "takeScreenshot": "截取屏幕",
-      "startRecording": "开始录制",
-      "exportVideo": "导出视频",
-      "saveImage": "保存图片"
-    },
-    "whatIsMode": "什么是 {{mode}} 模式？",
-    "freeWarning": "即时模式录制限制为 5 分钟，",
-    "upgradeToPro": "升级到 Pro"
-  },
-  "behaviours": {
-    "close": "关闭",
-    "minimise": "最小化",
-    "openEditor": "打开编辑器",
-    "showOverlay": "显示浮层",
-    "doNothing": "不做任何操作",
-    "reopenRecordingWindow": "重新打开录制窗口",
-    "cancel": "取消",
-    "done": "完成",
-    "delete": "删除"
-  },
-  "time": {
-    "seconds": "秒",
-    "threeSeconds": "3 秒",
-    "fiveSeconds": "5 秒",
-    "tenSeconds": "10 秒"
-  },
-  "editor": {
-    "initializing": "正在初始化编辑器...",
-    "timeline": {
-      "clip": {
-        "label": "片段"
-      },
-      "zoom": {
-        "placeholder": "点击添加缩放片段",
-        "description": "(平滑缩放重要区域)",
-        "label": "缩放",
-        "generate": "从点击处生成缩放片段"
-      },
-      "text": {
-        "placeholder": "点击添加文本",
-        "description": "(在视频上设置标签)",
-        "label": "文本",
-        "defaultContent": "标签"
-      },
-      "mask": {
-        "placeholder": "点击添加遮罩",
-        "description": "(结合敏感信息模糊或高亮遮罩)",
-        "label": "遮罩",
-        "sensitive": "模糊",
-        "highlight": "高亮"
-      },
-      "scene": {
-        "placeholder": "点击添加场景片段",
-        "description": "(使摄像头全屏或隐藏)",
-        "label": "场景",
-        "cameraOnly": "仅显示摄像头",
-        "hideCamera": "隐藏摄像头",
-        "default": "默认"
-      },
-      "addTrack": "添加轨道"
-    },
-    "sidebar": {
-      "background": "背景",
-      "camera": "摄像头",
-      "audio": "音频",
-      "cursor": "光标",
-      "captions": "字幕",
-      "audioControls": "音频控制",
-      "muteAudio": "静音音频",
-      "micStereoMode": "麦克风立体声模式",
-      "micVolume": "麦克风音量",
-      "systemAudioVolume": "系统音频音量",
-      "muted": "已静音",
-      "cursorType": "光标类型",
-      "cursorSize": "光标大小",
-      "hideWhenIdle": "空闲时隐藏",
-      "inactivityDelay": "不活动延迟",
-      "movementStyle": "移动样式",
-      "smoothMovement": "顺滑移动",
-      "tension": "张力",
-      "friction": "摩擦力",
-      "mass": "质量",
-      "highQualitySvg": "高质量 SVG 光标",
-      "backgroundBlur": "背景模糊",
-      "padding": "边距",
-      "roundedCorners": "圆角",
-      "cornerStyle": "圆角样式",
-      "motionBlur": "运动模糊",
-      "border": "边框",
-      "borderWidth": "边框宽度",
-      "borderColor": "边框颜色",
-      "borderOpacity": "边框不透明度",
-      "shadow": "阴影",
-      "shadowAdvanced": "高级阴影设置",
-      "shadowSize": "阴影大小",
-      "shadowOpacity": "阴影不透明度",
-      "shadowBlur": "阴影模糊",
-      "mirrorCamera": "镜像摄像头",
-      "hideCamera": "隐藏摄像头",
-      "cameraShape": "摄像头形状",
-      "cameraSize": "摄像头大小",
-      "zoomCameraSize": "缩放时大小",
-      "position": "位置",
-      "speed": "速度",
-      "speedNote": "修改速度将使该片段静音。",
-      "segmentSettings": "片段设置",
-      "segmentSettingsNote": "这些设置仅应用于选中的片段",
-      "clipSettings": "剪辑设置",
-      "clipSettingsNote": "这些设置应用于当前剪辑的所有片段",
-      "systemAudioOffset": "系统音频偏移",
-      "micOffset": "麦克风偏移",
-      "cameraOffset": "摄像头偏移",
-      "textSegment": "文本 {{index}}",
-      "maskSegment": "遮罩 {{index}}",
-      "zoomSegment": "缩放 {{index}}",
-      "textSegmentsSelected": "已选择 {{count}} 个文本片段",
-      "maskSegmentsSelected": "已选择 {{count}} 个遮罩片段",
-      "zoomSegmentsSelected": "已选择 {{count}} 个缩放片段",
-      "enabled": "启用",
-      "italic": "斜体",
-      "color": "颜色",
-      "fadeDuration": "淡入淡出时长",
-      "pixelation": "像素化",
-      "intensity": "强度",
-      "outsideDarkness": "外部暗度",
-      "loading": "正在加载...",
-      "clickToSelectImage": "点击选择或拖放图片",
-      "cameraLayout": "摄像头布局",
-      "cameraLayouts": {
-        "default": "默认",
-        "auto": "自动",
-        "manual": "手动",
-        "cameraOnly": "仅摄像头",
-        "hideCamera": "隐藏摄像头",
-        "defaultDescription": "同时显示屏幕和摄像头",
-        "cameraOnlyDescription": "仅显示摄像头画面",
-        "hideCameraDescription": "仅显示屏幕录制画面"
-      },
-      "backgroundSources": {
-        "wallpaper": "墙纸",
-        "image": "图片",
-        "color": "颜色",
-        "gradient": "渐变"
-      },
-      "backgroundThemes": {
-        "macOS": "macOS",
-        "dark": "深色",
-        "blue": "蓝色",
-        "purple": "紫色",
-        "orange": "橙色"
-      },
-      "messages": {
-        "wallpaperFailed": "设置墙纸失败",
-        "invalidImage": "无效的图片文件类型",
-        "imageSaveFailed": "保存图片失败"
-      },
-      "stereoModes": {
-        "stereo": "立体声",
-        "monoL": "单声道 (左)",
-        "monoR": "单声道 (右)"
-      },
-      "cameraShapes": {
-        "square": "方形",
-        "source": "原始"
-      },
-      "cornerStyles": {
-        "squircle": "超椭圆",
-        "rounded": "圆角"
-      },
-      "cursorTypes": {
-        "auto": "自动",
-        "autoDescription": "使用录制中的真实光标。",
-        "circle": "圆形",
-        "circleDescription": "类似移动端模拟器的触摸样式圆形光标。"
-      },
-      "animationStyles": {
-        "slow": "缓慢",
-        "slowDescription": "带有些许惯性的轻松平滑效果。",
-        "mellow": "柔和",
-        "mellowDescription": "适用于日常教程和演示的均衡平滑效果。",
-        "custom": "自定义",
-        "customDescription": "手动调整张力、摩擦力和质量以获得完全控制。"
-      }
-    },
-    "captions": {
-      "title": "字幕",
-      "model": "语音转文本模型",
-      "language": "语言",
-      "selectLanguage": "选择语言",
-      "downloadModel": "下载模型",
-      "downloading": "正在下载...",
-      "generate": "生成字幕",
-      "regenerate": "重新生成字幕",
-      "generating": "正在生成...",
-      "fontSettings": "字体设置",
-      "fontFamily": "字体系列",
-      "fontSize": "字体大小",
-      "highlight": "当前词高亮",
-      "highlightNote": "这是 Cap 字幕的第一个版本。当前词高亮在某些情况下可能不够准确。我们正在努力修复此问题，并将在后续版本中发布。",
-      "fontColor": "字体颜色",
-      "backgroundSettings": "背景设置",
-      "backgroundColor": "背景颜色",
-      "backgroundOpacity": "背景不透明度",
-      "position": "位置",
-      "animation": "动画",
-      "highlightColor": "高亮颜色",
-      "fadeDuration": "淡入淡出时长",
-      "downloadSuccess": "字幕模型下载成功！",
-      "downloadFailed": "下载字幕模型失败",
-      "generateSuccess": "字幕生成成功！",
-      "generateFailed": "生成字幕失败: {{error}}",
-      "noAudio": "未在视频文件中找到音频",
-      "modelNotFound": "未找到字幕模型。请先下载",
-      "loadModelFailed": "加载字幕模型失败。请尝试重新下载",
-      "noCaptionsGenerated": "未生成任何字幕。音频可能太小或不清晰。",
-      "newCaption": "新字幕",
-      "transcriptionModel": "转录模型",
-      "autoDetect": "自动检测",
-      "downloaded": "已下载",
-      "fontWeight": "字体粗细",
-      "normal": "常规",
-      "medium": "中等",
-      "bold": "加粗",
-      "exportOptions": "导出选项",
-      "exportWithSubtitles": "导出时包含字幕",
-      "segments": "字幕片段",
-      "addAtCurrentTime": "在当前位置添加",
-      "startTime": "开始时间",
-      "endTime": "结束时间",
-      "text": "字幕文本"
-    },
-    "export": {
-      "title": "导出",
-      "backToEditor": "返回编辑器",
-      "preview": "预览",
-      "previewNote": "这是视频中的一个渲染帧。调整下方设置以查看最终导出视频的质量。",
-      "generatingPreview": "正在生成预览...",
-      "destination": "目的地",
-      "organization": "组织",
-      "file": "文件",
-      "fileDescription": "保存到您的电脑",
-      "clipboard": "剪贴板",
-      "clipboardDescription": "复制以便在任何地方粘贴",
-      "shareableLink": "可分享链接",
-      "shareableLinkDescription": "通过 Cap 云分享",
-      "format": "格式",
-      "noMp4Transparency": "MP4 不支持透明背景",
-      "linksRequireMp4": "链接分享仅支持 MP4 格式",
-      "resolution": "分辨率",
-      "frameRate": "帧率",
-      "qualityLabel": "画质",
-      "smallerFile": "更小文件",
-      "largerFile": "更高画质",
-      "qualityPreview": "画质预览",
-      "estimatedSize": "预计大小:",
-      "compression": {
-        "title": "压缩",
-        "minimal": "极小",
-        "social": "社交媒体",
-        "socialShort": "社交",
-        "web": "网页",
-        "potato": "低画质"
-      },
-      "actions": {
-        "signInToShare": "登录以分享",
-        "exportToFile": "导出到文件",
-        "exportToClipboard": "导出到剪贴板",
-        "exportToLink": "导出为链接",
-        "copyLink": "复制链接",
-        "openLink": "打开链接",
-        "openFile": "打开文件",
-        "copyToClipboard": "复制到剪贴板"
-      },
-      "status": {
-        "preparing": "正在准备...",
-        "renderingGif": "正在渲染 GIF...",
-        "renderingVideo": "正在渲染视频...",
-        "copying": "正在复制到剪贴板...",
-        "copied": "已复制到剪贴板",
-        "exportingToFile": "正在导出到文件...",
-        "exportCompleted": "导出完成",
-        "exportComplete": "导出成功",
-        "ready": "您的 {{type}} 已准备就绪",
-        "uploading": "正在上传...",
-        "uploadingProgress": "正在上传 - {{progress}}%",
-        "uploadComplete": "上传成功",
-        "uploadSuccess": "您的录制已成功上传",
-        "renderingFrames": "正在渲染 {{type}} ({{current}}/{{total}} 帧)",
-        "preparingRender": "正在准备渲染..."
-      },
-      "messages": {
-        "authRequired": "您需要登录才能分享录制",
-        "planCheckFailed": "验证您的订阅状态失败",
-        "upgradeRequired": "此功能需要升级后的计划",
-        "uploadFailed": "上传录制失败",
-        "exportedToClipboard": "{{type}} 已导出到剪贴板",
-        "exportedToFile": "{{type}} 已导出到文件",
-        "errorCopying": "复制录制失败",
-        "errorExporting": "导出录制失败: {{error}}",
-        "cancelConfirm": "您确定要取消导出吗？",
-        "cancelTitle": "取消导出"
-      },
-      "recording": "录制视频",
-      "gif": "GIF 动图",
-      "quality": {
-        "minimal": "极小压缩",
-        "social": "社交媒体",
-        "web": "网页",
-        "potato": "低画质"
-      },
-      "exportTo": {
-        "file": {
-          "label": "文件",
-          "description": "保存到您的电脑"
-        },
-        "clipboard": {
-          "label": "剪贴板",
-          "description": "复制以便粘贴"
-        },
-        "link": {
-          "label": "链接",
-          "description": "通过 Cap 云分享"
-        }
-      }
-    },
-    "header": {
-      "deleteTooltip": "删除录制",
-      "openBundleTooltip": "打开录制包",
-      "captionsTooltip": "字幕",
-      "performanceTooltip": "性能",
-      "undoTooltip": "撤销",
-      "redoTooltip": "重做",
-      "export": "导出",
-      "confirmDelete": "您确定要删除此录制吗？"
-    },
-    "presets": {
-      "title": "预设",
-      "none": "暂无预设",
-      "default": "默认",
-      "apply": "应用",
-      "setDefault": "设为默认",
-      "rename": "重命名",
-      "delete": "删除",
-      "create": "创建新预设",
-      "createTitle": "创建预设",
-      "renameTitle": "重命名预设",
-      "deleteTitle": "删除预设",
-      "deleteConfirm": "您确定要删除此预设吗？",
-      "placeholder": "输入预设名称...",
-      "setDefaultAction": "设为默认"
-    },
-    "player": {
-      "quality": "预览画质",
-      "selectQuality": "选择预览画质",
-      "crop": "裁剪",
-      "cropTooltip": "裁剪视频",
-      "playPauseTooltip": "播放 / 暂停视频",
-      "splitTooltip": "切换分割",
-      "zoomOutTooltip": "缩小",
-      "zoomInTooltip": "放大",
-      "secondsVisible": "{{seconds}} 秒可见",
-      "qualities": {
-        "full": "全屏",
-        "half": "二分之一",
-        "quarter": "四分之一"
-      }
-    },
-    "share": {
-      "signInRequired": "您需要登录才能分享录制",
-      "upgradeRequired": "分享超过 5 分钟的录制需要升级计划",
-      "failedToVerify": "无法验证您的订阅状态",
-      "upgradeRequiredFeature": "此功能需要升级计划",
-      "failedToUpload": "上传录制失败",
-      "reuploading": "正在重新上传视频",
-      "reupload": "重新上传视频",
-      "openLink": "打开链接",
-      "selectLink": "选择链接",
-      "copyLink": "复制链接",
-      "reuploadTitle": "重新上传录制",
-      "preparing": "正在准备渲染...",
-      "rendering": "正在渲染视频 ({{current}}/{{total}} 帧)",
-      "uploading": "正在上传 - {{progress}}%",
-      "copied": "链接已复制到剪贴板！"
-    },
-    "crop": {
-      "size": "尺寸",
-      "position": "位置",
-      "full": "全屏",
-      "reset": "重置",
-      "save": "保存"
-    }
-  },
-  "screenshotEditor": {
-    "header": {
-      "crop": "裁剪图片",
-      "copy": "复制到剪贴板",
-      "save": "保存",
-      "moreActions": "更多操作",
-      "openFolder": "打开文件夹",
-      "delete": "删除",
-      "confirmDelete": "您确定要删除此截图吗？"
-    },
-    "tools": {
-      "layers": "图层",
-      "select": "选择",
-      "arrow": "箭头",
-      "rectangle": "矩形",
-      "mask": "遮罩",
-      "circle": "圆形",
-      "text": "文本"
-    },
-    "layers": {
-      "title": "图层",
-      "empty": "暂无图层",
-      "instruction": "使用上方工具添加标注",
-      "reorder": "拖动以排序 • 顶部代表顶层"
-    },
-    "config": {
-      "color": "颜色",
-      "stroke": "描边",
-      "width": "宽度",
-      "fill": "填充",
-      "opacity": "不透明度",
-      "style": "样式",
-      "intensity": "强度",
-      "size": "大小",
-      "done": "完成",
-      "transparent": "透明",
-      "blur": "模糊",
-      "pixelate": "马赛克"
-    },
-    "background": {
-      "title": "背景",
-      "image": "背景图片",
-      "blur": "背景模糊",
-      "selectImage": "点击选择或拖放图片",
-      "sources": {
-        "wallpaper": "壁纸",
-        "image": "图片",
-        "color": "颜色",
-        "gradient": "渐变"
-      },
-      "themes": {
-        "macOS": "macOS",
-        "dark": "深色",
-        "blue": "蓝色",
-        "purple": "紫色",
-        "orange": "橙色"
-      }
-    },
-    "appearance": {
-      "shadow": {
-        "title": "阴影",
-        "advanced": "高级阴影设置"
-      },
-      "padding": {
-        "title": "边距"
-      },
-      "rounding": {
-        "title": "圆角",
-        "label": "圆角",
-        "cornerStyle": {
-          "label": "圆角样式",
-          "squircle": "超椭圆",
-          "rounded": "圆角"
-        }
-      },
-      "border": {
-        "title": "边框"
-      },
-      "annotation": {
-        "settings": "标注设置",
-        "placeholder": "选择一个标注进行编辑。",
-        "strokeColor": "边框颜色",
-        "fillColor": "填充颜色",
-        "strokeWidth": "边框宽度",
-        "delete": "删除标注"
-      }
-    }
-  },
-  "fps": {
-    "30": "30 FPS",
-    "60": "60 FPS（推荐）",
-    "120": "120 FPS"
-  },
-  "notifications": {
-    "micDisconnected": {
-      "title": "麦克风已断开",
-      "body": "录制已暂停。请重新连接麦克风，然后恢复或停止录制。"
-    },
-    "cameraDisconnected": {
-      "title": "摄像头已断开",
-      "body": "录制已暂停。请重新连接摄像头，然后恢复或停止录制。"
-    },
-    "videoSaved": {
-      "title": "视频已保存",
-      "body": "视频已成功保存"
-    },
-    "videoCopied": {
-      "title": "视频已复制",
-      "body": "视频已复制到剪贴板"
-    },
-    "linkCopied": {
-      "title": "链接已复制",
-      "body": "链接已复制到剪贴板"
-    },
-    "uploadFailed": {
-      "title": "上传失败",
-      "body": "无法上传媒体。请重试"
-    },
-    "videoSaveFailed": {
-      "title": "保存失败",
-      "body": "无法保存视频。请重试"
-    },
-    "videoCopyFailed": {
-      "title": "复制失败",
-      "body": "无法将视频复制到剪贴板。请重试"
-    },
-    "shareFailed": {
-      "title": "分享失败",
-      "body": "无法创建分享链接。请重试"
-    },
-    "screenshotSaved": {
-      "title": "截图已保存",
-      "body": "截图已成功保存"
-    },
-    "screenshotCopied": {
-      "title": "截图已复制",
-      "body": "截图已复制到剪贴板"
-    },
-    "screenshotSaveFailed": {
-      "title": "保存失败",
-      "body": "无法保存截图。请重试"
-    },
-    "screenshotCopyFailed": {
-      "title": "复制失败",
-      "body": "无法将截图复制到剪贴板。请重试"
-    }
-  },
-  "setup": {
-    "permissionsRequired": "需要授权",
-    "description": "Cap 需要相关权限才能正常运行。",
-    "granted": "已授权",
-    "openSettings": "打开设置",
-    "grantPermission": "授予权限",
-    "continue": "继续",
-    "continueToCap": "进入 Cap",
-    "restartRequired": "需要重启",
-    "restartMessage": "在系统设置中添加 Cap 后，您需要重启应用以使权限生效。",
-    "restartOk": "已授权，立即重启",
-    "restartCancel": "稍后，我还需设置",
-    "welcome": "欢迎使用 Cap",
-    "tagline": "由您掌控的精美屏幕录制。",
-    "getStarted": "开始使用",
-    "selectMode": "选择录制模式",
-    "modeDescription": "选择您希望的录制方式。您稍后可以随时更改。",
-    "permissions": {
-      "screenRecording": {
-        "name": "屏幕录制",
-        "description": "在系统设置中添加 Cap，然后重启应用以使更改生效。"
-      },
-      "accessibility": {
-        "name": "辅助功能",
-        "description": "在录制期间，Cap 会在本地收集鼠标活动，以生成自动缩放片段。"
-      },
-      "microphone": {
-        "name": "麦克风",
-        "description": "录制 Caps 中的音频需要此权限。"
-      },
-      "camera": {
-        "name": "摄像头",
-        "description": "录制 Caps 中的摄像头画面需要此权限。"
-      }
-    }
-  },
-  "upgrade": {
-    "title": "早期采纳者定价",
-    "completeTitle": "升级完成",
-    "completeMessage": "您现在可以关闭此窗口了 - 感谢您的升级！",
-    "closeWindow": "关闭窗口",
-    "commercialLicense": "商业许可证",
-    "commercialDescription": "您的 Cap 商业用途许可证详情",
-    "licenseKey": "许可证密钥",
-    "expires": "有效期至",
-    "deactivating": "正在停用...",
-    "deactivateLicense": "停用许可证",
-    "forCommercialUse": "用于商业用途",
-    "billedAnnually": "按年计费",
-    "oneTimePayment": "一次性付款",
-    "switchTo": "切换到 {{mode}}: {{price}}",
-    "lifetime": "终身",
-    "yearly": "年度",
-    "monthly": "月度",
-    "purchaseLicense": "购买许可证",
-    "alreadyHaveLicense": "已有许可证密钥？",
-    "capPro": "Cap 专业版",
-    "proDescription": "适用于专业人士和团队。",
-    "perUserBilledAnnually": "每用户，按年计费",
-    "perUserBilledMonthly": "每用户，按月计费",
-    "upgradeToPro": "升级到 Cap 专业版",
-    "proFeatures": {
-      "commercial": "包含商业许可证",
-      "storage": "无限云端存储和分享链接",
-      "s3": "连接自定义 S3 存储桶",
-      "teams": "高级团队功能",
-      "views": "无限观看次数",
-      "password": "密码保护视频",
-      "analytics": "高级分析",
-      "support": "优先支持"
-    },
-    "pricing": {
-      "commercial": "Cap 录制器 + 编辑器商业使用权",
-      "support": "社区支持",
-      "localOnly": "仅本地功能",
-      "perpetual": "永久许可证选项"
-    },
-    "activateLicense": {
-      "title": "激活许可证",
-      "placeholder": "输入许可证密钥...",
-      "button": "激活"
-    }
-  },
-  "update": {
-    "noUpdate": "当前已是最新版本",
-    "installing": "正在安装更新",
-    "done": "更新已安装。重启 Cap 以完成更新。",
-    "restartNow": "立即重启"
-  },
-  "errorPage": {
-    "title": "发生错误",
-    "description": "非常抱歉，程序运行出现了问题。",
-    "copyError": "复制错误信息",
-    "reload": "重新加载",
-    "close": "关闭"
-  },
-  "changelogPage": {
-    "title": "赞助我们",
-    "description": "如果这个软件对您有帮助，欢迎请我喝杯咖啡 ☕",
-    "thanks": "感谢您的支持，您的鼓励是我持续更新的动力！"
-  }
+	"common": {
+		"back": "返回",
+		"search": "搜索",
+		"noResults": "没有找到结果",
+		"settings": "设置",
+		"general": "通用",
+		"appearance": "外观",
+		"system": "系统",
+		"light": "浅色",
+		"dark": "深色",
+		"select": "选择",
+		"cancel": "取消",
+		"save": "保存",
+		"delete": "删除",
+		"confirm": "确认",
+		"yes": "是",
+		"no": "否",
+		"close": "关闭",
+		"done": "完成",
+		"loading": "加载中...",
+		"error": "错误",
+		"success": "成功",
+		"warning": "警告",
+		"info": "信息",
+		"reset": "重置",
+		"size": "大小",
+		"position": "位置",
+		"full": "全屏",
+		"update": "更新",
+		"comingSoon": "敬请期待",
+		"off": "关",
+		"on": "开",
+		"unknown": "未知"
+	},
+	"nav": {
+		"general": "通用",
+		"shortcuts": "快捷键",
+		"recordings": "录制",
+		"screenshots": "截图",
+		"integrations": "集成",
+		"license": "许可证",
+		"experimental": "实验性功能",
+		"feedback": "反馈",
+		"changelog": "赞助我们",
+		"signIn": "登录",
+		"signOut": "退出登录"
+	},
+	"app": {
+		"title": "Cap",
+		"subtitle": "精美的屏幕录制，完全属于你。",
+		"update": {
+			"title": "更新 Cap",
+			"message": "Cap 版本 {{version}} 已发布，是否现在更新？",
+			"ok": "安装更新",
+			"ignore": "以后再说"
+		}
+	},
+	"recording": {
+		"start": "开始录制",
+		"stop": "停止录制",
+		"pause": "暂停",
+		"resume": "继续",
+		"restart": "重新开始",
+		"delete": "删除录制",
+		"saved": "录制已保存",
+		"failed": "录制失败",
+		"preparing": "正在准备录制...",
+		"countdown": "录制倒计时",
+		"countdownDescription": "录制开始前的倒计时",
+		"instantModeMaxResolution": "即时模式最大分辨率",
+		"instantModeMaxResolutionDescription": "选择即时模式录制的最大分辨率",
+		"mainWindowStartBehaviour": "主窗口录制开始行为",
+		"mainWindowStartBehaviourDescription": "录制开始时主窗口的行为",
+		"studioFinishBehaviour": "工作室录制完成行为",
+		"studioFinishBehaviourDescription": "工作室录制完成时的行为",
+		"afterDeleteBehaviour": "删除录制后的行为",
+		"afterDeleteBehaviourDescription": "删除正在进行的录制后，Cap 是否应该重新打开？",
+		"deleteAfterUpload": "上传后删除即时录制",
+		"deleteAfterUploadDescription": "完成即时录制后，Cap 是否应该从您的设备中删除它？",
+		"crashRecovery": "崩溃恢复录制",
+		"crashRecoveryDescription": "以分段方式录制，如果应用崩溃或系统断电可以恢复。录制期间可能会占用稍多的存储空间。",
+		"maxFramerate": "最大捕获帧率",
+		"maxFramerateDescription": "屏幕捕获的最大帧率。较高的值可能会在某些系统上导致不稳定。",
+		"highFramerateWarning": "⚠️ 较高的帧率可能会在某些系统上导致丢帧或增加 CPU 使用率。",
+		"search": {
+			"displays": "搜索显示器",
+			"windows": "搜索窗口",
+			"recordings": "搜索录制",
+			"screenshots": "搜索截图",
+			"noDisplays": "未找到匹配的显示器",
+			"noWindows": "未找到匹配的窗口",
+			"noRecordings": "未找到匹配的录制",
+			"noScreenshots": "未找到匹配的截图",
+			"errorLoadingDisplays": "无法加载显示器。请尝试点击“显示器”按钮。",
+			"errorLoadingWindows": "无法加载窗口。请尝试点击“窗口”按钮。"
+		},
+		"modeSelect": {
+			"title": "选择录制模式",
+			"subtitle": "选择您想要捕获屏幕的方式",
+			"instant": {
+				"title": "即时模式",
+				"description": "通过链接即时分享。录制内容会边录边传，录制完成后可立即分享。"
+			},
+			"studio": {
+				"title": "工作室模式",
+				"description": "以最高质量进行本地录制，方便后期编辑。非常适合制作带有特效和转场的精美内容。"
+			},
+			"screenshot": {
+				"title": "截图模式",
+				"description": "立即捕获并标注截图。非常适合快速捕获、错误报告和视觉交流。"
+			}
+		},
+		"defaultName": "Cap 录制",
+		"captureArea": {
+			"title": "捕获区域",
+			"close": "关闭",
+			"reset": "重置",
+			"fill": "填充",
+			"aspectRatio": "纵横比",
+			"confirm": "确认",
+			"selectionHint": "拖动以选择录制区域"
+		},
+		"camera": {
+			"loading": "正在加载摄像头...",
+			"disconnected": "摄像头已断开连接"
+		},
+		"systemAudio": {
+			"record": "录制系统音频",
+			"noAudio": "不录制系统音频",
+			"notSupported": "系统音频录制需要 macOS 13.0 或更高版本"
+		},
+		"back": "返回"
+	},
+	"recordingsPage": {
+		"title": "录制历史",
+		"description": "管理您的录制。在这里您可以查看、编辑、分享或删除您的录制。",
+		"notFound": "未找到任何录制",
+		"noCategoryRecordings": "未找到 {{category}} 录制",
+		"tabs": {
+			"all": "全部",
+			"instant": "即时",
+			"studio": "工作室"
+		},
+		"status": {
+			"inProgress": "正在录制",
+			"failed": "录制失败",
+			"uploadFailed": "上传失败",
+			"loadFailed": "加载录制失败",
+			"renderingVideo": "正在渲染视频",
+			"renderingImage": "正在渲染图片",
+			"copyingToClipboard": "正在复制到剪贴板",
+			"copiedToClipboard": "已复制到剪贴板",
+			"choosingLocation": "正在准备",
+			"creatingLink": "正在创建链接",
+			"linkCopied": "链接已复制",
+			"savingVideo": "正在保存视频",
+			"savedVideo": "视频已保存",
+			"savingImage": "正在保存图片",
+			"savedImage": "图片已保存"
+		},
+		"actions": {
+			"openLink": "打开链接",
+			"edit": "编辑",
+			"view": "预览",
+			"reupload": "重新上传",
+			"retryUpload": "重试上传",
+			"openBundle": "在文件夹中打开",
+			"delete": "删除",
+			"copyToClipboard": "复制到剪贴板",
+			"copyingToClipboard": "正在复制...",
+			"saveAs": "另存为...",
+			"export": "导出",
+			"close": "关闭",
+			"copyLink": "复制链接",
+			"createLink": "创建链接"
+		},
+		"confirm": {
+			"corruptedTitle": "录制可能已损坏",
+			"corruptedMessage": "此录制可能已损坏或某些片段丢失。是否仍要尝试打开？",
+			"deleteMessage": "确定要永久删除此录制吗？此操作无法撤销。"
+		}
+	},
+	"screenshot": {
+		"copied": "截图已复制到剪贴板",
+		"messages": {
+			"saveSuccess": "截图已保存！",
+			"copySuccess": "截图已复制到剪贴板！",
+			"saveFailed": "保存截图失败",
+			"copyFailed": "复制截图失败",
+			"exportFailed": "导出失败",
+			"loadFailed": "加载截图失败"
+		},
+		"editor": {
+			"loadingPreview": "正在加载预览..."
+		}
+	},
+	"modes": {
+		"screen": "屏幕",
+		"window": "窗口",
+		"camera": "摄像头",
+		"audio": "音频",
+		"screenshot": "截图",
+		"recording": "录制"
+	},
+	"settings": {
+		"general": "通用设置",
+		"theme": "主题",
+		"language": "语言",
+		"appearance": "外观",
+		"behavior": "行为",
+		"audio": "音频",
+		"camera": "摄像头",
+		"hotkeys": "快捷键",
+		"shortcuts": "快捷键",
+		"advanced": "高级",
+		"reset": "恢复默认设置",
+		"recordings": "录制",
+		"screenshots": "截图",
+		"integrations": "集成",
+		"license": "许可证",
+		"experimental": "实验性",
+		"feedback": "反馈",
+		"changelog": "赞助我们"
+	},
+	"settingsPage": {
+		"capPro": "Cap Pro",
+		"autoOpenShareableLinks": "自动打开可分享链接",
+		"autoOpenShareableLinksDescription": "Cap 是否应该自动在浏览器中打开即时录制",
+		"app": "应用",
+		"alwaysShowDockIcon": "始终显示 Dock 图标",
+		"alwaysShowDockIconDescription": "即使没有可关闭的窗口，也在 Dock 中显示 Cap。",
+		"enableSystemNotifications": "启用系统通知",
+		"enableSystemNotificationsDescription": "显示系统通知，例如复制到剪贴板、保存文件等。您可能需要通过系统通知设置手动允许 Cap 访问。",
+		"defaultProjectName": "默认项目名称",
+		"defaultProjectNameDescription": "选择用作默认项目和文件名的模板。",
+		"howToCustomize": "如何自定义？",
+		"customizePlaceholders": "在模板中使用占位符，它们会被自动填充。",
+		"recordingMode": "录制模式",
+		"excludedWindows": "排除的窗口",
+		"excludedWindowsDescription": "从录制和截图中排除的窗口列表。",
+		"excludedWindowsDescriptionWindows": "Cap 在录制时应该隐藏的窗口列表。",
+		"addWindow": "添加窗口",
+		"resetToDefaults": "重置为默认",
+		"noExclusions": "没有排除项",
+		"selfHost": "自托管",
+		"capServerUrl": "Cap 服务器 URL",
+		"capServerUrlDescription": "只有在您自托管 Cap Web 实例时才应更改此设置。",
+		"confirmServerChange": "您确定要将服务器 URL 更改为 '{{origin}}' 吗？您需要重新登录。",
+		"target": "目标",
+		"dateAndTime": "日期和时间",
+		"customFormats": "自定义格式",
+		"windowsExclusionNote": "注意：由于技术限制，在 Windows 上只能排除 Cap 相关的窗口。"
+	},
+	"hotkeysPage": {
+		"title": "快捷键",
+		"description": "配置系统全局快捷键以控制 Cap。",
+		"setHotkeys": "设置快捷键...",
+		"none": "无"
+	},
+	"actions": {
+		"startStudioRecording": "开始工作室录制",
+		"startInstantRecording": "开始即时录制",
+		"restartRecording": "重新开始录制",
+		"stopRecording": "停止录制",
+		"togglePauseRecording": "暂停/继续录制",
+		"cycleRecordingMode": "切换录制模式",
+		"openRecordingPicker": "打开录制选择器",
+		"openRecordingPickerDisplay": "选择显示器录制",
+		"openRecordingPickerWindow": "选择窗口录制",
+		"openRecordingPickerArea": "录制区域",
+		"chooseDisplay": "选择显示器",
+		"chooseWindow": "选择窗口",
+		"signingIn": "正在登录...",
+		"cancelSignIn": "取消登录"
+	},
+	"screenshotsPage": {
+		"title": "截图",
+		"description": "管理您的截图并执行操作。",
+		"notFound": "未找到截图",
+		"tabs": {
+			"all": "全部显示"
+		},
+		"actions": {
+			"openFolder": "打开文件夹",
+			"openInEditor": "在编辑器中打开",
+			"copyImage": "复制图片",
+			"delete": "删除"
+		},
+		"confirm": {
+			"deleteMessage": "您确定要删除此截图吗？"
+		}
+	},
+	"licensePage": {
+		"proTitle": "Cap Pro 许可证",
+		"proDescriptionPrefix": "您的账户已升级到 ",
+		"proDescriptionSuffix": " 并已包含商业许可证。",
+		"commercialTitle": "商业许可证",
+		"licenseKey": "许可证密钥",
+		"expires": "过期时间",
+		"deactivate": "停用许可证",
+		"haveKey": "已有许可证密钥？",
+		"keyPlaceholder": "许可证密钥",
+		"activate": "激活许可证",
+		"activating": "正在激活...",
+		"forCommercialUse": "供商业使用",
+		"billedAnnually": "按年付费",
+		"oneTimePayment": "一次性付费",
+		"switchTo": "切换到 {{type}}: {{price}}",
+		"yearly": "年度",
+		"lifetime": "终身",
+		"purchase": "购买许可证",
+		"loading": "加载中...",
+		"features": {
+			"commercialUse": "Cap 录制器 + 编辑器的商业使用",
+			"communitySupport": "社区支持",
+			"localFeatures": "仅本地功能",
+			"perpetualOption": "永久许可证选项"
+		}
+	},
+	"experimentalPage": {
+		"title": "实验性功能",
+		"description": "这些功能仍在开发中，可能无法按预期工作。",
+		"recordingFeatures": "录制功能",
+		"features": {
+			"customCursor": {
+				"label": "工作室模式下的自定义光标捕获",
+				"description": "工作室模式录制将单独捕获光标状态以在编辑器中进行自定义（大小、平滑）。目前处于实验阶段，因为光标事件可能无法准确捕获。"
+			},
+			"nativeCamera": {
+				"label": "原生摄像头预览",
+				"description": "使用原生 GPU 表面而不是在 webview 中渲染摄像头预览。这在某些 Windows 系统上不可用，因此效果可能因人而异。"
+			},
+			"autoZoom": {
+				"label": "点击时自动缩放",
+				"description": "在工作室模式录制期间，围绕鼠标点击自动生成缩放片段。这有助于突出显示录制中的重要交互。"
+			}
+		}
+	},
+	"feedbackPage": {
+		"title": "问题反馈",
+		"description": "遇到问题？扫码添加微信直接联系我"
+	},
+	"integrationsPage": {
+		"title": "集成",
+		"description": "配置集成以扩展 Cap 的功能并连接第三方服务。",
+		"apps": {
+			"s3Config": {
+				"name": "S3 配置",
+				"description": "连接您自己的 S3 存储桶以完全控制数据存储。所有新的共享链接上传将自动上传到您配置的 S3 存储桶，确保您对内容保持完全的所有权和控制权。非常适合需要数据主权和自定义存储策略的组织。"
+			}
+		},
+		"buttons": {
+			"upgradeToPro": "升级到 Pro",
+			"configure": "配置"
+		}
+	},
+	"s3ConfigPage": {
+		"error": {
+			"fetch": "获取 S3 配置失败",
+			"save": "保存 S3 配置失败",
+			"delete": "删除 S3 配置失败",
+			"test": "S3 连接测试失败。请检查您的配置和网络连接。",
+			"timeout": "连接测试在 5 秒后超时。请检查您的端点 URL 和网络连接。"
+		},
+		"success": {
+			"save": "S3 配置保存成功",
+			"delete": "S3 配置删除成功",
+			"test": "S3 配置测试成功！连接正常。"
+		},
+		"guideTextPre": "设置并将存储桶连接到 Cap 只需不到 10 分钟。查看 ",
+		"guideLink": "存储配置指南",
+		"guideTextPost": " 开始。",
+		"storageProvider": "存储提供商",
+		"labels": {
+			"accessKeyId": "访问密钥 ID",
+			"secretAccessKey": "秘密访问密钥",
+			"endpoint": "端点",
+			"bucketName": "存储桶名称",
+			"region": "区域"
+		},
+		"providers": {
+			"aws": "AWS S3",
+			"cloudflare": "Cloudflare R2",
+			"supabase": "Supabase",
+			"minio": "MinIO",
+			"other": "其他 S3 兼容"
+		},
+		"buttons": {
+			"remove": "移除配置",
+			"removing": "正在移除...",
+			"test": "测试连接",
+			"testing": "正在测试...",
+			"save": "保存",
+			"saving": "正在保存..."
+		}
+	},
+	"recordingsOverlay": {
+		"action": {
+			"renderingVideo": "正在渲染视频",
+			"copyingToClipboard": "正在复制到剪贴板",
+			"copiedToClipboard": "已复制到剪贴板",
+			"preparing": "正在准备",
+			"renderingImage": "正在渲染图片",
+			"savingVideo": "正在保存视频",
+			"savedVideo": "视频已保存",
+			"savingImage": "正在保存图片",
+			"savedImage": "图片已保存",
+			"choosingLocation": "选择{{type}}保存位置...",
+			"creatingLink": "正在创建分享链接",
+			"linkCopied": "分享链接已复制"
+		},
+		"tooltips": {
+			"close": "关闭",
+			"edit": "编辑",
+			"view": "查看",
+			"copyToClipboard": "复制到剪贴板",
+			"copyingToClipboard": "正在复制到剪贴板",
+			"copyLink": "复制分享链接",
+			"createLink": "创建分享链接"
+		},
+		"export": "导出"
+	},
+	"recordingOverlay": {
+		"issues": {
+			"micDisconnected": "麦克风已断开。重新连接以继续录制。",
+			"cameraDisconnected": "摄像头已断开。重新连接以继续录制。",
+			"dismiss": "关闭录制问题提示"
+		},
+		"controls": {
+			"stop": "停止录制",
+			"starting": "正在启动",
+			"resume": "恢复录制",
+			"pause": "暂停录制",
+			"restart": "重新录制",
+			"delete": "删除录制",
+			"settings": "录制设置"
+		},
+		"menu": {
+			"cameraPreview": "显示摄像头预览",
+			"mic": "麦克风",
+			"micLocked": "麦克风 (在此次录制中已锁定)",
+			"noMic": "无麦克风",
+			"systemAudio": {
+				"record": "录制系统音频",
+				"noAudio": "不录制系统音频",
+				"notSupported": "系统音频录制需要 macOS 13.0 或更高版本"
+			},
+			"webcam": "网络摄像头",
+			"webcamLocked": "网络摄像头 (在此次录制中已锁定)",
+			"noWebcam": "无网络摄像头"
+		},
+		"confirm": {
+			"restartTitle": "确认重新录制",
+			"restartMessage": "您确定要重新录制吗？当前的录制将被丢弃。",
+			"restartOk": "重新录制",
+			"deleteTitle": "确认删除",
+			"deleteMessage": "您确定要删除此录制吗？",
+			"deleteOk": "删除",
+			"cancel": "取消"
+		},
+		"errors": {
+			"authRequiredTitle": "需要身份验证",
+			"authRequiredMessage": "您必须登录才能开始即时模式录制。请登录或切换到工作室模式。",
+			"login": "登录",
+			"switchToStudio": "切换到工作室模式",
+			"startErrorTitle": "开始录制时出错",
+			"signInToShare": "您需要登录才能分享录像",
+			"upgradeRequired": "分享超过 5 分钟的录像需要升级"
+		}
+	},
+	"targetSelect": {
+		"monitor": "显示器",
+		"adjustArea": "调整录制区域",
+		"resetSelection": "重置选择",
+		"minSize": "最小尺寸为 {{width}} x {{height}}",
+		"tooSmall": "{{width}} x {{height}} 太小了",
+		"hint": "点击并拖拽以选择区域",
+		"modes": {
+			"studio": "工作室模式",
+			"instant": "即时模式",
+			"screenshot": "截图模式"
+		},
+		"countdown": {
+			"title": "录制倒计时",
+			"off": "关闭",
+			"3s": "3 秒",
+			"5s": "5 秒",
+			"10s": "10 秒"
+		},
+		"actions": {
+			"signInToUse": "登录后使用",
+			"takeScreenshot": "截取屏幕",
+			"startRecording": "开始录制",
+			"exportVideo": "导出视频",
+			"saveImage": "保存图片"
+		},
+		"whatIsMode": "什么是 {{mode}} 模式？",
+		"freeWarning": "即时模式录制限制为 5 分钟，",
+		"upgradeToPro": "升级到 Pro"
+	},
+	"behaviours": {
+		"close": "关闭",
+		"minimise": "最小化",
+		"openEditor": "打开编辑器",
+		"showOverlay": "显示浮层",
+		"doNothing": "不做任何操作",
+		"reopenRecordingWindow": "重新打开录制窗口",
+		"cancel": "取消",
+		"done": "完成",
+		"delete": "删除"
+	},
+	"time": {
+		"seconds": "秒",
+		"threeSeconds": "3 秒",
+		"fiveSeconds": "5 秒",
+		"tenSeconds": "10 秒"
+	},
+	"editor": {
+		"initializing": "正在初始化编辑器...",
+		"timeline": {
+			"clip": {
+				"label": "片段"
+			},
+			"zoom": {
+				"placeholder": "点击添加缩放片段",
+				"description": "(平滑缩放重要区域)",
+				"label": "缩放",
+				"generate": "从点击处生成缩放片段"
+			},
+			"text": {
+				"placeholder": "点击添加文本",
+				"description": "(在视频上设置标签)",
+				"label": "文本",
+				"defaultContent": "标签"
+			},
+			"mask": {
+				"placeholder": "点击添加遮罩",
+				"description": "(结合敏感信息模糊或高亮遮罩)",
+				"label": "遮罩",
+				"sensitive": "模糊",
+				"highlight": "高亮"
+			},
+			"scene": {
+				"placeholder": "点击添加场景片段",
+				"description": "(使摄像头全屏或隐藏)",
+				"label": "场景",
+				"cameraOnly": "仅显示摄像头",
+				"hideCamera": "隐藏摄像头",
+				"default": "默认"
+			},
+			"addTrack": "添加轨道"
+		},
+		"sidebar": {
+			"background": "背景",
+			"camera": "摄像头",
+			"audio": "音频",
+			"cursor": "光标",
+			"captions": "字幕",
+			"audioControls": "音频控制",
+			"muteAudio": "静音音频",
+			"micStereoMode": "麦克风立体声模式",
+			"micVolume": "麦克风音量",
+			"systemAudioVolume": "系统音频音量",
+			"muted": "已静音",
+			"cursorType": "光标类型",
+			"cursorSize": "光标大小",
+			"hideWhenIdle": "空闲时隐藏",
+			"inactivityDelay": "不活动延迟",
+			"movementStyle": "移动样式",
+			"smoothMovement": "顺滑移动",
+			"tension": "张力",
+			"friction": "摩擦力",
+			"mass": "质量",
+			"highQualitySvg": "高质量 SVG 光标",
+			"backgroundBlur": "背景模糊",
+			"padding": "边距",
+			"roundedCorners": "圆角",
+			"cornerStyle": "圆角样式",
+			"motionBlur": "运动模糊",
+			"border": "边框",
+			"borderWidth": "边框宽度",
+			"borderColor": "边框颜色",
+			"borderOpacity": "边框不透明度",
+			"shadow": "阴影",
+			"shadowAdvanced": "高级阴影设置",
+			"shadowSize": "阴影大小",
+			"shadowOpacity": "阴影不透明度",
+			"shadowBlur": "阴影模糊",
+			"mirrorCamera": "镜像摄像头",
+			"hideCamera": "隐藏摄像头",
+			"cameraShape": "摄像头形状",
+			"cameraSize": "摄像头大小",
+			"zoomCameraSize": "缩放时大小",
+			"position": "位置",
+			"speed": "速度",
+			"speedNote": "修改速度将使该片段静音。",
+			"segmentSettings": "片段设置",
+			"segmentSettingsNote": "这些设置仅应用于选中的片段",
+			"clipSettings": "剪辑设置",
+			"clipSettingsNote": "这些设置应用于当前剪辑的所有片段",
+			"systemAudioOffset": "系统音频偏移",
+			"micOffset": "麦克风偏移",
+			"cameraOffset": "摄像头偏移",
+			"textSegment": "文本 {{index}}",
+			"maskSegment": "遮罩 {{index}}",
+			"zoomSegment": "缩放 {{index}}",
+			"textSegmentsSelected": "已选择 {{count}} 个文本片段",
+			"maskSegmentsSelected": "已选择 {{count}} 个遮罩片段",
+			"zoomSegmentsSelected": "已选择 {{count}} 个缩放片段",
+			"enabled": "启用",
+			"italic": "斜体",
+			"color": "颜色",
+			"fadeDuration": "淡入淡出时长",
+			"pixelation": "像素化",
+			"intensity": "强度",
+			"outsideDarkness": "外部暗度",
+			"loading": "正在加载...",
+			"clickToSelectImage": "点击选择或拖放图片",
+			"cameraLayout": "摄像头布局",
+			"cameraLayouts": {
+				"default": "默认",
+				"auto": "自动",
+				"manual": "手动",
+				"cameraOnly": "仅摄像头",
+				"hideCamera": "隐藏摄像头",
+				"defaultDescription": "同时显示屏幕和摄像头",
+				"cameraOnlyDescription": "仅显示摄像头画面",
+				"hideCameraDescription": "仅显示屏幕录制画面"
+			},
+			"backgroundSources": {
+				"wallpaper": "墙纸",
+				"image": "图片",
+				"color": "颜色",
+				"gradient": "渐变"
+			},
+			"backgroundThemes": {
+				"macOS": "macOS",
+				"dark": "深色",
+				"blue": "蓝色",
+				"purple": "紫色",
+				"orange": "橙色"
+			},
+			"messages": {
+				"wallpaperFailed": "设置墙纸失败",
+				"invalidImage": "无效的图片文件类型",
+				"imageSaveFailed": "保存图片失败"
+			},
+			"stereoModes": {
+				"stereo": "立体声",
+				"monoL": "单声道 (左)",
+				"monoR": "单声道 (右)"
+			},
+			"cameraShapes": {
+				"square": "方形",
+				"source": "原始"
+			},
+			"cornerStyles": {
+				"squircle": "超椭圆",
+				"rounded": "圆角"
+			},
+			"cursorTypes": {
+				"auto": "自动",
+				"autoDescription": "使用录制中的真实光标。",
+				"circle": "圆形",
+				"circleDescription": "类似移动端模拟器的触摸样式圆形光标。"
+			},
+			"animationStyles": {
+				"slow": "缓慢",
+				"slowDescription": "带有些许惯性的轻松平滑效果。",
+				"mellow": "柔和",
+				"mellowDescription": "适用于日常教程和演示的均衡平滑效果。",
+				"custom": "自定义",
+				"customDescription": "手动调整张力、摩擦力和质量以获得完全控制。"
+			}
+		},
+		"captions": {
+			"title": "字幕",
+			"model": "语音转文本模型",
+			"language": "语言",
+			"selectLanguage": "选择语言",
+			"downloadModel": "下载模型",
+			"downloading": "正在下载...",
+			"generate": "生成字幕",
+			"regenerate": "重新生成字幕",
+			"generating": "正在生成...",
+			"fontSettings": "字体设置",
+			"fontFamily": "字体系列",
+			"fontSize": "字体大小",
+			"highlight": "当前词高亮",
+			"highlightNote": "这是 Cap 字幕的第一个版本。当前词高亮在某些情况下可能不够准确。我们正在努力修复此问题，并将在后续版本中发布。",
+			"fontColor": "字体颜色",
+			"backgroundSettings": "背景设置",
+			"backgroundColor": "背景颜色",
+			"backgroundOpacity": "背景不透明度",
+			"position": "位置",
+			"animation": "动画",
+			"highlightColor": "高亮颜色",
+			"fadeDuration": "淡入淡出时长",
+			"downloadSuccess": "字幕模型下载成功！",
+			"downloadFailed": "下载字幕模型失败",
+			"generateSuccess": "字幕生成成功！",
+			"generateFailed": "生成字幕失败: {{error}}",
+			"noAudio": "未在视频文件中找到音频",
+			"modelNotFound": "未找到字幕模型。请先下载",
+			"loadModelFailed": "加载字幕模型失败。请尝试重新下载",
+			"noCaptionsGenerated": "未生成任何字幕。音频可能太小或不清晰。",
+			"newCaption": "新字幕",
+			"transcriptionModel": "转录模型",
+			"autoDetect": "自动检测",
+			"downloaded": "已下载",
+			"fontWeight": "字体粗细",
+			"normal": "常规",
+			"medium": "中等",
+			"bold": "加粗",
+			"exportOptions": "导出选项",
+			"exportWithSubtitles": "导出时包含字幕",
+			"segments": "字幕片段",
+			"addAtCurrentTime": "在当前位置添加",
+			"startTime": "开始时间",
+			"endTime": "结束时间",
+			"text": "字幕文本"
+		},
+		"export": {
+			"title": "导出",
+			"backToEditor": "返回编辑器",
+			"preview": "预览",
+			"previewNote": "这是视频中的一个渲染帧。调整下方设置以查看最终导出视频的质量。",
+			"generatingPreview": "正在生成预览...",
+			"destination": "目的地",
+			"organization": "组织",
+			"file": "文件",
+			"fileDescription": "保存到您的电脑",
+			"clipboard": "剪贴板",
+			"clipboardDescription": "复制以便在任何地方粘贴",
+			"shareableLink": "可分享链接",
+			"shareableLinkDescription": "通过 Cap 云分享",
+			"format": "格式",
+			"noMp4Transparency": "MP4 不支持透明背景",
+			"linksRequireMp4": "链接分享仅支持 MP4 格式",
+			"resolution": "分辨率",
+			"frameRate": "帧率",
+			"qualityLabel": "画质",
+			"smallerFile": "更小文件",
+			"largerFile": "更高画质",
+			"qualityPreview": "画质预览",
+			"estimatedSize": "预计大小:",
+			"compression": {
+				"title": "压缩",
+				"minimal": "极小",
+				"social": "社交媒体",
+				"socialShort": "社交",
+				"web": "网页",
+				"potato": "低画质"
+			},
+			"actions": {
+				"signInToShare": "登录以分享",
+				"exportToFile": "导出到文件",
+				"exportToClipboard": "导出到剪贴板",
+				"exportToLink": "导出为链接",
+				"copyLink": "复制链接",
+				"openLink": "打开链接",
+				"openFile": "打开文件",
+				"copyToClipboard": "复制到剪贴板"
+			},
+			"status": {
+				"preparing": "正在准备...",
+				"renderingGif": "正在渲染 GIF...",
+				"renderingVideo": "正在渲染视频...",
+				"copying": "正在复制到剪贴板...",
+				"copied": "已复制到剪贴板",
+				"exportingToFile": "正在导出到文件...",
+				"exportCompleted": "导出完成",
+				"exportComplete": "导出成功",
+				"ready": "您的 {{type}} 已准备就绪",
+				"uploading": "正在上传...",
+				"uploadingProgress": "正在上传 - {{progress}}%",
+				"uploadComplete": "上传成功",
+				"uploadSuccess": "您的录制已成功上传",
+				"renderingFrames": "正在渲染 {{type}} ({{current}}/{{total}} 帧)",
+				"preparingRender": "正在准备渲染..."
+			},
+			"messages": {
+				"authRequired": "您需要登录才能分享录制",
+				"planCheckFailed": "验证您的订阅状态失败",
+				"upgradeRequired": "此功能需要升级后的计划",
+				"uploadFailed": "上传录制失败",
+				"exportedToClipboard": "{{type}} 已导出到剪贴板",
+				"exportedToFile": "{{type}} 已导出到文件",
+				"errorCopying": "复制录制失败",
+				"errorExporting": "导出录制失败: {{error}}",
+				"cancelConfirm": "您确定要取消导出吗？",
+				"cancelTitle": "取消导出"
+			},
+			"recording": "录制视频",
+			"gif": "GIF 动图",
+			"quality": {
+				"minimal": "极小压缩",
+				"maximum": "最高画质",
+				"social": "社交媒体",
+				"web": "网页",
+				"potato": "低画质"
+			},
+			"exportTo": {
+				"file": {
+					"label": "文件",
+					"description": "保存到您的电脑"
+				},
+				"clipboard": {
+					"label": "剪贴板",
+					"description": "复制以便粘贴"
+				},
+				"link": {
+					"label": "链接",
+					"description": "通过 Cap 云分享"
+				}
+			}
+		},
+		"header": {
+			"deleteTooltip": "删除录制",
+			"openBundleTooltip": "打开录制包",
+			"captionsTooltip": "字幕",
+			"performanceTooltip": "性能",
+			"undoTooltip": "撤销",
+			"redoTooltip": "重做",
+			"export": "导出",
+			"confirmDelete": "您确定要删除此录制吗？"
+		},
+		"presets": {
+			"title": "预设",
+			"none": "暂无预设",
+			"default": "默认",
+			"apply": "应用",
+			"setDefault": "设为默认",
+			"rename": "重命名",
+			"delete": "删除",
+			"create": "创建新预设",
+			"createTitle": "创建预设",
+			"renameTitle": "重命名预设",
+			"deleteTitle": "删除预设",
+			"deleteConfirm": "您确定要删除此预设吗？",
+			"placeholder": "输入预设名称...",
+			"setDefaultAction": "设为默认"
+		},
+		"player": {
+			"quality": "预览画质",
+			"selectQuality": "选择预览画质",
+			"crop": "裁剪",
+			"cropTooltip": "裁剪视频",
+			"playPauseTooltip": "播放 / 暂停视频",
+			"splitTooltip": "切换分割",
+			"zoomOutTooltip": "缩小",
+			"zoomInTooltip": "放大",
+			"secondsVisible": "{{seconds}} 秒可见",
+			"qualities": {
+				"full": "全屏",
+				"half": "二分之一",
+				"quarter": "四分之一"
+			}
+		},
+		"share": {
+			"signInRequired": "您需要登录才能分享录制",
+			"upgradeRequired": "分享超过 5 分钟的录制需要升级计划",
+			"failedToVerify": "无法验证您的订阅状态",
+			"upgradeRequiredFeature": "此功能需要升级计划",
+			"failedToUpload": "上传录制失败",
+			"reuploading": "正在重新上传视频",
+			"reupload": "重新上传视频",
+			"openLink": "打开链接",
+			"selectLink": "选择链接",
+			"copyLink": "复制链接",
+			"reuploadTitle": "重新上传录制",
+			"preparing": "正在准备渲染...",
+			"rendering": "正在渲染视频 ({{current}}/{{total}} 帧)",
+			"uploading": "正在上传 - {{progress}}%",
+			"copied": "链接已复制到剪贴板！"
+		},
+		"crop": {
+			"size": "尺寸",
+			"position": "位置",
+			"full": "全屏",
+			"reset": "重置",
+			"save": "保存"
+		}
+	},
+	"screenshotEditor": {
+		"header": {
+			"crop": "裁剪图片",
+			"copy": "复制到剪贴板",
+			"save": "保存",
+			"moreActions": "更多操作",
+			"openFolder": "打开文件夹",
+			"delete": "删除",
+			"confirmDelete": "您确定要删除此截图吗？"
+		},
+		"tools": {
+			"layers": "图层",
+			"select": "选择",
+			"arrow": "箭头",
+			"rectangle": "矩形",
+			"mask": "遮罩",
+			"circle": "圆形",
+			"text": "文本"
+		},
+		"layers": {
+			"title": "图层",
+			"empty": "暂无图层",
+			"instruction": "使用上方工具添加标注",
+			"reorder": "拖动以排序 • 顶部代表顶层"
+		},
+		"config": {
+			"color": "颜色",
+			"stroke": "描边",
+			"width": "宽度",
+			"fill": "填充",
+			"opacity": "不透明度",
+			"style": "样式",
+			"intensity": "强度",
+			"size": "大小",
+			"done": "完成",
+			"transparent": "透明",
+			"blur": "模糊",
+			"pixelate": "马赛克"
+		},
+		"background": {
+			"title": "背景",
+			"image": "背景图片",
+			"blur": "背景模糊",
+			"selectImage": "点击选择或拖放图片",
+			"sources": {
+				"wallpaper": "壁纸",
+				"image": "图片",
+				"color": "颜色",
+				"gradient": "渐变"
+			},
+			"themes": {
+				"macOS": "macOS",
+				"dark": "深色",
+				"blue": "蓝色",
+				"purple": "紫色",
+				"orange": "橙色"
+			}
+		},
+		"appearance": {
+			"shadow": {
+				"title": "阴影",
+				"advanced": "高级阴影设置"
+			},
+			"padding": {
+				"title": "边距"
+			},
+			"rounding": {
+				"title": "圆角",
+				"label": "圆角",
+				"cornerStyle": {
+					"label": "圆角样式",
+					"squircle": "超椭圆",
+					"rounded": "圆角"
+				}
+			},
+			"border": {
+				"title": "边框"
+			},
+			"annotation": {
+				"settings": "标注设置",
+				"placeholder": "选择一个标注进行编辑。",
+				"strokeColor": "边框颜色",
+				"fillColor": "填充颜色",
+				"strokeWidth": "边框宽度",
+				"delete": "删除标注"
+			}
+		}
+	},
+	"fps": {
+		"30": "30 FPS",
+		"60": "60 FPS（推荐）",
+		"120": "120 FPS"
+	},
+	"notifications": {
+		"micDisconnected": {
+			"title": "麦克风已断开",
+			"body": "录制已暂停。请重新连接麦克风，然后恢复或停止录制。"
+		},
+		"cameraDisconnected": {
+			"title": "摄像头已断开",
+			"body": "录制已暂停。请重新连接摄像头，然后恢复或停止录制。"
+		},
+		"videoSaved": {
+			"title": "视频已保存",
+			"body": "视频已成功保存"
+		},
+		"videoCopied": {
+			"title": "视频已复制",
+			"body": "视频已复制到剪贴板"
+		},
+		"linkCopied": {
+			"title": "链接已复制",
+			"body": "链接已复制到剪贴板"
+		},
+		"uploadFailed": {
+			"title": "上传失败",
+			"body": "无法上传媒体。请重试"
+		},
+		"videoSaveFailed": {
+			"title": "保存失败",
+			"body": "无法保存视频。请重试"
+		},
+		"videoCopyFailed": {
+			"title": "复制失败",
+			"body": "无法将视频复制到剪贴板。请重试"
+		},
+		"shareFailed": {
+			"title": "分享失败",
+			"body": "无法创建分享链接。请重试"
+		},
+		"screenshotSaved": {
+			"title": "截图已保存",
+			"body": "截图已成功保存"
+		},
+		"screenshotCopied": {
+			"title": "截图已复制",
+			"body": "截图已复制到剪贴板"
+		},
+		"screenshotSaveFailed": {
+			"title": "保存失败",
+			"body": "无法保存截图。请重试"
+		},
+		"screenshotCopyFailed": {
+			"title": "复制失败",
+			"body": "无法将截图复制到剪贴板。请重试"
+		}
+	},
+	"setup": {
+		"permissionsRequired": "需要授权",
+		"description": "Cap 需要相关权限才能正常运行。",
+		"granted": "已授权",
+		"openSettings": "打开设置",
+		"grantPermission": "授予权限",
+		"continue": "继续",
+		"continueToCap": "进入 Cap",
+		"restartRequired": "需要重启",
+		"restartMessage": "在系统设置中添加 Cap 后，您需要重启应用以使权限生效。",
+		"restartOk": "已授权，立即重启",
+		"restartCancel": "稍后，我还需设置",
+		"welcome": "欢迎使用 Cap",
+		"tagline": "由您掌控的精美屏幕录制。",
+		"getStarted": "开始使用",
+		"selectMode": "选择录制模式",
+		"modeDescription": "选择您希望的录制方式。您稍后可以随时更改。",
+		"permissions": {
+			"screenRecording": {
+				"name": "屏幕录制",
+				"description": "在系统设置中添加 Cap，然后重启应用以使更改生效。"
+			},
+			"accessibility": {
+				"name": "辅助功能",
+				"description": "在录制期间，Cap 会在本地收集鼠标活动，以生成自动缩放片段。"
+			},
+			"microphone": {
+				"name": "麦克风",
+				"description": "录制 Caps 中的音频需要此权限。"
+			},
+			"camera": {
+				"name": "摄像头",
+				"description": "录制 Caps 中的摄像头画面需要此权限。"
+			}
+		}
+	},
+	"upgrade": {
+		"title": "早期采纳者定价",
+		"completeTitle": "升级完成",
+		"completeMessage": "您现在可以关闭此窗口了 - 感谢您的升级！",
+		"closeWindow": "关闭窗口",
+		"commercialLicense": "商业许可证",
+		"commercialDescription": "您的 Cap 商业用途许可证详情",
+		"licenseKey": "许可证密钥",
+		"expires": "有效期至",
+		"deactivating": "正在停用...",
+		"deactivateLicense": "停用许可证",
+		"forCommercialUse": "用于商业用途",
+		"billedAnnually": "按年计费",
+		"oneTimePayment": "一次性付款",
+		"switchTo": "切换到 {{mode}}: {{price}}",
+		"lifetime": "终身",
+		"yearly": "年度",
+		"monthly": "月度",
+		"purchaseLicense": "购买许可证",
+		"alreadyHaveLicense": "已有许可证密钥？",
+		"capPro": "Cap 专业版",
+		"proDescription": "适用于专业人士和团队。",
+		"perUserBilledAnnually": "每用户，按年计费",
+		"perUserBilledMonthly": "每用户，按月计费",
+		"upgradeToPro": "升级到 Cap 专业版",
+		"proFeatures": {
+			"commercial": "包含商业许可证",
+			"storage": "无限云端存储和分享链接",
+			"s3": "连接自定义 S3 存储桶",
+			"teams": "高级团队功能",
+			"views": "无限观看次数",
+			"password": "密码保护视频",
+			"analytics": "高级分析",
+			"support": "优先支持"
+		},
+		"pricing": {
+			"commercial": "Cap 录制器 + 编辑器商业使用权",
+			"support": "社区支持",
+			"localOnly": "仅本地功能",
+			"perpetual": "永久许可证选项"
+		},
+		"activateLicense": {
+			"title": "激活许可证",
+			"placeholder": "输入许可证密钥...",
+			"button": "激活"
+		}
+	},
+	"update": {
+		"noUpdate": "当前已是最新版本",
+		"installing": "正在安装更新",
+		"done": "更新已安装。重启 Cap 以完成更新。",
+		"restartNow": "立即重启"
+	},
+	"errorPage": {
+		"title": "发生错误",
+		"description": "非常抱歉，程序运行出现了问题。",
+		"copyError": "复制错误信息",
+		"reload": "重新加载",
+		"close": "关闭"
+	},
+	"changelogPage": {
+		"title": "赞助我们",
+		"description": "如果这个软件对您有帮助，欢迎请我喝杯咖啡 ☕",
+		"thanks": "感谢您的支持，您的鼓励是我持续更新的动力！"
+	}
 }

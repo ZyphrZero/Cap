@@ -1,71 +1,92 @@
 <p align="center">
   <p align="center">
-   <img width="150" height="150" src="https://github.com/CapSoftware/Cap/blob/main/apps/desktop/src-tauri/icons/Square310x310Logo.png" alt="Logo">
+   <img width="150" height="150" src="./apps/desktop/src-tauri/icons/Square310x310Logo.png" alt="Logo">
   </p>
-	<h1 align="center"><b>Cap</b></h1>
+	<h1 align="center"><b>Cap 中文版</b></h1>
 	<p align="center">
-		The open source Loom alternative.
+		开源屏幕录制工具，基于原项目汉化并优化
     <br />
-    <a href="https://cap.so"><strong>Cap.so »</strong></a>
+    <a href="https://github.com/lid664951-crypto/Cap"><strong>GitHub 仓库 »</strong></a>
     <br />
     <br />
-    <b>Downloads for </b>
-		<a href="https://cap.so/download">macOS & Windows</a>
+    <b>支持平台：</b>
+		macOS & Windows
     <br />
   </p>
 </p>
 <br/>
 
-[![Open Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2FCapSoftware%2Fbounties%3Fstatus%3Dopen)](https://console.algora.io/org/CapSoftware/bounties?status=open)
+## 📖 项目简介
 
-Cap is the open source alternative to Loom. It's a video messaging tool that allows you to record, edit and share videos in seconds.
+Cap 中文版是基于 <a href="https://github.com/CapSoftware/Cap">Cap 官方项目</a> 进行汉化和优化的开源屏幕录制工具，是 Loom 的开源替代方案。它允许您在几秒钟内录制、编辑和分享视频。
 
-<img src="https://raw.githubusercontent.com/CapSoftware/Cap/refs/heads/main/apps/web/public/landing-cover.png"/>
+## ✨ 主要特性
 
-# Self Hosting
+- **完全汉化**：界面和功能说明已全部汉化，提供更友好的中文用户体验
+- **移除登录限制**：无需登录即可使用所有功能
+- **去除付费板块**：所有功能完全免费使用
+- **同步官方版本**：已同步官方 0.4.3 版本
+- **编辑器优化**：优化了视频编辑功能，使用更流畅
+- **多平台支持**：支持 macOS 和 Windows 系统
 
-Cap Web is available to self-host using Docker or Railway, see our [self-hosting docs](https://cap.so/docs/self-hosting) to learn more.
-You can also use the button below to deploy Cap Web to Railway:
+## 📸 界面预览
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/PwpGcf)
+### 首页
+<img src="./UI界面/首页.png" alt="首页" width="800" />
 
-Cap Desktop can connect to your self-hosted Cap Web instance regardless of if you build it yourself or [download from our website](https://cap.so/download).
+### 编辑器页面
+<img src="./UI界面/编辑器页面.png" alt="编辑器页面" width="800" />
 
-# Monorepo App Architecture
+### 设置页面
+<img src="./UI界面/设置页面.png" alt="设置页面" width="800" />
 
-We use a combination of Rust, React (Next.js), TypeScript, Tauri, Drizzle (ORM), MySQL, TailwindCSS throughout this Turborepo powered monorepo.
+## 🚀 安装使用
 
-> A note about database: The codebase is currently designed to work with MySQL only. MariaDB or other compatible databases might partially work but are not officially supported.
+### 方法一：直接运行
+1. 从 GitHub 仓库下载最新版本
+2. 解压后运行相应平台的可执行文件
 
-### Apps:
+### 方法二：源码构建
+```bash
+# 克隆仓库
+git clone https://github.com/lid664951-crypto/Cap.git
+cd Cap
 
-- `desktop`: A [Tauri](https://tauri.app) (Rust) app, using [SolidStart](https://start.solidjs.com) on the frontend.
-- `web`: A [Next.js](https://nextjs.org) web app.
+# 安装依赖
+pnpm install
 
-### Packages:
+# 构建桌面应用
+pnpm build:desktop
 
-- `ui`: A [React](https://reactjs.org) Shared component library.
-- `utils`: A [React](https://reactjs.org) Shared utility library.
-- `tsconfig`: Shared `tsconfig` configurations used throughout the monorepo.
-- `database`: A [React](https://reactjs.org) and [Drizzle ORM](https://orm.drizzle.team/) Shared database library.
-- `config`: `eslint` configurations (includes `eslint-config-next`, `eslint-config-prettier` other configs used throughout the monorepo).
+# 运行开发版本
+pnpm dev:desktop
+```
 
-### License:
-Portions of this software are licensed as follows:
+## 🛠️ 技术栈
 
-- All code residing in the `cap-camera*` and `scap-*` families of crates is licensed under the MIT License (see [licenses/LICENSE-MIT](https://github.com/CapSoftware/Cap/blob/main/licenses/LICENSE-MIT)).
-- All third party components are licensed under the original license provided by the owner of the applicable component
-- All other content not mentioned above is available under the AGPLv3 license as defined in [LICENSE](https://github.com/CapSoftware/Cap/blob/main/LICENSE)
-  
-# Contributing
+- **前端**：React (Next.js)、TypeScript、SolidStart、TailwindCSS
+- **后端**：Rust、Tauri、Drizzle (ORM)、MySQL
+- **构建工具**：Turborepo
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more information. This guide is a work in progress, and is updated regularly as the app matures.
+## 📄 许可证
 
-## Analytics (Tinybird)
+本项目基于原项目的许可证进行分发：
 
-Cap uses [Tinybird](https://www.tinybird.co) to ingest viewer telemetry for dashboards. The Tinybird admin token (`TINYBIRD_ADMIN_TOKEN` or `TINYBIRD_TOKEN`) must be available in your environment. Once the token is present you can:
+- `cap-camera*` 和 `scap-*` 系列代码使用 MIT 许可证
+- 第三方组件使用其原始许可证
+- 其他内容使用 AGPLv3 许可证
 
-- Provision the required data sources and materialized views via `pnpm analytics:setup`. This command installs the Tinybird CLI (if needed), runs `tb login` when a `.tinyb` credential file is missing, copies that credential into `scripts/analytics/tinybird`, and finally executes `tb deploy --allow-destructive-operations --wait` from that directory. **It synchronizes the Tinybird workspace to the resources defined in `scripts/analytics/tinybird`, removing any other datasources/pipes in that workspace.**
-- Validate that the schema and materialized views match what the app expects via `pnpm analytics:check`.
+详细信息请查看 [LICENSE](LICENSE) 文件。
 
-Both commands target the workspace pointed to by `TINYBIRD_HOST` (defaults to `https://api.tinybird.co`). Make sure you are comfortable with the destructive nature of the deploy step before running `analytics:setup`.
+## 🔗 相关链接
+
+- **官方项目**：<a href="https://github.com/CapSoftware/Cap">https://github.com/CapSoftware/Cap</a>
+- **本项目**：<a href="https://github.com/lid664951-crypto/Cap">https://github.com/lid664951-crypto/Cap</a>
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request 来帮助改进这个项目！
+
+## 📞 联系方式
+
+如有问题或建议，请在 GitHub 仓库中提交 Issue。

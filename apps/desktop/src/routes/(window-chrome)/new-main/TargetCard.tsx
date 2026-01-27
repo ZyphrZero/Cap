@@ -51,25 +51,25 @@ function formatRefreshRate(refreshRate?: number) {
 
 type TargetCardProps = (
 	| {
-		variant: "display";
-		target: CaptureDisplayWithThumbnail;
-	}
+			variant: "display";
+			target: CaptureDisplayWithThumbnail;
+	  }
 	| {
-		variant: "window";
-		target: CaptureWindowWithThumbnail;
-	}
+			variant: "window";
+			target: CaptureWindowWithThumbnail;
+	  }
 	| {
-		variant: "recording";
-		target: RecordingWithPath;
-		uploadProgress?: number;
-		isReuploading?: boolean;
-		onReupload?: (path: string) => void;
-		onRefetch?: () => void;
-	}
+			variant: "recording";
+			target: RecordingWithPath;
+			uploadProgress?: number;
+			isReuploading?: boolean;
+			onReupload?: (path: string) => void;
+			onRefetch?: () => void;
+	  }
 	| {
-		variant: "screenshot";
-		target: ScreenshotWithPath;
-	}
+			variant: "screenshot";
+			target: ScreenshotWithPath;
+	  }
 ) &
 	Omit<ComponentProps<"button">, "children"> & {
 		highlightQuery?: string;
@@ -135,7 +135,9 @@ export default function TargetCard(props: TargetCardProps) {
 	const subtitle = createMemo(() => {
 		const recording = recordingTarget();
 		if (recording) {
-			return recording.mode === "studio" ? t("recording.modeSelect.studio.title") : t("recording.modeSelect.instant.title");
+			return recording.mode === "studio"
+				? t("recording.modeSelect.studio.title")
+				: t("recording.modeSelect.instant.title");
 		}
 		return undefined;
 	});
@@ -330,8 +332,9 @@ export default function TargetCard(props: TargetCardProps) {
 					{(src) => (
 						<img
 							src={src()}
-							alt={`${local.variant === "display" ? "Display" : "Window"
-								} preview for ${label()}`}
+							alt={`${
+								local.variant === "display" ? "Display" : "Window"
+							} preview for ${label()}`}
 							class="object-cover w-full h-full"
 							loading="lazy"
 							draggable={false}
@@ -358,7 +361,9 @@ export default function TargetCard(props: TargetCardProps) {
 						<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-9/20 text-red-11">
 							<IconPhWarningBold class="size-2.5" />
 							<span class="text-[10px] font-medium">
-								{recordingFailed() ? t("recordingsPage.status.failed") : t("recordingsPage.status.uploadFailed")}
+								{recordingFailed()
+									? t("recordingsPage.status.failed")
+									: t("recordingsPage.status.uploadFailed")}
 							</span>
 						</div>
 					</div>
@@ -445,7 +450,11 @@ export default function TargetCard(props: TargetCardProps) {
 										when={hasProgress}
 										fallback={
 											<Tooltip
-												content={uploadFailed ? t("recordingsPage.actions.retryUpload") : t("recordingsPage.actions.reupload")}
+												content={
+													uploadFailed
+														? t("recordingsPage.actions.retryUpload")
+														: t("recordingsPage.actions.reupload")
+												}
 											>
 												<div
 													role="button"

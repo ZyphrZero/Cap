@@ -14,24 +14,27 @@ export function handleRecordingResult(
 			if (result === "InvalidAuthentication") {
 				const buttons = setOptions
 					? {
-						yes: t('recordingOverlay.errors.login'),
-						no: t('recordingOverlay.errors.switchToStudio'),
-						cancel: t('recordingOverlay.confirm.cancel'),
-					}
+							yes: t("recordingOverlay.errors.login"),
+							no: t("recordingOverlay.errors.switchToStudio"),
+							cancel: t("recordingOverlay.confirm.cancel"),
+						}
 					: {
-						ok: t('recordingOverlay.errors.login'),
-						cancel: t('recordingOverlay.confirm.cancel'),
-					};
+							ok: t("recordingOverlay.errors.login"),
+							cancel: t("recordingOverlay.confirm.cancel"),
+						};
 
 				const dialogResult = await dialog.message(
-					t('recordingOverlay.errors.authRequiredMessage'),
+					t("recordingOverlay.errors.authRequiredMessage"),
 					{
-						title: t('recordingOverlay.errors.authRequiredTitle'),
+						title: t("recordingOverlay.errors.authRequiredTitle"),
 						buttons,
 					},
 				);
 
-				if (dialogResult === (buttons as any).yes || dialogResult === (buttons as any).ok)
+				if (
+					dialogResult === (buttons as any).yes ||
+					dialogResult === (buttons as any).ok
+				)
 					emit("start-sign-in");
 				else if (dialogResult === (buttons as any).no && setOptions) {
 					setOptions({ mode: "studio" });
@@ -40,12 +43,12 @@ export function handleRecordingResult(
 			} else if (result === "UpgradeRequired") commands.showWindow("Upgrade");
 			else
 				await dialog.message(`Error: ${result}`, {
-					title: t('recordingOverlay.errors.startErrorTitle'),
+					title: t("recordingOverlay.errors.startErrorTitle"),
 				});
 		})
 		.catch((err) =>
 			dialog.message(err, {
-				title: t('recordingOverlay.errors.startErrorTitle'),
+				title: t("recordingOverlay.errors.startErrorTitle"),
 				kind: "error",
 			}),
 		);
