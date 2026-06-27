@@ -49,6 +49,10 @@ export function I18nProvider(props: ParentProps) {
 		await i18nChangeLanguage(lng);
 		localStorage.setItem(languageStorageKey, lng);
 		syncLanguage(lng);
+		await syncTrayLanguage(lng);
+	};
+
+	const syncTrayLanguage = async (lng: LanguageCode) => {
 		if (isTauriRuntime()) {
 			await invoke("set_tray_language", { language: lng });
 		}
@@ -67,6 +71,8 @@ export function I18nProvider(props: ParentProps) {
 		const savedLanguage = getStoredLanguage() ?? defaultLanguage;
 		if (savedLanguage !== getCurrentLanguage()) {
 			void changeLanguage(savedLanguage);
+		} else {
+			void syncTrayLanguage(savedLanguage);
 		}
 	});
 

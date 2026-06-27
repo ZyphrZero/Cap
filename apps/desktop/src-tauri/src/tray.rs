@@ -39,6 +39,13 @@ fn t_en(key: &str) -> &str {
         "upload_logs" => "Upload Logs",
         "quit" => "Quit Cap",
         "request_permissions" => "Request Permissions",
+        "previous" => "Previous",
+        "no_recent_items" => "No recent items",
+        "video_files" => "Video Files",
+        "failed_to_import_video" => "Failed to import video",
+        "import_error" => "Import Error",
+        "logs_uploaded_successfully" => "Logs uploaded successfully",
+        "failed_to_upload_logs" => "Failed to upload logs",
         _ => key,
     }
 }
@@ -64,6 +71,13 @@ fn t_zh(key: &str) -> &str {
         "upload_logs" => "上传日志",
         "quit" => "退出 Cap",
         "request_permissions" => "请求权限",
+        "previous" => "最近项目",
+        "no_recent_items" => "暂无最近项目",
+        "video_files" => "视频文件",
+        "failed_to_import_video" => "导入视频失败",
+        "import_error" => "导入错误",
+        "logs_uploaded_successfully" => "日志上传成功",
+        "failed_to_upload_logs" => "日志上传失败",
         _ => key,
     }
 }
@@ -371,18 +385,18 @@ fn create_previous_submenu(
     cache: &PreviousItemsCache,
 ) -> tauri::Result<Submenu<tauri::Wry>> {
     if cache.items.is_empty() {
-        let submenu = Submenu::with_id(app, "previous", "Previous", false)?;
+        let submenu = Submenu::with_id(app, "previous", t("previous"), false)?;
         submenu.append(&MenuItem::with_id(
             app,
             "previous_empty",
-            "No recent items",
+            t("no_recent_items"),
             false,
             None::<&str>,
         )?)?;
         return Ok(submenu);
     }
 
-    let submenu = Submenu::with_id(app, "previous", "Previous", true)?;
+    let submenu = Submenu::with_id(app, "previous", t("previous"), true)?;
 
     for item in &cache.items {
         let id = TrayItem::PreviousItem(item.path.to_string_lossy().to_string());
@@ -828,7 +842,7 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                             .dialog()
                             .file()
                             .add_filter(
-                                "Video Files",
+                                t("video_files"),
                                 &["mp4", "mov", "avi", "mkv", "webm", "wmv", "m4v", "flv"],
                             )
                             .blocking_pick_file();
@@ -849,8 +863,8 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                                 Err(e) => {
                                     tracing::error!("Failed to import video: {e}");
                                     app.dialog()
-                                        .message(format!("Failed to import video: {e}"))
-                                        .title("Import Error")
+                                        .message(format!("{}: {e}", t("failed_to_import_video")))
+                                        .title(t("import_error"))
                                         .kind(tauri_plugin_dialog::MessageDialogKind::Error)
                                         .blocking_show();
                                 }
@@ -883,12 +897,14 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                             Ok(_) => {
                                 tracing::info!("Successfully uploaded logs");
                                 app.dialog()
-                                    .message("Logs uploaded successfully")
+                                    .message(t("logs_uploaded_successfully"))
                                     .show(|_| {});
                             }
                             Err(e) => {
                                 tracing::error!("Failed to upload logs: {e:#}");
-                                app.dialog().message("Failed to upload logs").show(|_| {});
+                                app.dialog()
+                                    .message(t("failed_to_upload_logs"))
+                                    .show(|_| {});
                             }
                         }
                     });
