@@ -10,8 +10,8 @@ use std::{
 use tracing::{debug, info, warn};
 
 use crate::{
-    CaptionsData, CursorEvents, CursorImage, ProjectConfiguration, XY,
-    cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS,
+    cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS, CaptionsData, CursorEvents, CursorImage,
+    ProjectConfiguration, XY,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -117,8 +117,6 @@ pub enum RecordingMetaInner {
     Instant(InstantRecordingMeta),
 }
 
-impl specta::Flatten for RecordingMetaInner {}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum InstantRecordingMeta {
@@ -191,12 +189,10 @@ impl RecordingMeta {
 pub enum StudioRecordingMeta {
     SingleSegment {
         #[serde(flatten)]
-        #[specta(flatten)]
         segment: SingleSegment,
     },
     MultipleSegments {
         #[serde(flatten)]
-        #[specta(flatten)]
         inner: MultipleSegments,
     },
 }

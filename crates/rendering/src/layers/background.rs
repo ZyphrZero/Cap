@@ -6,8 +6,8 @@ use specta::Type;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
-    ProjectUniforms, RenderVideoConstants, RenderingError, create_shader_render_pipeline,
-    srgb_to_linear,
+    create_shader_render_pipeline, srgb_to_linear, ProjectUniforms, RenderVideoConstants,
+    RenderingError,
 };
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Type)]
@@ -341,8 +341,8 @@ impl ImageBackgroundPipeline {
             layout: Some(
                 &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("ImageBackgroundPipelineLayout"),
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
+                    bind_group_layouts: &[Some(&bind_group_layout)],
+                    immediate_size: 0,
                 }),
             ),
             vertex: wgpu::VertexState {
@@ -378,7 +378,7 @@ impl ImageBackgroundPipeline {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -400,7 +400,7 @@ impl ImageBackgroundPipeline {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             ..Default::default()
         });
 

@@ -1,19 +1,19 @@
 use crate::{
-    RecordingBaseInputs,
     capture_pipeline::{
-        MakeCapturePipeline, ScreenCaptureMethod, Stop, target_to_display_and_crop,
+        target_to_display_and_crop, MakeCapturePipeline, ScreenCaptureMethod, Stop,
     },
     feeds::microphone::MicrophoneFeedLock,
     output_pipeline::{self, OutputPipeline},
     resolution_limits::ensure_even,
     sources::screen_capture::{ScreenCaptureConfig, ScreenCaptureTarget},
+    RecordingBaseInputs,
 };
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use cap_media_info::{AudioInfo, VideoInfo};
 use cap_project::InstantRecordingMeta;
 use cap_timestamp::Timestamps;
 use cap_utils::ensure_dir;
-use kameo::{Actor as _, prelude::*};
+use kameo::prelude::*;
 use std::{
     path::PathBuf,
     sync::Arc,
@@ -48,7 +48,7 @@ pub struct ActorHandle {
 
 impl ActorHandle {
     pub async fn stop(&self) -> anyhow::Result<CompletedRecording> {
-        Ok(self.actor_ref.ask(Stop).await?)
+        Ok(self.actor_ref.ask(Stop).await.map_err(|e| anyhow!("{e}"))?)
     }
 
     pub fn done_fut(&self) -> output_pipeline::DoneFut {
@@ -56,19 +56,35 @@ impl ActorHandle {
     }
 
     pub async fn pause(&self) -> anyhow::Result<()> {
-        Ok(self.actor_ref.ask(Pause).await?)
+        Ok(self
+            .actor_ref
+            .ask(Pause)
+            .await
+            .map_err(|e| anyhow!("{e}"))?)
     }
 
     pub async fn resume(&self) -> anyhow::Result<()> {
-        Ok(self.actor_ref.ask(Resume).await?)
+        Ok(self
+            .actor_ref
+            .ask(Resume)
+            .await
+            .map_err(|e| anyhow!("{e}"))?)
     }
 
     pub async fn cancel(&self) -> anyhow::Result<()> {
-        Ok(self.actor_ref.ask(Cancel).await?)
+        Ok(self
+            .actor_ref
+            .ask(Cancel)
+            .await
+            .map_err(|e| anyhow!("{e}"))?)
     }
 
     pub async fn is_paused(&self) -> anyhow::Result<bool> {
-        Ok(self.actor_ref.ask(IsPaused).await?)
+        Ok(self
+            .actor_ref
+            .ask(IsPaused)
+            .await
+            .map_err(|e| anyhow!("{e}"))?)
     }
 }
 

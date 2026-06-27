@@ -4,8 +4,8 @@ use cap_fail::fail_err;
 use cap_media_info::VideoInfo;
 use cap_timestamp::Timestamp;
 use futures::{
-    FutureExt,
     future::{BoxFuture, Shared},
+    FutureExt,
 };
 use kameo::prelude::*;
 use replace_with::replace_with_or_abort;
@@ -641,14 +641,14 @@ impl Message<SetInput> for CameraFeed {
 
         match &mut self.state {
             State::Open(state) => {
-                let actor_ref = ctx.actor_ref();
+                let actor_ref = ctx.actor_ref().clone();
                 let new_frame_recipient = actor_ref.clone().recipient();
                 let native_frame_recipient = actor_ref.clone().recipient();
                 let id = msg.id.clone();
 
                 let (ready, _done_tx) = spawn_camera_setup(
                     id.clone(),
-                    actor_ref,
+                    actor_ref.clone(),
                     new_frame_recipient,
                     native_frame_recipient,
                     CameraSetupFlow::Open,
@@ -668,13 +668,13 @@ impl Message<SetInput> for CameraFeed {
                     return Err(SetInputError::Locked(FeedLockedError));
                 }
 
-                let actor_ref = ctx.actor_ref();
+                let actor_ref = ctx.actor_ref().clone();
                 let new_frame_recipient = actor_ref.clone().recipient();
                 let native_frame_recipient = actor_ref.clone().recipient();
 
                 let (ready, _done_tx) = spawn_camera_setup(
                     msg.id.clone(),
-                    actor_ref,
+                    actor_ref.clone(),
                     new_frame_recipient,
                     native_frame_recipient,
                     CameraSetupFlow::Locked,
@@ -897,16 +897,17 @@ impl Message<Lock> for CameraFeed {
 
         let (drop_tx, drop_rx) = oneshot::channel();
 
-        let actor_ref = ctx.actor_ref();
+        let actor_ref = ctx.actor_ref().clone();
+        let unlock_actor_ref = actor_ref.clone();
         tokio::spawn(async move {
             let _ = drop_rx.await;
-            let _ = actor_ref.tell(Unlock).await;
+            let _ = unlock_actor_ref.tell(Unlock).await;
         });
 
         Ok(CameraFeedLock {
             camera_info,
             video_info,
-            actor: ctx.actor_ref(),
+            actor: actor_ref,
             drop_tx: Some(drop_tx),
         })
     }

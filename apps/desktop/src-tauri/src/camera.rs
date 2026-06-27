@@ -1,7 +1,7 @@
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use cap_recording::{
-    FFmpegVideoFrame,
     feeds::{self, camera::CameraFeed},
+    FFmpegVideoFrame,
 };
 use ffmpeg::{
     format::{self, Pixel},
@@ -20,7 +20,7 @@ use tokio::{
     time::{Duration, Instant},
 };
 use tracing::{error, info, trace, warn};
-use wgpu::{CompositeAlphaMode, SurfaceTexture};
+use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, SurfaceTexture};
 
 static TOOLBAR_HEIGHT: f32 = 56.0; // also defined in Typescript
 
@@ -235,6 +235,7 @@ impl InitializedCameraPreview {
                     .using_resolution(adapter.limits()),
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
+                ..Default::default()
             })
             .await
             .with_context(|| "Failed to create wgpu device")?;
@@ -347,8 +348,8 @@ impl InitializedCameraPreview {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout, &uniform_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&bind_group_layout), Some(&uniform_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let swapchain_format = wgpu::TextureFormat::Bgra8Unorm;
@@ -374,7 +375,7 @@ impl InitializedCameraPreview {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: Default::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -412,7 +413,7 @@ impl InitializedCameraPreview {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             ..Default::default()
         });
 
@@ -438,11 +439,7 @@ impl InitializedCameraPreview {
 
         // We initialize and render a blank color fallback.
         // This is shown until the camera initializes and the first frame is rendered.
-        if let Ok(surface) = renderer
-            .surface
-            .get_current_texture()
-            .map_err(|err| error!("Error getting camera renderer surface texture: {err:?}"))
-        {
+        if let Some(surface) = current_surface_texture(renderer.surface.get_current_texture()) {
             let output_width = 5;
             let output_height = 5;
 
@@ -546,9 +543,9 @@ impl Renderer {
                     let aspect_ratio = frame.inner.width() as f32 / frame.inner.height() as f32;
                     self.sync_ratio_uniform_and_resize_window_to_it(&window, &state, aspect_ratio);
 
-                    if let Ok(surface) = self.surface.get_current_texture().map_err(|err| {
-                        error!("Error getting camera renderer surface texture: {err:?}")
-                    }) {
+                    if let Some(surface) =
+                        current_surface_texture(self.surface.get_current_texture())
+                    {
                         let output_width = 1280;
                         let output_height = (1280.0 / aspect_ratio) as u32;
 
@@ -719,12 +716,20 @@ fn resize_window(
 
     let base = clamp_size(state.size);
     let window_width = if state.shape == CameraPreviewShape::Full {
-        if aspect >= 1.0 { base * aspect } else { base }
+        if aspect >= 1.0 {
+            base * aspect
+        } else {
+            base
+        }
     } else {
         base
     };
     let window_height = if state.shape == CameraPreviewShape::Full {
-        if aspect >= 1.0 { base } else { base / aspect }
+        if aspect >= 1.0 {
+            base
+        } else {
+            base / aspect
+        }
     } else {
         base
     } + TOOLBAR_HEIGHT;
@@ -888,6 +893,7 @@ impl PreparedTexture {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &surface_view,
+                    depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -902,6 +908,7 @@ impl PreparedTexture {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
+                multiview_mask: None,
             });
 
             self.queue.write_texture(
@@ -931,6 +938,18 @@ impl PreparedTexture {
         }
 
         self.queue.submit(Some(encoder.finish()));
+    }
+}
+
+fn current_surface_texture(texture: CurrentSurfaceTexture) -> Option<SurfaceTexture> {
+    match texture {
+        CurrentSurfaceTexture::Success(surface) | CurrentSurfaceTexture::Suboptimal(surface) => {
+            Some(surface)
+        }
+        status => {
+            error!("Error getting camera renderer surface texture: {status:?}");
+            None
+        }
     }
 }
 

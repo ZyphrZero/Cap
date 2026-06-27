@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 cap-utils = { path = "../../crates/utils" }
 cap-project = { path = "../../crates/project" }
 cap-rendering = { path = "../../crates/rendering" }
@@ -16,12 +16,12 @@ cap-export = { path = "../../crates/export" }
 cap-camera = { path = "../../crates/camera" }
 scap-targets = { path = "../../crates/scap-targets" }
 serde = { workspace = true }
-serde_json = "1.0.133"
+serde_json = "1.0.150"
 tokio.workspace = true
-uuid = { version = "1.11.1", features = ["v4"] }
+uuid = { version = "1.23.4", features = ["v4"] }
 ffmpeg = { workspace = true }
 tracing.workspace = true
-tracing-subscriber = "0.3.19"
+tracing-subscriber = "0.3.23"
 flume.workspace = true
 workspace-hack = { version = "0.1", path = "../../crates/workspace-hack" }
 

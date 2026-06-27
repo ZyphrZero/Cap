@@ -1,13 +1,13 @@
 use cap_audio::estimate_input_latency;
-use cap_media_info::{AudioInfo, ffmpeg_sample_format_for};
+use cap_media_info::{ffmpeg_sample_format_for, AudioInfo};
 use cap_timestamp::Timestamp;
 use cpal::{
+    traits::{DeviceTrait, HostTrait, StreamTrait},
     BufferSize, Device, InputCallbackInfo, SampleFormat, StreamError, SupportedStreamConfig,
     SupportedStreamConfigRange,
-    traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use flume::TrySendError;
-use futures::{FutureExt, channel::oneshot, future::BoxFuture};
+use futures::{channel::oneshot, future::BoxFuture, FutureExt};
 use indexmap::IndexMap;
 use kameo::prelude::*;
 use replace_with::replace_with_or_abort;
@@ -535,7 +535,7 @@ impl Message<SetInput> for MicrophoneFeed {
                 let (stream_config, buffer_size_frames) =
                     stream_config_with_latency(&config, Some(&label));
 
-                let actor_ref = ctx.actor_ref();
+                let actor_ref = ctx.actor_ref().clone();
                 let (ready_future, done_tx) = Self::spawn_input_stream(StreamSpawnParams {
                     id,
                     label: label.clone(),
@@ -624,7 +624,7 @@ impl Message<SetInput> for MicrophoneFeed {
 
                 let _ = inner.done_tx.send(());
 
-                let actor_ref = ctx.actor_ref();
+                let actor_ref = ctx.actor_ref().clone();
                 let (ready_future, done_tx) = Self::spawn_input_stream(StreamSpawnParams {
                     id: new_id,
                     label: label.clone(),
@@ -756,15 +756,16 @@ impl Message<Lock> for MicrophoneFeed {
 
         let (drop_tx, drop_rx) = oneshot::channel();
 
-        let actor_ref = ctx.actor_ref();
+        let actor_ref = ctx.actor_ref().clone();
+        let unlock_actor_ref = actor_ref.clone();
         tokio::spawn(async move {
             let _ = drop_rx.await;
-            let _ = actor_ref.tell(Unlock).await;
+            let _ = unlock_actor_ref.tell(Unlock).await;
         });
 
         Ok(MicrophoneFeedLock {
             audio_info: AudioInfo::from_stream_config_with_buffer(&config, buffer_size_frames),
-            actor: ctx.actor_ref(),
+            actor: actor_ref,
             config,
             buffer_size_frames,
             drop_tx: Some(drop_tx),

@@ -110,7 +110,11 @@ impl InterpolatedScene {
                     SceneMode::Default
                 };
                 let progress = (cursor.time - transition_start) / SCENE_TRANSITION_DURATION;
-                (prev_mode, segment.mode, ease_in_out(progress as f32) as f64)
+                (
+                    prev_mode,
+                    segment.mode,
+                    ease_in_out.sample(progress as f32) as f64,
+                )
             } else if cursor.time >= transition_end && cursor.time < segment.end {
                 if let Some(next_seg) = cursor.next_segment() {
                     let gap = next_seg.start - segment.end;
@@ -132,7 +136,7 @@ impl InterpolatedScene {
                         (
                             segment.mode,
                             SceneMode::Default,
-                            ease_in_out(progress as f32) as f64,
+                            ease_in_out.sample(progress as f32) as f64,
                         )
                     } else {
                         // No gap, segments are back-to-back, transition directly if modes differ
@@ -141,7 +145,7 @@ impl InterpolatedScene {
                         (
                             segment.mode,
                             next_seg.mode,
-                            ease_in_out(progress as f32) as f64,
+                            ease_in_out.sample(progress as f32) as f64,
                         )
                     }
                 } else {
@@ -151,7 +155,7 @@ impl InterpolatedScene {
                     (
                         segment.mode,
                         SceneMode::Default,
-                        ease_in_out(progress as f32) as f64,
+                        ease_in_out.sample(progress as f32) as f64,
                     )
                 }
             } else {
@@ -183,7 +187,7 @@ impl InterpolatedScene {
                     (
                         prev_mode,
                         next_segment.mode,
-                        ease_in_out(progress as f32) as f64,
+                        ease_in_out.sample(progress as f32) as f64,
                     )
                 } else {
                     // We're in a gap that requires transition - should be at default
@@ -195,7 +199,7 @@ impl InterpolatedScene {
                 (
                     SceneMode::Default,
                     next_segment.mode,
-                    ease_in_out(progress as f32) as f64,
+                    ease_in_out.sample(progress as f32) as f64,
                 )
             } else {
                 (SceneMode::Default, SceneMode::Default, 1.0)

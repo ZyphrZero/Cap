@@ -13,4 +13,4 @@ device_query = "4.0.1"
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-graphics = "0.24.0"
+core-graphics = "0.25.0"

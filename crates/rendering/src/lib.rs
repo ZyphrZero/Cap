@@ -5,11 +5,11 @@ use cap_project::{
 };
 use composite_frame::CompositeVideoFrameUniforms;
 use core::f64;
-use cursor_interpolation::{InterpolatedCursorPosition, interpolate_cursor};
-use decoder::{AsyncVideoDecoderHandle, spawn_decoder};
-use frame_pipeline::{RenderSession, finish_encoder};
-use futures::FutureExt;
+use cursor_interpolation::{interpolate_cursor, InterpolatedCursorPosition};
+use decoder::{spawn_decoder, AsyncVideoDecoderHandle};
+use frame_pipeline::{finish_encoder, RenderSession};
 use futures::future::OptionFuture;
+use futures::FutureExt;
 use layers::{
     Background, BackgroundLayer, BlurLayer, CameraLayer, CaptionsLayer, CursorLayer, DisplayLayer,
     MaskLayer, TextLayer,
@@ -47,7 +47,7 @@ pub use project_recordings::{ProjectRecordingsMeta, SegmentRecordings, Video};
 
 use mask::interpolate_masks;
 use scene::*;
-use text::{PreparedText, prepare_texts};
+use text::{prepare_texts, PreparedText};
 use zoom::*;
 pub use zoom_focus_interpolation::ZoomFocusInterpolator;
 
@@ -528,7 +528,7 @@ impl RenderVideoConstants {
                 .map(|c| XY::new(c.width, c.height)),
         };
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
 
         let hardware_adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -1893,6 +1893,7 @@ impl RendererLayers {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: $view,
+                        depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: $load,
@@ -1902,6 +1903,7 @@ impl RendererLayers {
                     depth_stencil_attachment: None,
                     timestamp_writes: None,
                     occlusion_query_set: None,
+                    multiview_mask: None,
                 })
             };
         }
@@ -2033,8 +2035,8 @@ pub fn create_shader_render_pipeline(
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Render Pipeline Layout"),
-        bind_group_layouts: &[bind_group_layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(bind_group_layout)],
+        immediate_size: 0,
     });
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -2077,7 +2079,7 @@ pub fn create_shader_render_pipeline(
             mask: !0,
             alpha_to_coverage_enabled: false,
         },
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }

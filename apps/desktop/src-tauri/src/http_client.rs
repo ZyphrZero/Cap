@@ -4,6 +4,14 @@ use std::ops::Deref;
 
 use reqwest::StatusCode;
 
+struct RetryAllHosts;
+
+impl<'a> PartialEq<&'a str> for RetryAllHosts {
+    fn eq(&self, _: &&'a str) -> bool {
+        true
+    }
+}
+
 pub struct HttpClient(reqwest::Client);
 
 impl Default for HttpClient {
@@ -27,7 +35,7 @@ impl Default for RetryableHttpClient {
         Self(
             reqwest::Client::builder()
                 .retry(
-                    reqwest::retry::always()
+                    reqwest::retry::for_host(RetryAllHosts)
                         .classify_fn(|req_rep| {
                             match req_rep.status() {
                                 // Server errors

@@ -43,7 +43,7 @@ fn main() {
         ));
 
         // Caution! Everything before here runs in both app and crash reporter processes
-        let _guard = tauri_plugin_sentry::minidump::init(&sentry_client);
+        let _guard = sentry_rust_minidump::init(&sentry_client);
 
         (sentry_client, _guard)
     });
@@ -83,7 +83,7 @@ fn main() {
             .with_batch_exporter(
                 opentelemetry_otlp::SpanExporter::builder()
                     .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
                     .build()
                     .unwrap(),
             )

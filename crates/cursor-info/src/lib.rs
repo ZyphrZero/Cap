@@ -95,10 +95,7 @@ impl<'de> Deserialize<'de> for CursorShape {
 }
 
 impl Type for CursorShape {
-    fn inline(
-        types: &mut specta::TypeMap,
-        generics: specta::Generics,
-    ) -> specta::datatype::DataType {
-        String::inline(types, generics)
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        String::definition(types)
     }
 }

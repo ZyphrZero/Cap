@@ -2,7 +2,7 @@ use crate::cpu_yuv;
 
 #[cfg(target_os = "macos")]
 use crate::iosurface_texture::{
-    IOSurfaceTextureCache, IOSurfaceTextureError, import_metal_texture_to_wgpu,
+    import_metal_texture_to_wgpu, IOSurfaceTextureCache, IOSurfaceTextureError,
 };
 
 #[cfg(target_os = "macos")]
@@ -13,8 +13,8 @@ use crate::d3d_texture::D3DTextureError;
 
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11_CPU_ACCESS_READ, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_TEXTURE2D_DESC,
-    D3D11_USAGE_STAGING, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D,
+    ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_CPU_ACCESS_READ,
+    D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -353,15 +353,15 @@ impl YuvConverterPipelines {
 
         let nv12_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("NV12 Converter Pipeline Layout"),
-            bind_group_layouts: &[&nv12_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&nv12_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let yuv420p_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("YUV420P Converter Pipeline Layout"),
-                bind_group_layouts: &[&yuv420p_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&yuv420p_bind_group_layout)],
+                immediate_size: 0,
             });
 
         let nv12_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {

@@ -1,11 +1,11 @@
 use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc, time::Instant};
-use tauri::{AppHandle, Manager, Runtime, Window, ipc::CommandArg};
-use tokio::sync::{RwLock, watch};
+use tauri::{ipc::CommandArg, AppHandle, Manager, Runtime, Window};
+use tokio::sync::{watch, RwLock};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     create_editor_instance_impl,
-    frame_ws::{WSFrame, create_watch_frame_ws},
+    frame_ws::{create_watch_frame_ws, WSFrame},
 };
 
 pub struct EditorInstance {
@@ -112,7 +112,7 @@ pub struct EditorInstances(Arc<RwLock<HashMap<String, Arc<EditorInstance>>>>);
 pub struct WindowEditorInstance(pub Arc<EditorInstance>);
 
 impl specta::function::FunctionArg for WindowEditorInstance {
-    fn to_datatype(_: &mut specta::TypeMap) -> Option<specta::DataType> {
+    fn to_datatype(_: &mut specta::Types) -> Option<specta::datatype::DataType> {
         None
     }
 }

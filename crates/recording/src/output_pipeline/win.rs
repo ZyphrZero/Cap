@@ -1,5 +1,5 @@
-use crate::{AudioFrame, AudioMuxer, Muxer, TaskPool, VideoFrame, VideoMuxer, screen_capture};
-use anyhow::{Context, anyhow};
+use crate::{screen_capture, AudioFrame, AudioMuxer, Muxer, TaskPool, VideoFrame, VideoMuxer};
+use anyhow::{anyhow, Context};
 use cap_enc_ffmpeg::aac::AACEncoder;
 use cap_media_info::{AudioInfo, VideoInfo};
 use cap_timestamp::Timestamp;
@@ -7,9 +7,9 @@ use futures::channel::oneshot;
 use std::{
     path::PathBuf,
     sync::{
-        Arc, Mutex,
         atomic::AtomicBool,
-        mpsc::{RecvTimeoutError, SyncSender, TrySendError, sync_channel},
+        mpsc::{sync_channel, RecvTimeoutError, SyncSender, TrySendError},
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -304,7 +304,7 @@ impl Muxer for WindowsMuxer {
                     either::Left((mut encoder, mut muxer)) => {
                         trace!("Running native encoder with frame pacing");
                         let frame_interval = Duration::from_secs_f64(1.0 / config.frame_rate as f64);
-                        let mut last_texture: Option<windows::Win32::Graphics::Direct3D11::ID3D11Texture2D> = None;
+                        let mut last_frame: Option<scap_direct3d::Frame> = None;
                         let mut first_timestamp: Option<Duration> = None;
                         let mut last_timestamp: Option<Duration> = None;
                         let mut frame_count: u64 = 0;
@@ -315,7 +315,7 @@ impl Muxer for WindowsMuxer {
                             || {
                                 match video_rx.recv_timeout(frame_interval) {
                                     Ok(Some((frame, timestamp))) => {
-                                        last_texture = Some(frame.texture().clone());
+                                        last_frame = Some(frame);
                                         last_timestamp = Some(timestamp);
                                     }
                                     Ok(None) => {
@@ -342,21 +342,21 @@ impl Muxer for WindowsMuxer {
                                     }
                                 }
 
-                                if let (Some(texture), Some(ts)) = (&last_texture, last_timestamp) {
+                                if let (Some(frame), Some(ts)) = (&last_frame, last_timestamp) {
                                     let normalized_ts = normalize_timestamp(ts, &mut first_timestamp);
                                     frame_count += 1;
                                     let frame_time = duration_to_timespan(normalized_ts);
-                                    Ok(Some((texture.clone(), frame_time)))
+                                    Ok(Some((frame.texture().clone(), frame_time)))
                                 } else {
                                     match video_rx.recv() {
                                         Ok(Some((frame, timestamp))) => {
-                                            let texture = frame.texture().clone();
-                                            last_texture = Some(texture.clone());
+                                            last_frame = Some(frame);
                                             last_timestamp = Some(timestamp);
                                             let normalized_ts = normalize_timestamp(timestamp, &mut first_timestamp);
                                             frame_count = 1;
                                             let frame_time = duration_to_timespan(normalized_ts);
-                                            Ok(Some((texture, frame_time)))
+                                            let frame = last_frame.as_ref().unwrap();
+                                            Ok(Some((frame.texture().clone(), frame_time)))
                                         }
                                         Ok(None) | Err(_) => Ok(None),
                                     }

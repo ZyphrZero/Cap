@@ -96,6 +96,7 @@ impl TextLayer {
                 &text.content,
                 &attrs,
                 Shaping::Advanced,
+                None,
             );
 
             for line in buffer.lines.iter_mut() {

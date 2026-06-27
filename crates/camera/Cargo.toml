@@ -12,7 +12,7 @@ workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cidre = { workspace = true }
-objc2-av-foundation = { version = "0.3.1", features = ["objc2-core-media"] }
+objc2-av-foundation = { version = "0.3.2", features = ["objc2-core-media"] }
 cap-camera-avfoundation = { path = "../camera-avfoundation" }
 
 [target.'cfg(windows)'.dependencies]
@@ -21,7 +21,7 @@ windows-core = { workspace = true }
 cap-camera-windows = { path = "../camera-windows" }
 
 [dev-dependencies]
-inquire = "0.7.5"
+inquire = "0.9.4"
 
 [lints]
 workspace = true

@@ -49,7 +49,7 @@ static GPU: OnceCell<Option<SharedGpuContext>> = OnceCell::const_new();
 
 pub async fn get_shared_gpu() -> Option<&'static SharedGpuContext> {
     GPU.get_or_init(|| async {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
 
         let hardware_adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {

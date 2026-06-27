@@ -4,11 +4,11 @@ use bytemuck::{Pod, Zeroable};
 use cap_project::*;
 use image::GenericImageView;
 use tracing::error;
-use wgpu::{BindGroup, FilterMode, include_wgsl, util::DeviceExt};
+use wgpu::{include_wgsl, util::DeviceExt, BindGroup, FilterMode};
 
 use crate::{
-    Coord, DecodedSegmentFrames, FrameSpace, ProjectUniforms, RenderVideoConstants,
-    STANDARD_CURSOR_HEIGHT, zoom::InterpolatedZoom,
+    zoom::InterpolatedZoom, Coord, DecodedSegmentFrames, FrameSpace, ProjectUniforms,
+    RenderVideoConstants, STANDARD_CURSOR_HEIGHT,
 };
 
 const CURSOR_CLICK_DURATION: f64 = 0.25;
@@ -86,8 +86,8 @@ impl Statics {
             layout: Some(
                 &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Cursor Pipeline Layout"),
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
+                    bind_group_layouts: &[Some(&bind_group_layout)],
+                    immediate_size: 0,
                 }),
             ),
             vertex: wgpu::VertexState {
@@ -134,7 +134,7 @@ impl Statics {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -149,7 +149,7 @@ impl Statics {
             texture_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 mag_filter: FilterMode::Linear,
                 min_filter: FilterMode::Linear,
-                mipmap_filter: FilterMode::Linear,
+                mipmap_filter: wgpu::MipmapFilterMode::Linear,
                 anisotropy_clamp: 4,
                 ..Default::default()
             }),
@@ -374,24 +374,28 @@ impl CursorLayer {
                 if let Some(cursor_shape) = cursor_shape {
                     if uniforms.project.cursor.use_svg {
                         if let Some(info) = cursor_shape.resolve() {
-                            loaded_cursor =
-                                CursorTexture::prepare_svg(constants, info.raw, info.hotspot.into())
-                                    .map_err(|err| {
-                                        error!(
-                                            "Error loading SVG cursor {:?}: {err}",
-                                            interpolated_cursor.cursor_id
-                                        )
-                                    })
-                                    .ok();
+                            loaded_cursor = CursorTexture::prepare_svg(
+                                constants,
+                                info.raw,
+                                info.hotspot.into(),
+                            )
+                            .map_err(|err| {
+                                error!(
+                                    "Error loading SVG cursor {:?}: {err}",
+                                    interpolated_cursor.cursor_id
+                                )
+                            })
+                            .ok();
                         }
                     }
                 }
 
                 if let StudioRecordingMeta::MultipleSegments { inner, .. } = &constants.meta {
                     if loaded_cursor.is_none() {
-                        if let Some(c) = inner
-                            .get_cursor_image(&constants.recording_meta, &interpolated_cursor.cursor_id)
-                        {
+                        if let Some(c) = inner.get_cursor_image(
+                            &constants.recording_meta,
+                            &interpolated_cursor.cursor_id,
+                        ) {
                             if let Ok(img) = image::open(&c.path).map_err(|err| {
                                 error!("Failed to load cursor image from {:?}: {err}", c.path)
                             }) {

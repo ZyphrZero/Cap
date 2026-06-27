@@ -13,10 +13,10 @@ name = "cap_desktop_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.1.0", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
-swift-rs = { version = "1.0.6", features = ["build"] }
+swift-rs = { version = "1.0.7", features = ["build"] }
 
 [dependencies]
 tauri = { workspace = true, features = [
@@ -26,56 +26,56 @@ tauri = { workspace = true, features = [
     "image-png",
     "devtools",
 ] }
-tauri-specta = { version = "=2.0.0-rc.20", features = ["derive", "typescript"] }
-tauri-plugin-dialog = "2.2.0"
-tauri-plugin-fs = "2.2.0"
-tauri-plugin-global-shortcut = "2.2.0"
-tauri-plugin-http = "2.2.0"
-tauri-plugin-notification = "2.2.0"
-tauri-plugin-os = "2.2.0"
-tauri-plugin-process = "2.2.0"
-tauri-plugin-shell = "2.2.0"
-tauri-plugin-single-instance = { version = "2.2.0", features = ["deep-link"] }
-tauri-plugin-store = "2.2.0"
-tauri-plugin-updater = "2.9.0"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-fs = "2.5.1"
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-http = "2.5.9"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-os = "2.3.2"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-shell = "2.3.5"
+tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
+tauri-plugin-store = "2.4.3"
+tauri-plugin-updater = "2.10.1"
 tauri-plugin-oauth = { git = "https://github.com/FabianLars/tauri-plugin-oauth", branch = "v2" }
-tauri-plugin-window-state = "2.2.0"
-tauri-plugin-positioner = "2.2.0"
-tauri-plugin-deep-link = "2.2.0"
-tauri-plugin-clipboard-manager = "2.2.1"
-tauri-plugin-opener = "2.2.6"
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-positioner = "2.3.2"
+tauri-plugin-deep-link = "2.4.9"
+tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-opener = "2.5.4"
 
 serde = { workspace = true }
-serde_json = "1.0.111"
+serde_json = "1.0.150"
 specta.workspace = true
-specta-typescript = "0.0.7"
+specta-typescript = "0.0.12"
 tokio.workspace = true
-uuid = { version = "1.10.0", features = ["v4"] }
-image = "0.25.2"
+uuid = { version = "1.23.4", features = ["v4"] }
+image = "0.25.10"
 futures-intrusive = "0.5.0"
 anyhow.workspace = true
 futures = { workspace = true }
-axum = { version = "0.7.5", features = ["ws", "macros"] }
+axum = { version = "0.8.9", features = ["ws", "macros"] }
 tracing.workspace = true
-tempfile = "3.9.0"
+tempfile = "3.27.0"
 ffmpeg.workspace = true
-chrono = { version = "0.4.31", features = ["serde"] }
-regex = "1.10.4"
-rodio = "0.19.0"
-png = "0.17.13"
+chrono = { version = "0.4.45", features = ["serde"] }
+regex = "1.12.4"
+rodio = "0.22.2"
+png = "0.18.1"
 device_query = "4.0.1"
 base64 = "0.22.1"
-reqwest = { version = "0.12.24", features = ["json", "stream", "multipart"] }
+reqwest = { version = "0.13.4", features = ["json", "stream", "multipart"] }
 dotenvy_macro = "0.15.7"
-global-hotkey = "0.7.0"
-rand = "0.8.5"
+global-hotkey = "0.8.0"
+rand = "0.10.1"
 cpal.workspace = true
 keyed_priority_queue = "0.4.2"
 sentry.workspace = true
-clipboard-rs = "0.2.2"
-whisper-rs = "0.11.0"
-lazy_static = "1.4.0"
-log = "0.4.20"
+clipboard-rs = "0.3.4"
+whisper-rs = "0.16.0"
+lazy_static = "1.5.0"
+log = "0.4.33"
 
 cap-audio = { path = "../../../crates/audio" }
 cap-camera = { path = "../../../crates/camera", features = ["serde", "specta"] }
@@ -94,45 +94,46 @@ scap-screencapturekit = { path = "../../../crates/scap-screencapturekit" }
 scap-direct3d = { path = "../../../crates/scap-direct3d" }
 
 flume.workspace = true
-tracing-subscriber = "0.3.19"
-tracing-appender = "0.2.3"
+tracing-subscriber = "0.3.23"
+tracing-appender = "0.2.5"
 dirs = "6.0.0"
-relative-path = "1.9.3"
+relative-path = "2.0.1"
 cap-fail = { version = "0.1.0", path = "../../../crates/fail" }
-tokio-stream = { version = "0.1.17", features = ["sync"] }
-md5 = "0.7.0"
-tokio-util = "0.7.15"
+tokio-stream = { version = "0.1.18", features = ["sync"] }
+md5 = "0.8.0"
+tokio-util = "0.7.18"
 wgpu.workspace = true
-bytemuck = "1.23.1"
-kameo = "0.17.2"
+bytemuck = "1.25.0"
+kameo = "0.21.0"
 tauri-plugin-sentry = "0.5.0"
+sentry-rust-minidump = "0.16.0"
 thiserror.workspace = true
-bytes = "1.10.1"
+bytes = "1.12.0"
 async-stream = "0.3.6"
-lz4_flex = "0.11"
+lz4_flex = "0.13"
 sanitize-filename = "0.6.0"
 tracing-futures = { version = "0.2.5", features = ["futures-03"] }
-tracing-opentelemetry = "0.32.0"
-opentelemetry = "0.31.0"
-opentelemetry-otlp = "0.31.0"                                                 #{ version = , features = ["http-proto", "reqwest-client"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "trace"] }
-posthog-rs = "0.3.7"
-sysinfo = "0.35"
+tracing-opentelemetry = "0.33.0"
+opentelemetry = "0.32.0"
+opentelemetry-otlp = "0.32.0"                                                 #{ version = , features = ["http-proto", "reqwest-client"] }
+opentelemetry_sdk = { version = "0.32.1", features = ["rt-tokio", "trace"] }
+posthog-rs = "0.14.2"
+sysinfo = "0.39"
 workspace-hack = { version = "0.1", path = "../../../crates/workspace-hack" }
 aho-corasick.workspace = true
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-graphics = "0.24.0"
-core-foundation = "0.10.0"
-objc2-app-kit = { version = "0.3.0", features = [
+core-graphics = "0.25.0"
+core-foundation = "0.10.1"
+objc2-app-kit = { version = "0.3.2", features = [
     "NSWindow",
     "NSResponder",
     "NSHapticFeedback",
 ] }
-cocoa = "0.26.0"
+cocoa = "0.26.1"
 objc = "0.2.7"
-swift-rs = "1.0.6"
+swift-rs = "1.0.7"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2" }
 cidre = { workspace = true }
 
@@ -146,4 +147,4 @@ windows = { workspace = true, features = [
 windows-sys = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29.0", features = ["fs"] }
+nix = { version = "0.31.3", features = ["fs"] }

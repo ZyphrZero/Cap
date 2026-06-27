@@ -105,10 +105,7 @@ pub fn async_capture_event(event: PostHogEvent) {
                 .map_err(|err| error!("Error adding PostHog property: {err:?}"))
                 .ok();
 
-            posthog_rs::capture(e)
-                .await
-                .map_err(|err| error!("Error sending event to PostHog: {err:?}"))
-                .ok();
+            posthog_rs::capture(e);
         });
     }
 }

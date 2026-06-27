@@ -11,15 +11,15 @@ workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cidre = { workspace = true }
-objc2 = "0.6.1"
-objc2-app-kit = "0.3.1"
-objc2-foundation = "0.3.1"
+objc2 = "0.6.4"
+objc2-app-kit = "0.3.2"
+objc2-foundation = "0.3.2"
 
 [lints]
 workspace = true
 
 [dev-dependencies]
-clap = { version = "4.5.40", features = ["derive"] }
-inquire = "0.7.5"
+clap = { version = "4.6.1", features = ["derive"] }
+inquire = "0.9.4"
 scap-targets = { path = "../scap-targets" }
 tokio.workspace = true

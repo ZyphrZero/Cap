@@ -3,7 +3,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{OsString, c_void},
+    ffi::{c_void, OsString},
     mem::ManuallyDrop,
     ops::Deref,
     os::windows::ffi::OsStringExt,
@@ -12,6 +12,7 @@ use std::{
 };
 use tracing::*;
 use windows::{
+    core::Interface,
     Win32::{
         Foundation::*,
         Media::{
@@ -25,9 +26,8 @@ use windows::{
             Variant::{VARIANT, VT_BSTR},
         },
     },
-    core::Interface,
 };
-use windows_core::{ComObject, ComObjectInner, GUID, PWSTR, implement};
+use windows_core::{implement, ComObject, ComObjectInner, IUnknownImpl, GUID, PWSTR};
 
 pub fn initialize_directshow() -> windows_core::Result<()> {
     unsafe { CoInitialize(None) }.ok()
@@ -619,8 +619,7 @@ impl SinkFilter {
         }
         .into_object();
 
-        // SAFETY: SinkFilter always implements IBaseFilter
-        *this.input_pin.owner.borrow_mut() = Some(this.cast::<IBaseFilter>().unwrap());
+        *this.input_pin.owner.borrow_mut() = Some(this.to_interface::<IBaseFilter>());
 
         this
     }
@@ -631,8 +630,7 @@ impl SinkFilter {
 
     pub fn get_pin(&self, i: u32) -> Option<IPin> {
         if i == 0 {
-            // SAFETY: SinkInputPin always implements IPin
-            Some(unsafe { self.input_pin.get().cast() }.unwrap())
+            Some(self.input_pin.to_interface::<IPin>())
         } else {
             None
         }
@@ -739,18 +737,23 @@ impl<'a> IEnumPins_Impl for PinEnumerator_Impl<'a> {
     fn Next(
         &self,
         cpins: u32,
-        pppins: windows_core::OutRef<'_, IPin>,
+        pppins: *mut Option<IPin>,
         pcfetched: *mut u32,
     ) -> windows_core::HRESULT {
         let mut pins_fetched = 0;
 
-        let index = *self.index.borrow();
         let filter = self.filter.as_ref();
-        if pins_fetched < cpins && filter.no_of_pins() > index {
+        while pins_fetched < cpins {
+            let index = *self.index.borrow();
+            if filter.no_of_pins() <= index {
+                break;
+            }
             let pin = filter.get_pin(index);
             self.index.replace_with(|v| *v + 1);
+            unsafe {
+                *pppins.add(pins_fetched as usize) = pin;
+            }
             pins_fetched += 1;
-            pppins.write(pin).unwrap();
         }
 
         if !pcfetched.is_null() {
@@ -759,7 +762,11 @@ impl<'a> IEnumPins_Impl for PinEnumerator_Impl<'a> {
             }
         }
 
-        if pins_fetched == cpins { S_OK } else { S_FALSE }
+        if pins_fetched == cpins {
+            S_OK
+        } else {
+            S_FALSE
+        }
     }
 
     fn Skip(&self, cpins: u32) -> windows_core::Result<()> {
@@ -779,7 +786,7 @@ impl<'a> IEnumPins_Impl for PinEnumerator_Impl<'a> {
     }
 
     fn Clone(&self) -> windows_core::Result<IEnumPins> {
-        unsafe { self.cast() }
+        Ok(self.to_interface::<IEnumPins>())
     }
 }
 
@@ -846,7 +853,7 @@ impl IPin_Impl for SinkInputPin_Impl {
         }
 
         self.connected_pin.replace(Some(preceivepin.clone()));
-        unsafe { preceivepin.ReceiveConnection(&self.cast::<IPin>()?, pmt) }
+        unsafe { preceivepin.ReceiveConnection(&self.to_interface::<IPin>(), pmt) }
     }
 
     fn ReceiveConnection(
@@ -1122,7 +1129,7 @@ impl<'a> IEnumMediaTypes_Impl for TypeEnumerator_Impl<'a> {
     }
 
     fn Clone(&self) -> windows_core::Result<IEnumMediaTypes> {
-        unsafe { self.cast() }
+        Ok(self.to_interface::<IEnumMediaTypes>())
     }
 
     fn Skip(&self, _cmediatypes: u32) -> windows_core::Result<()> {

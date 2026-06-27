@@ -8,12 +8,12 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = { version = "1.0.86" }
+anyhow = { version = "1.0.103" }
 # This includes a currently-unreleased fix that ensures the audio stream is actually
 # stopped and released on drop on macOS
 cpal = { git = "https://github.com/CapSoftware/cpal", rev = "3cc779a7b4ca" }
 ffmpeg = { package = "ffmpeg-next", git = "https://github.com/CapSoftware/rust-ffmpeg", rev = "49db1fede112" }
-tokio = { version = "1.39.3", features = [
+tokio = { version = "1.52.3", features = [
     "macros",
     "process",
     "fs",
@@ -22,8 +22,8 @@ tokio = { version = "1.39.3", features = [
     "rt-multi-thread",
     "time",
 ] }
-tauri = { version = "2.5.0", features = ["specta"] }
-specta = { version = "=2.0.0-rc.20", features = [
+tauri = { version = "2.11.3", features = ["specta"] }
+specta = { version = "=2.0.0-rc.25", features = [
     "derive",
     "serde_json",
     "uuid",
@@ -37,18 +37,18 @@ nokhwa = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2", 
     "serialize",
 ] }
 nokhwa-bindings-macos = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2" }
-wgpu = { version = "25.0.0", features = ["wgpu-core"] }
-wgpu-hal = "25.0.0"
-wgpu-core = "25.0.0"
-flume = "0.11.0"
-thiserror = "1.0"
-sentry = { version = "0.42.0", features = [
+wgpu = { version = "29.0.3", features = ["wgpu-core"] }
+wgpu-hal = "29.0.3"
+wgpu-core = "29.0.3"
+flume = "0.12.0"
+thiserror = "2.0"
+sentry = { version = "0.48.3", features = [
     "anyhow",
     "backtrace",
     "debug-images",
 ] }
-tracing = "0.1.41"
-futures = "0.3.31"
+tracing = "0.1.44"
+futures = "0.3.32"
 aho-corasick = "1.1.4"
 
 cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8", features = [
@@ -66,12 +66,12 @@ cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8", fe
     "mtl",
 ], default-features = false }
 
-windows = "0.60.0"
-windows-core = "0.60"
-windows-sys = "0.59.0"
-windows-capture = "1.5.0"
-percent-encoding = "2.3.1"
-sysinfo = "0.32"
+windows = "0.62.2"
+windows-core = "0.62"
+windows-sys = "0.61.2"
+windows-capture = "2.0.0"
+percent-encoding = "2.3.2"
+sysinfo = "0.39"
 
 # TODO: Reenable these: https://github.com/CapSoftware/Cap/issues/859
 [workspace.lints.rust]
@@ -107,8 +107,7 @@ cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8" }
 # https://github.com/gfx-rs/wgpu/pull/7550
 # wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "cd41a6e32a6239b65d1cecbeccde6a43a100914a" }
 
-# https://github.com/CapSoftware/posthog-rs/commit/c7e9712be2f9a9122b1df685d5a067afa5415288
-posthog-rs = { git = "https://github.com/CapSoftware/posthog-rs", rev = "c7e9712be2f9a9122b1df685d5a067afa5415288" }
-
 # https://github.com/CapSoftware/reqwest/commit/9b5ecbd5210a9510fde766015cabb724c1e70d2e
 reqwest = { git = "https://github.com/CapSoftware/reqwest", rev = "9b5ecbd5210a9510fde766015cabb724c1e70d2e" }
+
+ffmpeg-sys-next = { path = "patches/ffmpeg-sys-next-7.1.3" }

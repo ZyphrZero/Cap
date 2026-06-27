@@ -6,9 +6,9 @@ use glyphon::{
     TextArea, TextAtlas, TextBounds, TextRenderer, Viewport, Weight,
 };
 use log::warn;
-use wgpu::{Device, Queue, include_wgsl, util::DeviceExt};
+use wgpu::{include_wgsl, util::DeviceExt, Device, Queue};
 
-use crate::{DecodedSegmentFrames, ProjectUniforms, RenderVideoConstants, parse_color_component};
+use crate::{parse_color_component, DecodedSegmentFrames, ProjectUniforms, RenderVideoConstants};
 
 #[derive(Debug, Clone)]
 pub struct CaptionWord {
@@ -321,8 +321,8 @@ impl CaptionsLayer {
         let background_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Caption Background Pipeline Layout"),
-                bind_group_layouts: &[&background_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&background_bind_group_layout)],
+                immediate_size: 0,
             });
 
         let background_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -350,7 +350,7 @@ impl CaptionsLayer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -648,6 +648,7 @@ impl CaptionsLayer {
                 caption_text.as_str(),
                 &attrs,
                 Shaping::Advanced,
+                None,
             );
         }
 

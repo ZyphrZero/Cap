@@ -1,13 +1,13 @@
-use crate::{AudioFrame, AudioMuxer, Muxer, TaskPool, VideoMuxer, fragmentation, screen_capture};
-use anyhow::{Context, anyhow};
+use crate::{fragmentation, screen_capture, AudioFrame, AudioMuxer, Muxer, TaskPool, VideoMuxer};
+use anyhow::{anyhow, Context};
 use cap_media_info::{AudioInfo, VideoInfo};
 use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::{SyncSender, sync_channel},
+        mpsc::{sync_channel, SyncSender},
+        Arc, Mutex,
     },
     thread::JoinHandle,
     time::Duration,
@@ -517,6 +517,7 @@ impl WindowsSegmentedMuxer {
                     either::Left((mut encoder, mut muxer)) => {
                         trace!("Running native encoder for segment");
                         let mut first_timestamp: Option<Duration> = None;
+                        let mut held_frame: Option<scap_direct3d::Frame> = None;
                         let result = encoder.run(
                             Arc::new(AtomicBool::default()),
                             || {
@@ -524,6 +525,7 @@ impl WindowsSegmentedMuxer {
                                     trace!("No more frames available for segment");
                                     return Ok(None);
                                 };
+                                held_frame = Some(frame);
 
                                 let relative = if let Some(first) = first_timestamp {
                                     timestamp.checked_sub(first).unwrap_or(Duration::ZERO)
@@ -532,6 +534,7 @@ impl WindowsSegmentedMuxer {
                                     Duration::ZERO
                                 };
                                 let frame_time = duration_to_timespan(relative);
+                                let frame = held_frame.as_ref().unwrap();
 
                                 Ok(Some((frame.texture().clone(), frame_time)))
                             },

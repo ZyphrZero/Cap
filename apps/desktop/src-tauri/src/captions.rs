@@ -1,9 +1,10 @@
 use anyhow::Result;
 use cap_audio::AudioData;
 use ffmpeg::{
-    ChannelLayout, codec as avcodec,
+    codec as avcodec,
     format::{self as avformat},
     software::resampling,
+    ChannelLayout,
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -600,25 +601,23 @@ fn process_with_whisper(
         .full(params, &audio_data_f32[..])
         .map_err(|e| format!("Failed to run Whisper transcription: {e}"))?;
 
-    let num_segments = state
-        .full_n_segments()
-        .map_err(|e| format!("Failed to get number of segments: {e}"))?;
+    let num_segments = state.full_n_segments();
 
     log::info!("Found {num_segments} segments");
 
     let mut segments = Vec::new();
 
     for i in 0..num_segments {
-        let raw_text = state
-            .full_get_segment_text(i)
-            .map_err(|e| format!("Failed to get segment text: {e}"))?;
+        let segment = state
+            .get_segment(i)
+            .ok_or_else(|| format!("Failed to get segment at index {i}"))?;
+        let raw_text = segment
+            .to_str_lossy()
+            .map_err(|e| format!("Failed to get segment text: {e}"))?
+            .into_owned();
 
-        let start_i64 = state
-            .full_get_segment_t0(i)
-            .map_err(|e| format!("Failed to get segment start time: {e}"))?;
-        let end_i64 = state
-            .full_get_segment_t1(i)
-            .map_err(|e| format!("Failed to get segment end time: {e}"))?;
+        let start_i64 = segment.start_timestamp();
+        let end_i64 = segment.end_timestamp();
 
         let start_time = (start_i64 as f32) / 100.0;
         let end_time = (end_i64 as f32) / 100.0;
@@ -632,9 +631,7 @@ fn process_with_whisper(
         );
 
         let mut words = Vec::new();
-        let num_tokens = state
-            .full_n_tokens(i)
-            .map_err(|e| format!("Failed to get token count: {e}"))?;
+        let num_tokens = segment.n_tokens();
 
         log::info!("  Segment {i} has {num_tokens} tokens");
 
@@ -643,9 +640,16 @@ fn process_with_whisper(
         let mut word_end: f32 = start_time;
 
         for t in 0..num_tokens {
-            let token_text = state.full_get_token_text(i, t).unwrap_or_default();
-            let token_id = state.full_get_token_id(i, t).unwrap_or(0);
-            let token_prob = state.full_get_token_prob(i, t).unwrap_or(0.0);
+            let Some(token) = segment.get_token(t) else {
+                log::warn!("  Token[{t}] missing from segment {i}");
+                continue;
+            };
+            let token_text = token
+                .to_str_lossy()
+                .map(|text| text.into_owned())
+                .unwrap_or_default();
+            let token_id = token.token_id();
+            let token_prob = token.token_probability();
 
             if is_special_token(&token_text) {
                 log::debug!(
@@ -654,9 +658,8 @@ fn process_with_whisper(
                 continue;
             }
 
-            let token_data = state.full_get_token_data(i, t).ok();
-
-            if let Some(data) = token_data {
+            {
+                let data = token.token_data();
                 let token_start = (data.t0 as f32) / 100.0;
                 let token_end = (data.t1 as f32) / 100.0;
 
@@ -692,8 +695,6 @@ fn process_with_whisper(
                     log::debug!("    -> Appending to word: '{current_word}'");
                 }
                 word_end = token_end;
-            } else {
-                log::warn!("  Token[{t}]: id={token_id}, text={token_text:?} -> NO TIMING DATA");
             }
         }
 
