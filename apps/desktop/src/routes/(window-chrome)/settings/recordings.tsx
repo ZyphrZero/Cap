@@ -1,4 +1,4 @@
-import { ProgressCircle } from "@cap/ui-solid";
+import { Button, ProgressCircle } from "@cap/ui-solid";
 import Tooltip from "@corvu/tooltip";
 import {
 	createMutation,
@@ -9,10 +9,10 @@ import {
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { ask, confirm } from "@tauri-apps/plugin-dialog";
 import { remove } from "@tauri-apps/plugin-fs";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import * as shell from "@tauri-apps/plugin-shell";
 import { cx } from "cva";
 import {
+	createEffect,
 	createMemo,
 	createSignal,
 	For,
@@ -20,17 +20,22 @@ import {
 	type ParentProps,
 	Show,
 } from "solid-js";
-import { createStore, produce, reconcile } from "solid-js/store";
-import { t } from "~/components/I18nProvider";
+import { createStore, produce } from "solid-js/store";
 import CapTooltip from "~/components/Tooltip";
+import { Input } from "~/routes/editor/ui";
 import { trackEvent } from "~/utils/analytics";
 import { createTauriEventListener } from "~/utils/createEventListener";
+import { importVideoFromPicker, showImportError } from "~/utils/importMedia";
+import { openRecordingFolder } from "~/utils/recording";
 import {
 	commands,
 	events,
 	type RecordingMetaWithMetadata,
 	type UploadProgress,
 } from "~/utils/tauri";
+import IconLucideImport from "~icons/lucide/import";
+import IconLucideSearch from "~icons/lucide/search";
+import { Section, SettingsPageContent } from "./Setting";
 
 type Recording = {
 	meta: RecordingMetaWithMetadata;
@@ -56,7 +61,18 @@ const Tabs = [
 	},
 ] satisfies { id: string; label: string; icon?: JSX.Element }[];
 
-const recordingsQuery = queryOptions({
+const PAGE_SIZE = 20;
+
+const hasActiveRecording = (recording: Recording) => {
+	const status = recording.meta.status.status;
+	if (status === "InProgress" || status === "NeedsRemux") return true;
+	const uploadState = recording.meta.upload?.state;
+	return (
+		uploadState === "MultipartUpload" || uploadState === "SinglePartUpload"
+	);
+};
+
+const recordingsQuery = queryOptions<Recording[]>({
 	queryKey: ["recordings"],
 	queryFn: async () => {
 		const result = await commands.listRecordings().catch(() => [] as const);
@@ -76,22 +92,29 @@ const recordingsQuery = queryOptions({
 		);
 		return recordings;
 	},
-	reconcile: (old, n) => reconcile(n)(old),
-	// This will ensure any changes to the upload status in the project meta are reflected.
-	refetchInterval: 2000,
+	reconcile: "path",
+	refetchInterval: (query) => {
+		const data = query.state.data;
+		if (!data) return false;
+		return data.some(hasActiveRecording) ? 2000 : false;
+	},
 });
 
 export default function Recordings() {
 	const [activeTab, setActiveTab] = createSignal<(typeof Tabs)[number]["id"]>(
 		Tabs[0].id,
 	);
+	const [search, setSearch] = createSignal("");
+	const trimmedSearch = createMemo(() => search().trim());
+	const normalizedSearch = createMemo(() => trimmedSearch().toLowerCase());
+	const [visibleCount, setVisibleCount] = createSignal(PAGE_SIZE);
 	const [uploadProgress, setUploadProgress] = createStore<
 		Record</* video_id */ string, number>
 	>({});
 	const recordings = createQuery(() => recordingsQuery);
 
 	createTauriEventListener(events.uploadProgressEvent, (e) => {
-		if (e.uploaded === e.total) {
+		if (e.uploaded === "0" && e.total === "0") {
 			setUploadProgress(
 				produce((s) => {
 					delete s[e.video_id];
@@ -106,16 +129,40 @@ export default function Recordings() {
 
 	createTauriEventListener(events.recordingDeleted, () => recordings.refetch());
 
+	createEffect(() => {
+		activeTab();
+		trimmedSearch();
+		setVisibleCount(PAGE_SIZE);
+	});
+
 	const filteredRecordings = createMemo(() => {
-		if (!recordings.data) {
-			return [];
-		}
-		if (activeTab() === "all") {
-			return recordings.data;
-		}
-		return recordings.data.filter(
-			(recording) => recording.meta.mode === activeTab(),
+		const data = recordings.data ?? [];
+		const scopedRecordings =
+			activeTab() === "all"
+				? data
+				: data.filter((recording) => recording.meta.mode === activeTab());
+		const query = normalizedSearch();
+		if (!query) return scopedRecordings;
+		return scopedRecordings.filter((recording) =>
+			recording.prettyName.toLowerCase().includes(query),
 		);
+	});
+
+	const visibleRecordings = createMemo(() => {
+		const items = filteredRecordings();
+		if (normalizedSearch()) return items;
+		return items.slice(0, visibleCount());
+	});
+
+	const hasMoreRecordings = createMemo(
+		() => !normalizedSearch() && filteredRecordings().length > visibleCount(),
+	);
+
+	const emptyMessage = createMemo(() => {
+		const tabLabel =
+			activeTab() === "all" ? "recordings" : `${activeTab()} recordings`;
+		const prefix = trimmedSearch() ? "No matching" : "No";
+		return `${prefix} ${tabLabel}`;
 	});
 
 	const handleRecordingClick = (recording: Recording) => {
@@ -123,9 +170,11 @@ export default function Recordings() {
 		events.newStudioRecordingAdded.emit({ path: recording.path });
 	};
 
-	const handleOpenFolder = (path: string) => {
+	const handleOpenFolder = (recording: Recording) => {
 		trackEvent("recording_folder_clicked");
-		commands.openFilePath(path);
+		openRecordingFolder(recording.path, recording.meta.mode).catch((error) => {
+			console.error("Failed to open recording folder:", error);
+		});
 	};
 
 	const handleCopyVideoToClipboard = (path: string) => {
@@ -140,75 +189,133 @@ export default function Recordings() {
 		});
 	};
 
-	return (
-		<div class="flex relative flex-col p-4 space-y-4 w-full h-full">
-			<div class="flex flex-col">
-				<h2 class="text-lg font-medium text-gray-12">
-					{t("recordingsPage.title")}
-				</h2>
-				<p class="text-sm text-gray-10">{t("recordingsPage.description")}</p>
-			</div>
-			<Show
-				when={recordings.data && recordings.data.length > 0}
-				fallback={
-					<p class="text-center text-[--text-tertiary] absolute flex items-center justify-center w-full h-full">
-						{t("recordingsPage.notFound")}
-					</p>
-				}
-			>
-				<div class="flex gap-3 items-center pb-4 w-full border-b border-gray-2">
-					<For each={Tabs}>
-						{(tab) => (
-							<div
-								class={cx(
-									"flex gap-1.5 items-center transition-colors duration-200 p-2 px-3 border rounded-full",
-									activeTab() === tab.id
-										? "bg-gray-5 cursor-default border-gray-5"
-										: "bg-transparent cursor-pointer hover:bg-gray-3 border-gray-5",
-								)}
-								onClick={() => setActiveTab(tab.id)}
-							>
-								{tab.icon && tab.icon}
-								<p class="text-xs text-gray-12">
-									{t(`recordingsPage.tabs.${tab.id}` as any)}
-								</p>
-							</div>
-						)}
-					</For>
-				</div>
+	const handleVideoImport = async () => {
+		try {
+			await importVideoFromPicker();
+		} catch (e) {
+			console.error("Failed to import video:", e);
+			await showImportError("video", e);
+		}
+	};
 
-				<div class="flex relative flex-col flex-1 mt-4 rounded-xl border custom-scroll bg-gray-2 border-gray-3">
-					<Show when={filteredRecordings().length === 0}>
-						<p class="text-center text-[--text-tertiary] absolute flex items-center justify-center w-full h-full">
-							{t("recordingsPage.noCategoryRecordings", {
-								category: t(`recordingsPage.tabs.${activeTab()}` as any),
-							})}
-						</p>
-					</Show>
-					<ul class="flex flex-col w-full text-[--text-primary]">
-						<For each={filteredRecordings()}>
-							{(recording) => (
-								<RecordingItem
-									recording={recording}
-									onClick={() => handleRecordingClick(recording)}
-									onOpenFolder={() => handleOpenFolder(recording.path)}
-									onOpenEditor={() => handleOpenEditor(recording.path)}
-									onCopyVideoToClipboard={() =>
-										handleCopyVideoToClipboard(recording.path)
-									}
-									uploadProgress={
-										recording.meta.upload &&
-										(recording.meta.upload.state === "MultipartUpload" ||
-											recording.meta.upload.state === "SinglePartUpload")
-											? uploadProgress[recording.meta.upload.video_id]
-											: undefined
-									}
+	return (
+		<div class="cap-settings-page flex relative flex-col w-full h-full custom-scroll">
+			<SettingsPageContent class="max-w-none space-y-4">
+				<Section
+					title="Recordings"
+					description="Manage your recordings and perform actions."
+					right={
+						<Button
+							variant="gray"
+							size="sm"
+							class="h-[36px] px-3 shrink-0 flex items-center gap-1.5"
+							onClick={handleVideoImport}
+						>
+							<IconLucideImport class="size-3.5" />
+							<span>Import</span>
+						</Button>
+					}
+				>
+					<Show
+						when={recordings.data && recordings.data.length > 0}
+						fallback={
+							<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
+								No recordings found
+							</p>
+						}
+					>
+						<div class="flex flex-col gap-3 pb-4 w-full border-b border-gray-2">
+							<div class="flex flex-wrap gap-3 items-center">
+								<For each={Tabs}>
+									{(tab) => (
+										<div
+											class={cx(
+												"flex gap-1.5 items-center transition-colors duration-200 p-2 px-3 border rounded-full",
+												activeTab() === tab.id
+													? "bg-gray-5 cursor-default border-gray-5"
+													: "bg-transparent cursor-pointer hover:bg-gray-3 border-gray-5",
+											)}
+											onClick={() => setActiveTab(tab.id)}
+										>
+											{tab.icon && tab.icon}
+											<p class="text-xs text-gray-12">{tab.label}</p>
+										</div>
+									)}
+								</For>
+							</div>
+							<div class="relative w-full max-w-[260px] h-[36px] flex items-center">
+								<IconLucideSearch class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
+								<Input
+									type="search"
+									class="py-2 pl-6 h-full w-full"
+									value={search()}
+									onInput={(event) => setSearch(event.currentTarget.value)}
+									onKeyDown={(event) => {
+										if (event.key === "Escape" && search()) {
+											event.preventDefault();
+											setSearch("");
+										}
+									}}
+									placeholder="Search"
+									autoCapitalize="off"
+									autocorrect="off"
+									autocomplete="off"
+									spellcheck={false}
+									aria-label="Search recordings"
 								/>
-							)}
-						</For>
-					</ul>
-				</div>
-			</Show>
+							</div>
+						</div>
+
+						<div class="flex relative flex-col flex-1 mt-4 rounded-xl border custom-scroll bg-gray-2 border-gray-3">
+							<Show when={filteredRecordings().length === 0}>
+								<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
+									{emptyMessage()}
+								</p>
+							</Show>
+							<ul class="flex flex-col w-full text-(--text-primary)">
+								<For each={visibleRecordings()}>
+									{(recording) => (
+										<RecordingItem
+											recording={recording}
+											onClick={() => handleRecordingClick(recording)}
+											onOpenFolder={() => handleOpenFolder(recording)}
+											onOpenEditor={() => handleOpenEditor(recording.path)}
+											onCopyVideoToClipboard={() =>
+												handleCopyVideoToClipboard(recording.path)
+											}
+											uploadProgress={
+												recording.meta.upload &&
+												(recording.meta.upload.state === "MultipartUpload" ||
+													recording.meta.upload.state === "SinglePartUpload")
+													? uploadProgress[recording.meta.upload.video_id]
+													: undefined
+											}
+										/>
+									)}
+								</For>
+							</ul>
+							<Show when={hasMoreRecordings()}>
+								<div class="flex justify-center p-3 border-t border-gray-3">
+									<Button
+										variant="gray"
+										size="sm"
+										onClick={() =>
+											setVisibleCount((count) =>
+												Math.min(
+													count + PAGE_SIZE,
+													filteredRecordings().length,
+												),
+											)
+										}
+									>
+										Load more
+									</Button>
+								</div>
+							</Show>
+						</div>
+					</Show>
+				</Section>
+			</SettingsPageContent>
 		</div>
 	);
 }
@@ -238,7 +345,7 @@ function RecordingItem(props: {
 				}
 			}}
 			class={cx(
-				"flex flex-row justify-between p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-gray-3 items-center w-full  transition-colors duration-200",
+				"flex flex-row justify-between p-3 not-last:border-b not-last:border-gray-3 items-center w-full  transition-colors duration-200",
 				studioCompleteCheck()
 					? "cursor-pointer hover:bg-gray-3"
 					: "cursor-default",
@@ -247,10 +354,10 @@ function RecordingItem(props: {
 			<div class="flex gap-5 items-center">
 				<Show
 					when={imageExists()}
-					fallback={<div class="mr-4 rounded bg-gray-10 size-11" />}
+					fallback={<div class="mr-4 rounded-sm bg-gray-10 size-11" />}
 				>
 					<img
-						class="object-cover rounded size-12"
+						class="object-cover rounded-sm size-12"
 						alt="Recording thumbnail"
 						src={`${convertFileSrc(
 							props.recording.thumbnailPath,
@@ -274,6 +381,12 @@ function RecordingItem(props: {
 							)}
 							<p>{firstLetterUpperCase()}</p>
 						</div>
+
+						<Show when={props.recording.meta.clip_count > 1}>
+							<div class="px-2 py-0.5 flex items-center font-medium text-[11px] text-gray-12 rounded-full w-fit bg-gray-4">
+								<p>{props.recording.meta.clip_count} clips</p>
+							</div>
+						</Show>
 
 						<Show when={props.recording.meta.status.status === "InProgress"}>
 							<div
@@ -395,8 +508,10 @@ function RecordingItem(props: {
 					}}
 				</Show>
 				<TooltipIconButton
-					tooltipText={t("recordingsPage.actions.openBundle")}
-					onClick={() => revealItemInDir(`${props.recording.path}/`)}
+					tooltipText="Open recording bundle"
+					onClick={() => {
+						props.onOpenFolder();
+					}}
 				>
 					<IconLucideFolder class="size-4" />
 				</TooltipIconButton>

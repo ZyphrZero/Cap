@@ -1,17 +1,18 @@
 use std::{thread, time::Duration};
 
-use cap_media_info::{ensure_even, Pixel, VideoInfo};
+use cap_media_info::{Pixel, VideoInfo, ensure_even};
 use ffmpeg::{
+    Dictionary,
     codec::{codec::Codec, context, encoder},
     color,
     format::{self},
     frame,
     threading::Config,
-    Dictionary,
 };
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::base::EncoderBase;
+use crate::video::h264_packet::H264PacketEncoder;
 
 fn is_420(format: ffmpeg::format::Pixel) -> bool {
     format
@@ -20,12 +21,16 @@ fn is_420(format: ffmpeg::format::Pixel) -> bool {
         .unwrap_or(false)
 }
 
+#[derive(Clone)]
 pub struct H264EncoderBuilder {
     bpp: f32,
     input_config: VideoInfo,
     preset: H264Preset,
     output_size: Option<(u32, u32)>,
     external_conversion: bool,
+    encoder_priority_override: Option<&'static [&'static str]>,
+    is_export: bool,
+    crf: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -50,6 +55,8 @@ pub enum H264EncoderError {
 
 impl H264EncoderBuilder {
     pub const QUALITY_BPP: f32 = 0.3;
+    pub const ULTRA_BPP: f32 = 1.0;
+    pub const INSTANT_MODE_BPP: f32 = 0.15;
 
     pub fn new(input_config: VideoInfo) -> Self {
         Self {
@@ -58,6 +65,9 @@ impl H264EncoderBuilder {
             preset: H264Preset::Ultrafast,
             output_size: None,
             external_conversion: false,
+            encoder_priority_override: None,
+            is_export: false,
+            crf: None,
         }
     }
 
@@ -85,6 +95,28 @@ impl H264EncoderBuilder {
         self
     }
 
+    pub fn with_export_priority(mut self) -> Self {
+        if let Some(priority) = export_encoder_priority_override(&self.input_config, self.preset) {
+            self.encoder_priority_override = Some(priority);
+        }
+        self
+    }
+
+    pub fn with_export_settings(mut self) -> Self {
+        self.is_export = true;
+        self
+    }
+
+    pub fn with_crf(mut self, crf: u8) -> Self {
+        self.crf = Some(crf);
+        self
+    }
+
+    pub fn with_encoder_priority_override(mut self, codecs: &'static [&'static str]) -> Self {
+        self.encoder_priority_override = Some(codecs);
+        self
+    }
+
     pub fn build(
         self,
         output: &mut format::context::Output,
@@ -107,7 +139,13 @@ impl H264EncoderBuilder {
             );
         }
 
-        let candidates = get_codec_and_options(&input_config, self.preset);
+        let candidates = get_codec_and_options(
+            &input_config,
+            self.preset,
+            self.encoder_priority_override,
+            self.is_export,
+            self.crf,
+        );
         if candidates.is_empty() {
             return Err(H264EncoderError::CodecNotFound);
         }
@@ -126,6 +164,7 @@ impl H264EncoderBuilder {
                 output_height,
                 self.bpp,
                 self.external_conversion,
+                self.crf,
             ) {
                 Ok(encoder) => {
                     let is_hardware = matches!(
@@ -135,7 +174,7 @@ impl H264EncoderBuilder {
                     let fps =
                         input_config.frame_rate.0 as f32 / input_config.frame_rate.1.max(1) as f32;
                     if is_hardware {
-                        debug!(
+                        info!(
                             encoder = %codec_name,
                             width = input_config.width,
                             height = input_config.height,
@@ -144,7 +183,7 @@ impl H264EncoderBuilder {
                         );
                     } else {
                         let is_high_throughput =
-                            requires_software_encoder(&input_config, self.preset);
+                            requires_software_encoder(&input_config, self.preset, self.is_export);
                         if is_high_throughput {
                             warn!(
                                 encoder = %codec_name,
@@ -186,113 +225,330 @@ impl H264EncoderBuilder {
         output_height: u32,
         bpp: f32,
         external_conversion: bool,
+        crf: Option<u8>,
     ) -> Result<H264Encoder, H264EncoderError> {
-        let encoder_supports_input_format = codec
-            .video()
-            .ok()
-            .and_then(|codec_video| codec_video.formats())
-            .is_some_and(|mut formats| formats.any(|f| f == input_config.pixel_format));
+        let OpenedVideoEncoder {
+            encoder,
+            converter,
+            converted_frame_pool,
+            output_format,
+            output_width,
+            output_height,
+            input_format,
+            input_width,
+            input_height,
+        } = open_video_encoder(
+            codec,
+            encoder_options,
+            input_config,
+            output_width,
+            output_height,
+            bpp,
+            external_conversion,
+            crf,
+        )?;
 
-        let mut needs_pixel_conversion = false;
+        let mut output_stream = output.add_stream(codec)?;
+        let stream_index = output_stream.index();
+        output_stream.set_time_base((1, H264Encoder::TIME_BASE));
+        output_stream.set_rate(input_config.frame_rate);
+        output_stream.set_parameters(&encoder);
 
-        let output_format = if encoder_supports_input_format {
-            input_config.pixel_format
-        } else {
-            needs_pixel_conversion = true;
-            ffmpeg::format::Pixel::NV12
-        };
+        Ok(H264Encoder {
+            base: EncoderBase::new(stream_index),
+            encoder,
+            converter,
+            output_format,
+            output_width,
+            output_height,
+            input_format,
+            input_width,
+            input_height,
+            converted_frame_pool,
+        })
+    }
 
-        debug!(
-            encoder = %codec.name(),
-            input_format = ?input_config.pixel_format,
-            output_format = ?output_format,
-            needs_pixel_conversion = needs_pixel_conversion,
-            external_conversion = external_conversion,
-            "Encoder pixel format configuration"
-        );
+    pub fn build_standalone(self) -> Result<H264PacketEncoder, H264EncoderError> {
+        let input_config = self.input_config;
+        let (raw_width, raw_height) = self
+            .output_size
+            .unwrap_or((input_config.width, input_config.height));
 
-        if is_420(output_format)
-            && (!output_width.is_multiple_of(2) || !output_height.is_multiple_of(2))
-        {
-            return Err(H264EncoderError::InvalidOutputDimensions {
-                width: output_width,
-                height: output_height,
-            });
-        }
+        let output_width = ensure_even(raw_width);
+        let output_height = ensure_even(raw_height);
 
-        let needs_scaling =
-            output_width != input_config.width || output_height != input_config.height;
-
-        if needs_scaling && !external_conversion {
-            debug!(
-                "Scaling video frames for H264 encoding from {}x{} to {}x{}",
-                input_config.width, input_config.height, output_width, output_height
-            );
-        }
-
-        let converter = if external_conversion {
-            debug!(
-                output_format = ?output_format,
-                output_width = output_width,
-                output_height = output_height,
-                "External conversion enabled, skipping internal converter"
-            );
-            None
-        } else if needs_pixel_conversion || needs_scaling {
-            let flags = if needs_scaling {
-                ffmpeg::software::scaling::flag::Flags::BICUBIC
-            } else {
-                ffmpeg::software::scaling::flag::Flags::FAST_BILINEAR
-            };
-
-            match ffmpeg::software::scaling::Context::get(
-                input_config.pixel_format,
-                input_config.width,
-                input_config.height,
-                output_format,
+        if raw_width != output_width || raw_height != output_height {
+            warn!(
+                raw_width,
+                raw_height,
                 output_width,
                 output_height,
-                flags,
-            ) {
-                Ok(context) => {
-                    debug!(
-                        encoder = %codec.name(),
-                        src_format = ?input_config.pixel_format,
-                        src_size = %format!("{}x{}", input_config.width, input_config.height),
-                        dst_format = ?output_format,
-                        dst_size = %format!("{}x{}", output_width, output_height),
-                        needs_scaling = needs_scaling,
-                        "Created SOFTWARE scaler for pixel format conversion (CPU-intensive)"
-                    );
-                    Some(context)
-                }
-                Err(e) => {
-                    if needs_pixel_conversion {
-                        error!(
-                            "Failed to create converter from {:?} to {:?}: {:?}",
-                            input_config.pixel_format, output_format, e
-                        );
-                        return Err(H264EncoderError::PixFmtNotSupported(
-                            input_config.pixel_format,
-                        ));
-                    }
+                "Auto-adjusted odd dimensions to even for H264 encoding (standalone)"
+            );
+        }
 
-                    return Err(H264EncoderError::FFmpeg(e));
+        let candidates = get_codec_and_options(
+            &input_config,
+            self.preset,
+            self.encoder_priority_override,
+            self.is_export,
+            self.crf,
+        );
+        if candidates.is_empty() {
+            return Err(H264EncoderError::CodecNotFound);
+        }
+
+        let mut last_error = None;
+
+        for (codec, encoder_options) in candidates {
+            let codec_name = codec.name().to_string();
+            match Self::build_standalone_with_codec(
+                codec,
+                encoder_options,
+                &input_config,
+                output_width,
+                output_height,
+                self.bpp,
+                self.external_conversion,
+                self.crf,
+            ) {
+                Ok(encoder) => {
+                    let fps =
+                        input_config.frame_rate.0 as f32 / input_config.frame_rate.1.max(1) as f32;
+                    debug!(
+                        encoder = %codec_name,
+                        width = input_config.width,
+                        height = input_config.height,
+                        fps = fps,
+                        "Selected standalone H264 encoder"
+                    );
+                    return Ok(encoder);
+                }
+                Err(err) => {
+                    debug!("Standalone encoder {} init failed: {:?}", codec_name, err);
+                    last_error = Some(err);
                 }
             }
+        }
+
+        Err(last_error.unwrap_or(H264EncoderError::CodecNotFound))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_standalone_with_codec(
+        codec: Codec,
+        encoder_options: Dictionary<'static>,
+        input_config: &VideoInfo,
+        output_width: u32,
+        output_height: u32,
+        bpp: f32,
+        external_conversion: bool,
+        crf: Option<u8>,
+    ) -> Result<H264PacketEncoder, H264EncoderError> {
+        let opened = open_video_encoder_with_flags(
+            codec,
+            encoder_options,
+            input_config,
+            output_width,
+            output_height,
+            bpp,
+            external_conversion,
+            crf,
+            true,
+        )?;
+        let codec_name = codec.name().to_string();
+        Ok(H264PacketEncoder::from_opened(
+            opened,
+            codec_name,
+            input_config.time_base,
+            input_config.frame_rate,
+        ))
+    }
+}
+
+pub(crate) struct OpenedVideoEncoder {
+    pub encoder: encoder::Video,
+    pub converter: Option<ffmpeg::software::scaling::Context>,
+    pub converted_frame_pool: Option<frame::Video>,
+    pub output_format: format::Pixel,
+    pub output_width: u32,
+    pub output_height: u32,
+    pub input_format: format::Pixel,
+    pub input_width: u32,
+    pub input_height: u32,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn open_video_encoder(
+    codec: Codec,
+    encoder_options: Dictionary<'static>,
+    input_config: &VideoInfo,
+    output_width: u32,
+    output_height: u32,
+    bpp: f32,
+    external_conversion: bool,
+    crf: Option<u8>,
+) -> Result<OpenedVideoEncoder, H264EncoderError> {
+    open_video_encoder_inner(
+        codec,
+        encoder_options,
+        input_config,
+        output_width,
+        output_height,
+        bpp,
+        external_conversion,
+        crf,
+        false,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn open_video_encoder_with_flags(
+    codec: Codec,
+    encoder_options: Dictionary<'static>,
+    input_config: &VideoInfo,
+    output_width: u32,
+    output_height: u32,
+    bpp: f32,
+    external_conversion: bool,
+    crf: Option<u8>,
+    global_header: bool,
+) -> Result<OpenedVideoEncoder, H264EncoderError> {
+    open_video_encoder_inner(
+        codec,
+        encoder_options,
+        input_config,
+        output_width,
+        output_height,
+        bpp,
+        external_conversion,
+        crf,
+        global_header,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn open_video_encoder_inner(
+    codec: Codec,
+    encoder_options: Dictionary<'static>,
+    input_config: &VideoInfo,
+    output_width: u32,
+    output_height: u32,
+    bpp: f32,
+    external_conversion: bool,
+    crf: Option<u8>,
+    global_header: bool,
+) -> Result<OpenedVideoEncoder, H264EncoderError> {
+    let encoder_supports_input_format = codec
+        .video()
+        .ok()
+        .and_then(|codec_video| codec_video.formats())
+        .is_some_and(|mut formats| formats.any(|f| f == input_config.pixel_format));
+
+    let mut needs_pixel_conversion = false;
+
+    let output_format = if encoder_supports_input_format {
+        input_config.pixel_format
+    } else {
+        needs_pixel_conversion = true;
+        if codec.name() == "libx264" {
+            ffmpeg::format::Pixel::YUV420P
         } else {
-            debug!(
-                encoder = %codec.name(),
-                "No pixel format conversion needed (zero-copy path)"
-            );
-            None
+            ffmpeg::format::Pixel::NV12
+        }
+    };
+
+    debug!(
+        encoder = %codec.name(),
+        input_format = ?input_config.pixel_format,
+        output_format = ?output_format,
+        needs_pixel_conversion = needs_pixel_conversion,
+        external_conversion = external_conversion,
+        "Encoder pixel format configuration"
+    );
+
+    if is_420(output_format)
+        && (!output_width.is_multiple_of(2) || !output_height.is_multiple_of(2))
+    {
+        return Err(H264EncoderError::InvalidOutputDimensions {
+            width: output_width,
+            height: output_height,
+        });
+    }
+
+    let needs_scaling = output_width != input_config.width || output_height != input_config.height;
+
+    if needs_scaling && !external_conversion {
+        debug!(
+            "Scaling video frames for H264 encoding from {}x{} to {}x{}",
+            input_config.width, input_config.height, output_width, output_height
+        );
+    }
+
+    let converter = if external_conversion {
+        debug!(
+            output_format = ?output_format,
+            output_width = output_width,
+            output_height = output_height,
+            "External conversion enabled, skipping internal converter"
+        );
+        None
+    } else if needs_pixel_conversion || needs_scaling {
+        let flags = if needs_scaling {
+            ffmpeg::software::scaling::flag::Flags::BICUBIC
+        } else {
+            ffmpeg::software::scaling::flag::Flags::FAST_BILINEAR
         };
 
-        let mut encoder_ctx = context::Context::new_with_codec(codec);
+        match ffmpeg::software::scaling::Context::get(
+            input_config.pixel_format,
+            input_config.width,
+            input_config.height,
+            output_format,
+            output_width,
+            output_height,
+            flags,
+        ) {
+            Ok(context) => {
+                debug!(
+                    encoder = %codec.name(),
+                    src_format = ?input_config.pixel_format,
+                    src_size = %format!("{}x{}", input_config.width, input_config.height),
+                    dst_format = ?output_format,
+                    dst_size = %format!("{}x{}", output_width, output_height),
+                    needs_scaling = needs_scaling,
+                    "Created SOFTWARE scaler for pixel format conversion (CPU-intensive)"
+                );
+                Some(context)
+            }
+            Err(e) => {
+                if needs_pixel_conversion {
+                    error!(
+                        "Failed to create converter from {:?} to {:?}: {:?}",
+                        input_config.pixel_format, output_format, e
+                    );
+                    return Err(H264EncoderError::PixFmtNotSupported(
+                        input_config.pixel_format,
+                    ));
+                }
 
-        let thread_count = thread::available_parallelism()
-            .map(|v| v.get())
-            .unwrap_or(1);
+                return Err(H264EncoderError::FFmpeg(e));
+            }
+        }
+    } else {
+        debug!(
+            encoder = %codec.name(),
+            "No pixel format conversion needed (zero-copy path)"
+        );
+        None
+    };
+
+    let thread_count = thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(1);
+
+    let encoder = {
+        let mut encoder_ctx = context::Context::new_with_codec(codec);
         encoder_ctx.set_threading(Config::count(thread_count));
         let mut encoder = encoder_ctx.encoder().video()?;
 
@@ -308,48 +564,48 @@ impl H264EncoderBuilder {
                 ffmpeg::ffi::AVColorPrimaries::AVCOL_PRI_BT709;
             (*encoder.as_mut_ptr()).color_trc =
                 ffmpeg::ffi::AVColorTransferCharacteristic::AVCOL_TRC_BT709;
+            if global_header {
+                (*encoder.as_mut_ptr()).flags |= ffmpeg::ffi::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
+            }
         }
 
-        let bitrate = get_bitrate(
-            output_width,
-            output_height,
-            input_config.frame_rate.0 as f32 / input_config.frame_rate.1 as f32,
-            bpp,
-        );
-
-        encoder.set_bit_rate(bitrate);
-
-        let encoder = encoder.open_with(encoder_options)?;
-
-        let mut output_stream = output.add_stream(codec)?;
-        let stream_index = output_stream.index();
-        output_stream.set_time_base((1, H264Encoder::TIME_BASE));
-        output_stream.set_rate(input_config.frame_rate);
-        output_stream.set_parameters(&encoder);
-
-        let converted_frame_pool = if converter.is_some() {
-            Some(frame::Video::new(
-                output_format,
+        if crf.is_some() {
+            encoder.set_bit_rate(0);
+        } else {
+            let bitrate = get_bitrate(
                 output_width,
                 output_height,
-            ))
-        } else {
-            None
-        };
+                input_config.frame_rate.0 as f32 / input_config.frame_rate.1 as f32,
+                bpp,
+            );
+            encoder.set_bit_rate(bitrate);
+            encoder.set_max_bit_rate(bitrate * 3 / 2);
+        }
 
-        Ok(H264Encoder {
-            base: EncoderBase::new(stream_index),
-            encoder,
-            converter,
+        encoder.open_as_with(codec, encoder_options)?
+    };
+
+    let converted_frame_pool = if converter.is_some() {
+        Some(frame::Video::new(
             output_format,
             output_width,
             output_height,
-            input_format: input_config.pixel_format,
-            input_width: input_config.width,
-            input_height: input_config.height,
-            converted_frame_pool,
-        })
-    }
+        ))
+    } else {
+        None
+    };
+
+    Ok(OpenedVideoEncoder {
+        encoder,
+        converter,
+        converted_frame_pool,
+        output_format,
+        output_width,
+        output_height,
+        input_format: input_config.pixel_format,
+        input_width: input_config.width,
+        input_height: input_config.height,
+    })
 }
 
 pub struct H264Encoder {
@@ -494,18 +750,29 @@ impl H264Encoder {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const VIDEOTOOLBOX_4K_MAX_FPS: f64 = 55.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const VIDEOTOOLBOX_1080P_MAX_FPS: f64 = 190.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const NVENC_4K_MAX_FPS: f64 = 120.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const NVENC_1080P_MAX_FPS: f64 = 500.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const QSV_4K_MAX_FPS: f64 = 90.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const QSV_1080P_MAX_FPS: f64 = 300.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const AMF_4K_MAX_FPS: f64 = 100.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const AMF_1080P_MAX_FPS: f64 = 350.0;
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const PIXELS_4K: f64 = 3840.0 * 2160.0;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const PIXELS_1080P: f64 = 1920.0 * 1080.0;
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn estimate_hw_encoder_max_fps(encoder_name: &str, width: u32, height: u32) -> f64 {
     let pixels = (width as f64) * (height as f64);
 
@@ -527,15 +794,22 @@ fn estimate_hw_encoder_max_fps(encoder_name: &str, width: u32, height: u32) -> f
     }
 }
 
-fn requires_software_encoder(config: &VideoInfo, preset: H264Preset) -> bool {
+fn requires_software_encoder(config: &VideoInfo, preset: H264Preset, is_export: bool) -> bool {
+    if is_export {
+        return false;
+    }
+
     if preset == H264Preset::HighThroughput {
         return true;
     }
 
-    let fps = config.frame_rate.numerator() as f64 / config.frame_rate.denominator().max(1) as f64;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let _ = config;
 
     #[cfg(target_os = "macos")]
     {
+        let fps =
+            config.frame_rate.numerator() as f64 / config.frame_rate.denominator().max(1) as f64;
         let max_hw_fps =
             estimate_hw_encoder_max_fps("h264_videotoolbox", config.width, config.height);
         let headroom_factor = 0.9;
@@ -553,8 +827,10 @@ fn requires_software_encoder(config: &VideoInfo, preset: H264Preset) -> bool {
 
     #[cfg(target_os = "windows")]
     {
-        use cap_frame_converter::{detect_primary_gpu, GpuVendor};
+        use cap_frame_converter::{GpuVendor, detect_primary_gpu};
 
+        let fps =
+            config.frame_rate.numerator() as f64 / config.frame_rate.denominator().max(1) as f64;
         let encoder_name = match detect_primary_gpu().map(|info| info.vendor) {
             Some(GpuVendor::Nvidia) => "h264_nvenc",
             Some(GpuVendor::Amd) => "h264_amf",
@@ -580,26 +856,15 @@ fn requires_software_encoder(config: &VideoInfo, preset: H264Preset) -> bool {
     false
 }
 
-fn get_encoder_priority(config: &VideoInfo, preset: H264Preset) -> &'static [&'static str] {
-    if requires_software_encoder(config, preset) {
-        return &["libx264"];
-    }
-
+fn get_default_encoder_priority(_config: &VideoInfo) -> &'static [&'static str] {
     #[cfg(target_os = "macos")]
     {
-        &[
-            "h264_videotoolbox",
-            "h264_qsv",
-            "h264_nvenc",
-            "h264_amf",
-            "h264_mf",
-            "libx264",
-        ]
+        &["h264_videotoolbox", "libx264"]
     }
 
     #[cfg(target_os = "windows")]
     {
-        use cap_frame_converter::{detect_primary_gpu, GpuVendor};
+        use cap_frame_converter::{GpuVendor, detect_primary_gpu};
 
         static ENCODER_PRIORITY_NVIDIA: &[&str] =
             &["h264_nvenc", "h264_mf", "h264_qsv", "h264_amf", "libx264"];
@@ -610,11 +875,15 @@ fn get_encoder_priority(config: &VideoInfo, preset: H264Preset) -> &'static [&'s
         static ENCODER_PRIORITY_DEFAULT: &[&str] =
             &["h264_nvenc", "h264_qsv", "h264_amf", "h264_mf", "libx264"];
 
-        match detect_primary_gpu().map(|info| info.vendor) {
-            Some(GpuVendor::Nvidia) => ENCODER_PRIORITY_NVIDIA,
-            Some(GpuVendor::Amd) => ENCODER_PRIORITY_AMD,
-            Some(GpuVendor::Intel) => ENCODER_PRIORITY_INTEL,
-            _ => ENCODER_PRIORITY_DEFAULT,
+        match detect_primary_gpu() {
+            Some(info) if !info.supports_hardware_encoding() => &["libx264"],
+            Some(info) => match info.vendor {
+                GpuVendor::Nvidia => ENCODER_PRIORITY_NVIDIA,
+                GpuVendor::Amd => ENCODER_PRIORITY_AMD,
+                GpuVendor::Intel => ENCODER_PRIORITY_INTEL,
+                _ => ENCODER_PRIORITY_DEFAULT,
+            },
+            None => ENCODER_PRIORITY_DEFAULT,
         }
     }
 
@@ -624,11 +893,62 @@ fn get_encoder_priority(config: &VideoInfo, preset: H264Preset) -> &'static [&'s
     }
 }
 
-pub const DEFAULT_KEYFRAME_INTERVAL_SECS: u32 = 3;
+fn get_encoder_priority_with_override(
+    config: &VideoInfo,
+    preset: H264Preset,
+    override_priority: Option<&'static [&'static str]>,
+    is_export: bool,
+) -> &'static [&'static str] {
+    if force_software_encoder() {
+        return &["libx264"];
+    }
+
+    if requires_software_encoder(config, preset, is_export) {
+        return &["libx264"];
+    }
+
+    override_priority.unwrap_or_else(|| get_default_encoder_priority(config))
+}
+
+fn force_software_encoder() -> bool {
+    std::env::var("CAP_EXPORT_FORCE_SOFTWARE_ENCODER").is_ok_and(|value| {
+        matches!(
+            value.to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
+}
+
+fn export_encoder_priority_override(
+    _config: &VideoInfo,
+    _preset: H264Preset,
+) -> Option<&'static [&'static str]> {
+    #[cfg(target_os = "windows")]
+    {
+        use cap_frame_converter::{GpuVendor, detect_primary_gpu};
+
+        static ENCODER_PRIORITY_AMD_EXPORT: &[&str] =
+            &["h264_amf", "h264_mf", "h264_nvenc", "h264_qsv", "libx264"];
+
+        if let Some(info) = detect_primary_gpu()
+            && info.supports_hardware_encoding()
+            && info.vendor == GpuVendor::Amd
+        {
+            return Some(ENCODER_PRIORITY_AMD_EXPORT);
+        }
+    }
+
+    None
+}
+
+pub const DEFAULT_KEYFRAME_INTERVAL_SECS: u32 = 2;
 
 fn get_codec_and_options(
     config: &VideoInfo,
     preset: H264Preset,
+    encoder_priority_override: Option<&'static [&'static str]>,
+    is_export: bool,
+    crf: Option<u8>,
 ) -> Vec<(Codec, Dictionary<'static>)> {
     let keyframe_interval_secs = DEFAULT_KEYFRAME_INTERVAL_SECS;
     let denominator = config.frame_rate.denominator();
@@ -639,9 +959,15 @@ fn get_codec_and_options(
         .max(1.0) as i32;
     let keyframe_interval_str = keyframe_interval.to_string();
 
-    let encoder_priority = get_encoder_priority(config, preset);
+    let encoder_priority = if crf.is_some() {
+        &["libx264"] as &[&str]
+    } else {
+        get_encoder_priority_with_override(config, preset, encoder_priority_override, is_export)
+    };
 
     let mut encoders = Vec::new();
+
+    let crf_str = crf.map(|v| v.to_string());
 
     for encoder_name in encoder_priority {
         let Some(codec) = encoder::find_by_name(encoder_name) else {
@@ -652,55 +978,108 @@ fn get_codec_and_options(
 
         match *encoder_name {
             "h264_videotoolbox" => {
-                options.set("realtime", "true");
-                options.set("prio_speed", "true");
-                options.set("profile", "baseline");
+                if is_export {
+                    options.set("realtime", "false");
+                    options.set("profile", "main");
+                    options.set("allow_sw", "0");
+                } else {
+                    options.set("realtime", "true");
+                    options.set("prio_speed", "true");
+                    options.set("profile", "main");
+                }
             }
             "h264_nvenc" => {
-                options.set("preset", "p4");
-                options.set("tune", "ll");
-                options.set("rc", "vbr");
-                options.set("spatial-aq", "1");
-                options.set("temporal-aq", "1");
+                if is_export {
+                    options.set("preset", "p5");
+                    options.set("tune", "hq");
+                    options.set("rc", "vbr");
+                    options.set("spatial-aq", "1");
+                    options.set("temporal-aq", "1");
+                    options.set("b_ref_mode", "middle");
+                } else {
+                    options.set("preset", "p4");
+                    options.set("tune", "ll");
+                    options.set("rc", "vbr");
+                    options.set("spatial-aq", "1");
+                    options.set("temporal-aq", "1");
+                }
                 options.set("g", &keyframe_interval_str);
                 options.set("keyint_min", &keyframe_interval_str);
                 options.set("bf", "0");
             }
             "h264_qsv" => {
-                options.set("preset", "faster");
-                options.set("look_ahead", "1");
+                if is_export {
+                    options.set("preset", "medium");
+                    options.set("look_ahead", "1");
+                    options.set("look_ahead_depth", "20");
+                } else {
+                    options.set("preset", "faster");
+                    options.set("look_ahead", "1");
+                }
                 options.set("g", &keyframe_interval_str);
                 options.set("keyint_min", &keyframe_interval_str);
                 options.set("bf", "0");
             }
             "h264_amf" => {
-                options.set("quality", "balanced");
-                options.set("rc", "vbr_latency");
+                if is_export {
+                    options.set("quality", "quality");
+                    options.set("rc", "vbr_peak");
+                } else {
+                    options.set("quality", "balanced");
+                    options.set("rc", "vbr_latency");
+                }
                 options.set("g", &keyframe_interval_str);
                 options.set("keyint_min", &keyframe_interval_str);
                 options.set("bf", "0");
             }
             "h264_mf" => {
                 options.set("hw_encoding", "true");
-                options.set("scenario", "4");
-                options.set("quality", "1");
+                if is_export {
+                    options.set("scenario", "0");
+                    options.set("quality", "0");
+                } else {
+                    options.set("scenario", "4");
+                    options.set("quality", "1");
+                }
                 options.set("g", &keyframe_interval_str);
                 options.set("keyint_min", &keyframe_interval_str);
                 options.set("bf", "0");
             }
             "libx264" => {
-                options.set(
-                    "preset",
-                    match preset {
-                        H264Preset::Slow => "slow",
-                        H264Preset::Medium => "medium",
+                if let Some(ref crf_val) = crf_str {
+                    options.set("preset", "slow");
+                    options.set("crf", crf_val);
+                    options.set("pix_fmt", "yuv420p");
+                } else if is_export {
+                    options.set(
+                        "preset",
+                        match preset {
+                            H264Preset::Slow => "slow",
+                            H264Preset::Medium => "medium",
+                            _ => "veryfast",
+                        },
+                    );
+                    if !matches!(preset, H264Preset::Slow | H264Preset::Medium) {
+                        let thread_count = thread::available_parallelism()
+                            .map(|v| v.get())
+                            .unwrap_or(4);
+                        options.set("threads", &thread_count.to_string());
+                        options.set("bf", "0");
+                        options.set("rc-lookahead", "10");
+                        options.set("b-adapt", "0");
+                        options.set("aq-mode", "1");
+                        options.set("ref", "2");
+                        options.set("subme", "2");
+                        options.set("trellis", "0");
+                    }
+                } else {
+                    let realtime_preset = match preset {
+                        H264Preset::Slow | H264Preset::Medium => "veryfast",
                         H264Preset::Ultrafast | H264Preset::HighThroughput => "ultrafast",
-                    },
-                );
-                if matches!(preset, H264Preset::Ultrafast | H264Preset::HighThroughput) {
+                    };
+                    options.set("preset", realtime_preset);
                     options.set("tune", "zerolatency");
                 }
-                options.set("vsync", "1");
                 options.set("g", &keyframe_interval_str);
                 options.set("keyint_min", &keyframe_interval_str);
             }

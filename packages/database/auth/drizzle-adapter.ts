@@ -15,17 +15,101 @@ import {
 	verificationTokens,
 } from "../schema.ts";
 
+type CreateUserData = Parameters<NonNullable<Adapter["createUser"]>>[0];
+type LinkAccountData = Parameters<NonNullable<Adapter["linkAccount"]>>[0];
+type UnlinkAccountData = Parameters<NonNullable<Adapter["unlinkAccount"]>>[0];
+type UpdateSessionData = Parameters<NonNullable<Adapter["updateSession"]>>[0];
+
+function getProvisionedUserName(email: string) {
+	return (
+		email
+			.split("@")[0]
+			?.replace(/[._-]+/g, " ")
+			.trim() || email
+	);
+}
+
+async function hasPendingProvisionedInvite(
+	db: MySql2Database,
+	userId: User.UserId,
+	email: string,
+) {
+	const [pendingInviteMember] = await db
+		.select({ inviteId: organizationInvites.id })
+		.from(organizationInvites)
+		.innerJoin(
+			organizationMembers,
+			and(
+				eq(
+					organizationMembers.organizationId,
+					organizationInvites.organizationId,
+				),
+				eq(organizationMembers.userId, userId),
+			),
+		)
+		.where(
+			and(
+				eq(organizationInvites.invitedEmail, email),
+				eq(organizationInvites.status, "pending"),
+			),
+		)
+		.limit(1);
+
+	return !!pendingInviteMember;
+}
+
+async function hasLinkedAccount(db: MySql2Database, userId: User.UserId) {
+	const [linkedAccount] = await db
+		.select({ id: accounts.id })
+		.from(accounts)
+		.where(eq(accounts.userId, userId))
+		.limit(1);
+
+	return !!linkedAccount;
+}
+
 export function DrizzleAdapter(db: MySql2Database): Adapter {
 	return {
-		async createUser(userData: any) {
-			const userId = User.UserId.make(nanoId());
+		async createUser(userData: CreateUserData) {
+			const normalizedEmail = userData.email.toLowerCase();
+			let userId = User.UserId.make(nanoId());
 			await db.transaction(async (tx) => {
+				const [existingUser] = await tx
+					.select()
+					.from(users)
+					.where(eq(users.email, normalizedEmail))
+					.limit(1);
+
+				if (existingUser) {
+					userId = existingUser.id;
+					const userUpdate: Partial<typeof users.$inferInsert> = {};
+
+					if (!existingUser.name && userData.name) {
+						userUpdate.name = userData.name;
+					}
+					if (!existingUser.name && !userData.name) {
+						userUpdate.name = getProvisionedUserName(normalizedEmail);
+					}
+					if (!existingUser.emailVerified && userData.emailVerified) {
+						userUpdate.emailVerified = userData.emailVerified;
+					}
+					if (!existingUser.image && userData.image) {
+						userUpdate.image = userData.image as ImageUpload.ImageUrlOrKey;
+					}
+
+					if (Object.keys(userUpdate).length > 0) {
+						await tx.update(users).set(userUpdate).where(eq(users.id, userId));
+					}
+
+					return;
+				}
+
 				const [pendingInvite] = await tx
 					.select({ id: organizationInvites.id })
 					.from(organizationInvites)
 					.where(
 						and(
-							eq(organizationInvites.invitedEmail, userData.email),
+							eq(organizationInvites.invitedEmail, normalizedEmail),
 							eq(organizationInvites.status, "pending"),
 						),
 					)
@@ -33,10 +117,10 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 
 				await tx.insert(users).values({
 					id: userId,
-					email: userData.email,
+					email: normalizedEmail,
 					emailVerified: userData.emailVerified,
 					name: userData.name,
-					image: userData.image,
+					image: userData.image as ImageUpload.ImageUrlOrKey | null,
 					activeOrganizationId: Organisation.OrganisationId.make(""),
 				});
 
@@ -78,7 +162,7 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 
 			if (STRIPE_AVAILABLE()) {
 				const existingCustomers = await stripe().customers.list({
-					email: userData.email,
+					email: normalizedEmail,
 					limit: 1,
 				});
 
@@ -94,7 +178,7 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 					});
 				} else {
 					customer = await stripe().customers.create({
-						email: userData.email,
+						email: normalizedEmail,
 						metadata: {
 							userId: row.id,
 						},
@@ -153,16 +237,26 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 			return row ?? null;
 		},
 		async getUserByEmail(email) {
+			const normalizedEmail = email?.toLowerCase() ?? "";
 			const rows = await db
 				.select()
 				.from(users)
-				.where(eq(users.email, email))
+				.where(eq(users.email, normalizedEmail))
 				.limit(1)
 				.catch((e) => {
 					throw e;
 				});
 			const row = rows[0];
-			return row ?? null;
+			if (!row) return null;
+
+			if (
+				!(await hasLinkedAccount(db, row.id)) &&
+				(await hasPendingProvisionedInvite(db, row.id, normalizedEmail))
+			) {
+				return null;
+			}
+
+			return row;
 		},
 		async getUserByAccount({ providerAccountId, provider }) {
 			const rows = await db
@@ -200,7 +294,7 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 		async deleteUser(userId) {
 			await db.delete(users).where(eq(users.id, User.UserId.make(userId)));
 		},
-		async linkAccount(account: any) {
+		async linkAccount(account: LinkAccountData) {
 			await db.insert(accounts).values({
 				id: User.UserId.make(nanoId()),
 				userId: account.userId,
@@ -216,7 +310,7 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 				token_type: account.token_type,
 			});
 		},
-		async unlinkAccount({ providerAccountId, provider }: any) {
+		async unlinkAccount({ providerAccountId, provider }: UnlinkAccountData) {
 			await db
 				.delete(accounts)
 				.where(
@@ -270,11 +364,18 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 				},
 			};
 		},
-		async updateSession(session: any) {
-			await db
-				.update(sessions)
-				.set(session as any)
-				.where(eq(sessions.sessionToken, session.sessionToken));
+		async updateSession(session: UpdateSessionData) {
+			const sessionUpdate: Partial<typeof sessions.$inferInsert> = {};
+			if (session.expires) sessionUpdate.expires = session.expires;
+			if (session.userId)
+				sessionUpdate.userId = User.UserId.make(session.userId);
+
+			if (Object.keys(sessionUpdate).length > 0) {
+				await db
+					.update(sessions)
+					.set(sessionUpdate)
+					.where(eq(sessions.sessionToken, session.sessionToken));
+			}
 			const rows = await db
 				.select()
 				.from(sessions)
@@ -288,10 +389,12 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 			await db.delete(sessions).where(eq(sessions.sessionToken, sessionToken));
 		},
 		async createVerificationToken(verificationToken) {
+			const normalizedIdentifier =
+				verificationToken.identifier?.toLowerCase() ?? "";
 			const existingTokens = await db
 				.select()
 				.from(verificationTokens)
-				.where(eq(verificationTokens.identifier, verificationToken.identifier))
+				.where(eq(verificationTokens.identifier, normalizedIdentifier))
 				.limit(1);
 
 			if (existingTokens.length > 0) {
@@ -301,23 +404,19 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 						token: verificationToken.token,
 						expires: verificationToken.expires,
 					})
-					.where(
-						eq(verificationTokens.identifier, verificationToken.identifier),
-					);
+					.where(eq(verificationTokens.identifier, normalizedIdentifier));
 
 				return await db
 					.select()
 					.from(verificationTokens)
-					.where(
-						eq(verificationTokens.identifier, verificationToken.identifier),
-					)
+					.where(eq(verificationTokens.identifier, normalizedIdentifier))
 					.limit(1)
 					.then((rows) => rows[0]);
 			}
 
 			await db.insert(verificationTokens).values({
 				expires: verificationToken.expires,
-				identifier: verificationToken.identifier,
+				identifier: normalizedIdentifier,
 				token: verificationToken.token,
 			});
 
@@ -337,16 +436,31 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 				.where(eq(verificationTokens.token, token))
 				.limit(1);
 			const row = rows[0];
-			if (!row) return null;
+			if (!row) {
+				console.warn("[useVerificationToken] No token found for hash", {
+					identifier,
+					tokenPrefix: token.slice(0, 8),
+				});
+				return null;
+			}
+			const normalizedIdentifier = identifier?.toLowerCase() ?? "";
+			const storedIdentifier = row.identifier?.toLowerCase() ?? "";
+			if (normalizedIdentifier !== storedIdentifier) {
+				console.warn("[useVerificationToken] Identifier mismatch", {
+					expected: normalizedIdentifier,
+					stored: storedIdentifier,
+				});
+				return null;
+			}
 			await db
 				.delete(verificationTokens)
 				.where(
 					and(
 						eq(verificationTokens.token, token),
-						eq(verificationTokens.identifier, identifier),
+						eq(verificationTokens.identifier, row.identifier),
 					),
 				);
-			return row;
+			return { ...row, identifier: storedIdentifier };
 		},
 	};
 }

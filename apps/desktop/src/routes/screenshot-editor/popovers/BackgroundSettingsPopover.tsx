@@ -1,7 +1,7 @@
 import { Popover } from "@kobalte/core/popover";
 import { RadioGroup as KRadioGroup } from "@kobalte/core/radio-group";
 import { Tabs as KTabs } from "@kobalte/core/tabs";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { appDataDir, resolveResource } from "@tauri-apps/api/path";
 import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
 import {
@@ -27,13 +27,24 @@ import { useScreenshotEditorContext } from "../context";
 import { EditorButton, Field, Slider } from "../ui";
 
 // Constants
-const BACKGROUND_SOURCES = () =>
-	({
-		wallpaper: t("screenshotEditor.background.sources.wallpaper"),
-		image: t("screenshotEditor.background.sources.image"),
-		color: t("screenshotEditor.background.sources.color"),
-		gradient: t("screenshotEditor.background.sources.gradient"),
-	}) satisfies Record<BackgroundSource["type"], string>;
+const DEFAULT_BACKGROUND_SHADOW = 73.6;
+
+const prewarmedBackgrounds = new Set<string>();
+
+function prewarmBackground(path: string | null | undefined) {
+	if (!path || prewarmedBackgrounds.has(path)) return;
+	prewarmedBackgrounds.add(path);
+	void invoke("prewarm_screenshot_background", { path }).catch(() => {
+		prewarmedBackgrounds.delete(path);
+	});
+}
+
+const BACKGROUND_SOURCES = {
+	wallpaper: "Wallpaper",
+	image: "Image",
+	color: "Color",
+	gradient: "Gradient",
+} satisfies Record<BackgroundSource["type"], string>;
 
 const BACKGROUND_SOURCES_LIST = [
 	"wallpaper",
@@ -95,6 +106,14 @@ const WALLPAPER_NAMES = [
 	"purple/4",
 	"purple/5",
 	"purple/6",
+	"cities/liverpool",
+	"cities/santorini",
+	"cities/miami",
+	"cities/monaco",
+	"cities/london",
+	"cities/rome",
+	"cities/sf",
+	"cities/nyc",
 	"dark/1",
 	"dark/2",
 	"dark/3",
@@ -115,13 +134,14 @@ const WALLPAPER_NAMES = [
 
 type WallpaperName = (typeof WALLPAPER_NAMES)[number];
 
-const BACKGROUND_THEMES = () => ({
-	macOS: t("screenshotEditor.background.themes.macOS"),
-	dark: t("screenshotEditor.background.themes.dark"),
-	blue: t("screenshotEditor.background.themes.blue"),
-	purple: t("screenshotEditor.background.themes.purple"),
-	orange: t("screenshotEditor.background.themes.orange"),
-});
+const BACKGROUND_THEMES = {
+	macOS: "macOS",
+	dark: "Dark",
+	blue: "Blue",
+	cities: "Cities",
+	purple: "Purple",
+	orange: "Orange",
+};
 
 export function BackgroundSettingsPopover() {
 	const {
@@ -187,6 +207,7 @@ export function BackgroundSettingsPopover() {
 		batch(() => {
 			const isPaddingZero = project.background.padding === 0;
 			const isRoundingZero = project.background.rounding === 0;
+			const isShadowZero = project.background.shadow === 0;
 
 			if (isPaddingZero) {
 				setProject("background", "padding", 10);
@@ -195,6 +216,10 @@ export function BackgroundSettingsPopover() {
 			if (isPaddingZero && isRoundingZero) {
 				setProject("background", "rounding", 8);
 			}
+
+			if (isShadowZero) {
+				setProject("background", "shadow", DEFAULT_BACKGROUND_SHADOW);
+			}
 		});
 	};
 
@@ -202,10 +227,17 @@ export function BackgroundSettingsPopover() {
 		<Popover
 			placement="bottom-start"
 			open={activePopover() === "background"}
-			onOpenChange={(open) => setActivePopover(open ? "background" : null)}
+			onOpenChange={(open) => {
+				if (!open && activePopover() === "background") setActivePopover(null);
+			}}
 		>
-			<Popover.Trigger
+			<Popover.Anchor
 				as={EditorButton}
+				onClick={() =>
+					setActivePopover(
+						activePopover() === "background" ? null : "background",
+					)
+				}
 				leftIcon={<IconCapImage class="size-4" />}
 				tooltipText={t("screenshotEditor.background.title")}
 				kbd={["B"]}
@@ -262,12 +294,12 @@ export function BackgroundSettingsPopover() {
 									}
 								}}
 							>
-								<KTabs.List class="flex flex-row gap-2 items-center rounded-[0.5rem] relative">
+								<KTabs.List class="flex flex-row gap-2 items-center rounded-lg relative">
 									<For each={BACKGROUND_SOURCES_LIST}>
 										{(item) => {
 											return (
 												<KTabs.Trigger
-													class="z-10 flex-1 py-2.5 px-2 text-xs text-gray-11  ui-selected:border-gray-3 ui-selected:bg-gray-3 ui-not-selected:hover:border-gray-7 rounded-[10px] transition-colors duration-200 outline-none border ui-selected:text-gray-12 peer"
+													class="z-10 flex-1 py-2.5 px-2 text-xs text-gray-11 data-selected:border-gray-3 data-selected:bg-gray-3 not-data-selected:hover:border-gray-7 rounded-[10px] transition-colors duration-200 outline-hidden border data-selected:text-gray-12 peer"
 													value={item}
 												>
 													{BACKGROUND_SOURCES()[item]}
@@ -296,7 +328,7 @@ export function BackgroundSettingsPopover() {
 															)
 														}
 														value={key}
-														class="flex relative z-10 flex-1 justify-center items-center px-4 py-2 bg-transparent rounded-lg border transition-colors duration-200 text-gray-11 ui-not-selected:hover:border-gray-7 ui-selected:bg-gray-3 ui-selected:border-gray-3 group ui-selected:text-gray-12 disabled:opacity-50 focus:outline-none"
+														class="flex relative z-10 flex-1 justify-center items-center px-4 py-2 bg-transparent rounded-lg border transition-colors duration-200 text-gray-11 not-data-selected:hover:border-gray-7 data-selected:bg-gray-3 data-selected:border-gray-3 group data-selected:text-gray-12 disabled:opacity-50 focus:outline-hidden"
 													>
 														{value}
 													</KTabs.Trigger>
@@ -331,9 +363,11 @@ export function BackgroundSettingsPopover() {
 												<KRadioGroup.Item
 													value={photo.url}
 													class="relative aspect-square group"
+													onMouseEnter={() => prewarmBackground(photo.rawPath)}
+													onFocusIn={() => prewarmBackground(photo.rawPath)}
 												>
 													<KRadioGroup.ItemInput class="peer" />
-													<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg transition cursor-pointer ui-not-checked:ring-offset-1 ui-not-checked:ring-offset-gray-200 ui-not-checked:hover:ring-1 ui-not-checked:hover:ring-gray-400 ui-checked:ring-2 ui-checked:ring-gray-500 ui-checked:ring-offset-2 ui-checked:ring-offset-gray-200">
+													<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg transition cursor-pointer not-data-checked:ring-offset-1 not-data-checked:ring-offset-gray-200 not-data-checked:hover:ring-1 not-data-checked:hover:ring-gray-400 data-checked:ring-2 data-checked:ring-gray-500 data-checked:ring-offset-2 data-checked:ring-offset-gray-200">
 														<img
 															src={photo.url}
 															loading="eager"
@@ -357,7 +391,7 @@ export function BackgroundSettingsPopover() {
 											<button
 												type="button"
 												onClick={() => fileInput.click()}
-												class="p-6 bg-gray-2 text-[13px] w-full rounded-[0.5rem] border border-gray-5 border-dashed flex flex-col items-center justify-center gap-[0.5rem] hover:bg-gray-3 transition-colors duration-100"
+												class="p-6 bg-gray-2 text-[13px] w-full rounded-lg border border-gray-5 border-dashed flex flex-col items-center justify-center gap-2 hover:bg-gray-3 transition-colors duration-100"
 											>
 												<IconCapImage class="text-gray-11 size-6" />
 												<span class="text-gray-12">
@@ -452,7 +486,7 @@ export function BackgroundSettingsPopover() {
 															}}
 														/>
 														<div
-															class="rounded-lg transition-all duration-200 cursor-pointer size-8 peer-checked:hover:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
+															class="rounded-lg transition-all duration-200 cursor-pointer size-8 hover:peer-checked:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
 															style={{ background: color }}
 														/>
 													</label>
@@ -507,7 +541,7 @@ export function BackgroundSettingsPopover() {
 																		}}
 																	/>
 																	<div
-																		class="rounded-lg transition-all duration-200 cursor-pointer size-8 peer-checked:hover:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
+																		class="rounded-lg transition-all duration-200 cursor-pointer size-8 hover:peer-checked:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
 																		style={{
 																			background: `linear-gradient(${angle()}deg, rgb(${gradient.from.join(
 																				",",

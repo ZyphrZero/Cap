@@ -21,6 +21,7 @@ import {
 	commands,
 	type DeviceOrModelID,
 	type RecordingMode,
+	type RecordingTargetMode,
 	type ScreenCaptureTarget,
 } from "./tauri";
 import { orgCustomDomainClient, protectedHeaders } from "./web-api";
@@ -146,14 +147,19 @@ export const isSystemAudioSupported = queryOptions({
 	staleTime: Number.POSITIVE_INFINITY, // This won't change during runtime
 });
 
+type CameraCaptureTarget = ScreenCaptureTarget | { variant: "cameraOnly" };
+type ExtendedRecordingTargetMode = RecordingTargetMode | "camera" | null;
+type RecordingTargetModeSource = "main" | "editor" | "editorRecording" | null;
+
 export function createOptionsQuery() {
 	const PERSIST_KEY = "recording-options-query-2";
 	const [_state, _setState] = createStore<{
-		captureTarget: ScreenCaptureTarget;
+		captureTarget: CameraCaptureTarget;
 		micName: string | null;
 		mode: RecordingMode;
 		captureSystemAudio?: boolean;
-		targetMode?: "display" | "window" | "area" | null;
+		targetMode?: ExtendedRecordingTargetMode;
+		targetModeSource?: RecordingTargetModeSource;
 		cameraID?: DeviceOrModelID | null;
 		organizationId?: string | null;
 		/** @deprecated */
@@ -174,8 +180,23 @@ export function createOptionsQuery() {
 
 	recordingSettingsStore.get().then((data) => {
 		batch(() => {
+			if (data?.target) {
+				_setState("captureTarget", data.target);
+			}
+			if (data?.micName !== undefined) {
+				_setState("micName", data.micName);
+			}
+			if (data?.cameraId !== undefined) {
+				_setState("cameraID", data.cameraId);
+			}
 			if (data?.mode && data.mode !== _state.mode) {
 				_setState("mode", data.mode);
+			}
+			if (data?.systemAudio !== undefined) {
+				_setState("captureSystemAudio", data.systemAudio);
+			}
+			if (data?.organizationId !== undefined) {
+				_setState("organizationId", data.organizationId);
 			}
 			initialized = true;
 		});
@@ -236,8 +257,15 @@ export function createLicenseQuery() {
 		},
 	}));
 
-	generalSettingsStore.listen(() => query.refetch());
-	authStore.listen(() => query.refetch());
+	const generalSettingsCleanup = generalSettingsStore.listen(() =>
+		query.refetch(),
+	);
+	const authCleanup = authStore.listen(() => query.refetch());
+
+	onCleanup(() => {
+		generalSettingsCleanup.then((cleanup) => cleanup());
+		authCleanup.then((cleanup) => cleanup());
+	});
 
 	return query;
 }
@@ -245,33 +273,49 @@ export function createLicenseQuery() {
 export function createCameraMutation() {
 	const { setOptions, rawOptions } = useRecordingOptions();
 
-	const rawMutate = async (model: DeviceOrModelID | null) => {
+	const rawMutate = async (
+		model: DeviceOrModelID | null,
+		skipCameraWindow?: boolean,
+	) => {
 		const before = rawOptions.cameraID ? { ...rawOptions.cameraID } : null;
 		setOptions("cameraID", reconcile(model));
-		await commands.setCameraInput(model).catch(async (e) => {
-			const message =
-				typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+		await commands
+			.setCameraInput(model, skipCameraWindow ?? null)
+			.catch(async (e) => {
+				const message =
+					typeof e === "string"
+						? e
+						: e instanceof Error
+							? e.message
+							: String(e);
 
-			if (message.includes("DeviceNotFound")) {
-				setOptions("cameraID", null);
-				console.warn("Selected camera is unavailable.");
-				return;
-			}
+				if (
+					message.includes("DeviceNotFound") ||
+					message.includes("CameraTimeout") ||
+					message.includes("Failed to initialize camera")
+				) {
+					setOptions("cameraID", null);
+					console.warn("Selected camera is unavailable.");
+					return;
+				}
 
-			if (JSON.stringify(before) === JSON.stringify(model) || !before) {
-				setOptions("cameraID", null);
-			} else setOptions("cameraID", reconcile(before));
+				if (JSON.stringify(before) === JSON.stringify(model) || !before) {
+					setOptions("cameraID", null);
+				} else setOptions("cameraID", reconcile(before));
 
-			throw e;
-		});
+				throw e;
+			});
 
-		if (model) {
+		if (model && !skipCameraWindow) {
 			getCurrentWindow().setFocus();
 		}
 	};
 
 	const setCameraInput = useMutation(() => ({
-		mutationFn: rawMutate,
+		mutationFn: (args: {
+			model: DeviceOrModelID | null;
+			skipCameraWindow?: boolean;
+		}) => rawMutate(args.model, args.skipCameraWindow),
 	}));
 
 	return new Proxy(
@@ -309,12 +353,9 @@ export function createCustomDomainQuery() {
 export function createOrganizationsQuery() {
 	const auth = authStore.createQuery();
 
-	// Refresh organizations if they're missing
+	// Bootstrap only: auth.rs stamps organizations_updated_at even on org-fetch failure, stopping the loop on self-hosted where the endpoint is absent.
 	createEffect(() => {
-		if (
-			auth.data?.user_id &&
-			(!auth.data?.organizations || auth.data.organizations.length === 0)
-		) {
+		if (auth.data?.user_id && !auth.data?.organizations_updated_at) {
 			commands.updateAuthPlan().catch(console.error);
 		}
 	});

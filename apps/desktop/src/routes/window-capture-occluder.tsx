@@ -1,5 +1,6 @@
 import { getAllWindows } from "@tauri-apps/api/window";
 import { Show, Suspense } from "solid-js";
+import { isCameraWindowLabel } from "~/utils/camera-window";
 import { createCurrentRecordingQuery } from "~/utils/queries";
 
 export default function () {
@@ -7,18 +8,19 @@ export default function () {
 
 	getAllWindows().then((w) =>
 		w.forEach((w) => {
-			if (w.label === "camera" || w.label === "in-progress-recording")
+			if (isCameraWindowLabel(w.label) || w.label === "in-progress-recording")
 				w.setFocus();
 		}),
 	);
 
 	const bounds = () => {
 		if (!currentRecording.data) return;
-		if ("window" in currentRecording.data.target) {
-			return currentRecording.data.target.window.bounds;
+		const target = currentRecording.data.target;
+		if (typeof target === "object" && "window" in target) {
+			return target.window.bounds;
 		}
-		if ("area" in currentRecording.data.target) {
-			return currentRecording.data.target.area.bounds;
+		if (typeof target === "object" && "area" in target) {
+			return target.area.bounds;
 		}
 	};
 
@@ -28,7 +30,10 @@ export default function () {
 				{(bounds) => {
 					getAllWindows().then((w) =>
 						w.forEach((w) => {
-							if (w.label === "camera" || w.label === "in-progress-recording")
+							if (
+								isCameraWindowLabel(w.label) ||
+								w.label === "in-progress-recording"
+							)
 								w.setFocus();
 						}),
 					);

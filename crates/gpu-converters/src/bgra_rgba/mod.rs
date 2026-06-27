@@ -1,8 +1,8 @@
 use wgpu::{self, util::DeviceExt};
 
 use crate::{
-    util::{copy_texture_to_buffer_command, read_buffer_to_vec},
     GpuConverterError,
+    util::{copy_texture_to_buffer_command, read_buffer_to_vec},
 };
 
 pub struct BGRAToRGBA {
@@ -14,6 +14,12 @@ pub struct BGRAToRGBA {
 
 impl BGRAToRGBA {
     pub async fn new() -> Result<Self, GpuConverterError> {
+        #[cfg(target_os = "windows")]
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN,
+            ..Default::default()
+        });
+        #[cfg(not(target_os = "windows"))]
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
 
         let adapter = instance

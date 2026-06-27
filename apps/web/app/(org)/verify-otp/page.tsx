@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@cap/database/auth/session";
+import { serverEnv } from "@cap/env";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { getSafeNextPath } from "../safe-next";
 import { VerifyOTPForm } from "./form";
 
 export const metadata = {
@@ -14,7 +16,7 @@ export default async function VerifyOTPPage(props: {
 	const user = await getCurrentUser();
 
 	if (user) {
-		redirect(searchParams.next || "/dashboard");
+		redirect(getSafeNextPath(searchParams.next, serverEnv().WEB_URL));
 	}
 
 	if (!searchParams.email) {
@@ -25,7 +27,7 @@ export default async function VerifyOTPPage(props: {
 		<div className="flex h-screen w-full items-center justify-center">
 			<Suspense fallback={null}>
 				<VerifyOTPForm
-					email={searchParams.email}
+					email={searchParams.email?.toLowerCase() ?? ""}
 					next={searchParams.next}
 					lastSent={searchParams.lastSent}
 				/>

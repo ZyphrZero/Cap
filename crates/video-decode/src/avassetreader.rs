@@ -16,44 +16,66 @@ pub struct KeyframeIndex {
     keyframes: Vec<(u32, f64)>,
     fps: f64,
     duration_secs: f64,
+    pixel_format: Option<cv::PixelFormat>,
+    width: u32,
+    height: u32,
 }
 
 impl KeyframeIndex {
     pub fn build(path: &Path) -> Result<Self, String> {
         let build_start = std::time::Instant::now();
 
-        let input = avformat::input(path)
+        let mut input = avformat::input(path)
             .map_err(|e| format!("Failed to open video for keyframe scan: {e}"))?;
 
-        let video_stream = input
-            .streams()
-            .best(ffmpeg::media::Type::Video)
-            .ok_or("No video stream found")?;
+        let (stream_index, time_base, fps, duration_secs, pixel_format, width, height) = {
+            let video_stream = input
+                .streams()
+                .best(ffmpeg::media::Type::Video)
+                .ok_or("No video stream found")?;
 
-        let stream_index = video_stream.index();
-        let time_base = video_stream.time_base();
-        let fps = {
-            let rate = video_stream.avg_frame_rate();
-            if rate.denominator() == 0 {
-                30.0
-            } else {
-                rate.numerator() as f64 / rate.denominator() as f64
-            }
-        };
+            let stream_index = video_stream.index();
+            let time_base = video_stream.time_base();
+            let fps = {
+                let rate = video_stream.avg_frame_rate();
+                if rate.denominator() == 0 {
+                    30.0
+                } else {
+                    rate.numerator() as f64 / rate.denominator() as f64
+                }
+            };
 
-        let duration_secs = {
-            let duration = video_stream.duration();
-            if duration > 0 {
-                duration as f64 * time_base.numerator() as f64 / time_base.denominator() as f64
-            } else {
-                0.0
-            }
+            let duration_secs = {
+                let duration = video_stream.duration();
+                if duration > 0 {
+                    duration as f64 * time_base.numerator() as f64 / time_base.denominator() as f64
+                } else {
+                    0.0
+                }
+            };
+
+            let decoder = avcodec::Context::from_parameters(video_stream.parameters())
+                .map_err(|e| format!("decoder context / {e}"))?
+                .decoder()
+                .video()
+                .map_err(|e| format!("video decoder / {e}"))?;
+
+            let pixel_format = pixel_to_pixel_format(decoder.format()).ok();
+            let width = decoder.width();
+            let height = decoder.height();
+
+            (
+                stream_index,
+                time_base,
+                fps,
+                duration_secs,
+                pixel_format,
+                width,
+                height,
+            )
         };
 
         let mut keyframes = Vec::new();
-
-        let mut input =
-            avformat::input(path).map_err(|e| format!("Failed to reopen video for scan: {e}"))?;
 
         for (stream, packet) in input.packets() {
             if stream.index() != stream_index {
@@ -83,6 +105,9 @@ impl KeyframeIndex {
             keyframes,
             fps,
             duration_secs,
+            pixel_format,
+            width,
+            height,
         })
     }
 
@@ -141,13 +166,25 @@ impl KeyframeIndex {
             return self.keyframes.iter().map(|(_, time)| *time).collect();
         }
 
-        let step = total_keyframes / num_positions;
-        self.keyframes
-            .iter()
-            .step_by(step.max(1))
-            .take(num_positions)
-            .map(|(_, time)| *time)
-            .collect()
+        let mut positions: Vec<f64> = Vec::with_capacity(num_positions);
+
+        positions.push(self.keyframes[0].1);
+
+        if num_positions > 2 {
+            let inner_count = num_positions - 2;
+            let step = (total_keyframes - 1) as f64 / (inner_count + 1) as f64;
+            for i in 1..=inner_count {
+                let idx = (step * i as f64).round() as usize;
+                let idx = idx.min(total_keyframes - 2);
+                positions.push(self.keyframes[idx].1);
+            }
+        }
+
+        if num_positions > 1 {
+            positions.push(self.keyframes[total_keyframes - 1].1);
+        }
+
+        positions
     }
 
     pub fn fps(&self) -> f64 {
@@ -164,6 +201,10 @@ impl KeyframeIndex {
 
     pub fn keyframes(&self) -> &[(u32, f64)] {
         &self.keyframes
+    }
+
+    pub fn cached_video_info(&self) -> Option<(cv::PixelFormat, u32, u32)> {
+        self.pixel_format.map(|pf| (pf, self.width, self.height))
     }
 }
 
@@ -224,14 +265,19 @@ impl AVAssetReaderDecoder {
         start_time: f32,
         keyframe_index: Option<Arc<KeyframeIndex>>,
     ) -> Result<Self, String> {
-        let (pixel_format, width, height) = {
-            let input = ffmpeg::format::input(&path).unwrap();
+        let (pixel_format, width, height) = if let Some(info) = keyframe_index
+            .as_ref()
+            .and_then(|ki| ki.cached_video_info())
+        {
+            info
+        } else {
+            let input = ffmpeg::format::input(&path)
+                .map_err(|e| format!("Failed to open video input '{}': {e}", path.display()))?;
 
             let input_stream = input
                 .streams()
                 .best(ffmpeg::media::Type::Video)
-                .ok_or("Could not find a video stream")
-                .unwrap();
+                .ok_or_else(|| format!("No video stream in '{}'", path.display()))?;
 
             let decoder = avcodec::Context::from_parameters(input_stream.parameters())
                 .map_err(|e| format!("decoder context / {e}"))?
@@ -326,7 +372,11 @@ impl AVAssetReaderDecoder {
         height: u32,
     ) -> Result<(R<av::AssetReaderTrackOutput>, R<av::AssetReader>), String> {
         let asset = av::UrlAsset::with_url(
-            &ns::Url::with_fs_path_str(path.to_str().unwrap(), false),
+            &ns::Url::with_fs_path_str(
+                path.to_str()
+                    .ok_or_else(|| format!("Invalid UTF-8 in path: {path:?}"))?,
+                false,
+            ),
             None,
         )
         .ok_or_else(|| format!("UrlAsset::with_url{{{path:?}}}"))?;

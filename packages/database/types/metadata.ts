@@ -19,6 +19,7 @@ export interface VideoMetadata {
 	 * AI generated title for the video
 	 */
 	aiTitle?: string;
+	titleManuallyEdited?: boolean;
 	/**
 	 * AI generated summary of the content
 	 */
@@ -27,9 +28,25 @@ export interface VideoMetadata {
 	 * Chapter markers generated from the transcript
 	 */
 	chapters?: { title: string; start: number }[];
-	aiProcessing?: boolean;
-	aiGenerationSkipped?: boolean;
+	aiGenerationStatus?:
+		| "QUEUED"
+		| "PROCESSING"
+		| "COMPLETE"
+		| "ERROR"
+		| "SKIPPED";
+	enhancedAudioStatus?: "PROCESSING" | "COMPLETE" | "ERROR" | "SKIPPED";
 }
+
+export type VideoEditRange = {
+	start: number;
+	end: number;
+};
+
+export type VideoEditSpec = {
+	version: 1;
+	sourceDuration: number;
+	keepRanges: VideoEditRange[];
+};
 
 /**
  * Space metadata structure

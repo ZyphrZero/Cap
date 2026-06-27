@@ -5,8 +5,8 @@ use cap_recording::benchmark::{BenchmarkConfig, EncoderInfo, MetricsSnapshot, Pi
 use ffmpeg::format::Pixel;
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };

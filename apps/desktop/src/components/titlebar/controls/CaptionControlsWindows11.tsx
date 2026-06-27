@@ -27,10 +27,14 @@ export default function (
 	});
 	onCleanup(() => unlisten?.());
 
+	const handleClose = async () => {
+		currentWindow.close();
+	};
+
 	return (
 		<div
 			class={cx(
-				"flex flex-row items-stretch h-full align-baseline cursor-default rounded-none select-none *:outline-none *:transition-all *:duration-200",
+				"flex flex-row items-stretch h-full align-baseline cursor-default rounded-none select-none *:outline-hidden *:transition-all *:duration-200",
 				local.class,
 				focused()
 					? "*:text-black-transparent-80"
@@ -79,7 +83,7 @@ export default function (
 				</ControlButton>
 			</Show>
 			<ControlButton
-				onClick={titlebarState.closable ? currentWindow.close : undefined}
+				onClick={titlebarState.closable ? handleClose : undefined}
 				disabled={!titlebarState.closable}
 				class={cx(
 					"max-h-20 w-[46px] rounded-none bg-transparent hover:text-gray-1",

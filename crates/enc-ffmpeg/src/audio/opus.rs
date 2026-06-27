@@ -3,7 +3,7 @@ use std::{thread, time::Duration};
 use cap_media_info::{AudioInfo, FFRational};
 use ffmpeg::{
     codec::{context, encoder},
-    format::{self, sample::Type, Sample},
+    format::{self, Sample, sample::Type},
     frame,
     threading::Config,
 };

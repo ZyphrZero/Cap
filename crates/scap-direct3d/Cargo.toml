@@ -1,7 +1,7 @@
 [package]
 name = "scap-direct3d"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 
 [target.'cfg(windows)'.dependencies]
@@ -36,7 +36,7 @@ windows = { workspace = true, features = [
 [dev-dependencies]
 scap-targets = { path = "../scap-targets" }
 scap-ffmpeg = { path = "../scap-ffmpeg" }
-windows-numerics = "0.3.1"
+windows-numerics = "0.2.0"
 
 [lints]
 workspace = true
@@ -45,3 +45,6 @@ workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+cap-d3d-adapter = { path = "../d3d-adapter" }

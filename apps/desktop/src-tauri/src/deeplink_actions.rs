@@ -1,12 +1,12 @@
 use cap_recording::{
-    feeds::camera::DeviceOrModelID, sources::screen_capture::ScreenCaptureTarget, RecordingMode,
+    RecordingMode, feeds::camera::DeviceOrModelID, sources::screen_capture::ScreenCaptureTarget,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Url};
 use tracing::trace;
 
-use crate::{recording::StartRecordingInputs, windows::ShowCapWindow, App, ArcLock};
+use crate::{App, ArcLock, recording::StartRecordingInputs, windows::ShowCapWindow};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -82,9 +82,10 @@ impl TryFrom<&Url> for DeepLinkAction {
     fn try_from(url: &Url) -> Result<Self, Self::Error> {
         #[cfg(target_os = "macos")]
         if url.scheme() == "file" {
-            return Ok(Self::OpenEditor {
-                project_path: url.to_file_path().unwrap(),
-            });
+            return url
+                .to_file_path()
+                .map(|project_path| Self::OpenEditor { project_path })
+                .map_err(|_| ActionParseFromUrlError::Invalid);
         }
 
         match url.domain() {
@@ -116,7 +117,7 @@ impl DeepLinkAction {
             } => {
                 let state = app.state::<ArcLock<App>>();
 
-                crate::set_camera_input(app.clone(), state.clone(), camera).await?;
+                crate::set_camera_input(app.clone(), state.clone(), camera, None).await?;
                 crate::set_mic_input(state.clone(), mic_label).await?;
 
                 let capture_target: ScreenCaptureTarget = match capture_mode {

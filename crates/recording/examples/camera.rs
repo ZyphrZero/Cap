@@ -1,9 +1,9 @@
 use cap_recording::{
-    feeds::camera::{self, DeviceOrModelID},
     CameraFeed,
+    feeds::camera::{self, DeviceOrModelID},
 };
 use ffmpeg::format::Pixel;
-use image::{codecs::jpeg, ColorType};
+use image::{ColorType, codecs::jpeg};
 use kameo::Actor;
 use std::fmt::Display;
 
@@ -18,6 +18,7 @@ async fn main() {
 
     let feed = CameraFeed::spawn(CameraFeed::default());
     feed.ask(camera::SetInput {
+        settings: None,
         id: DeviceOrModelID::from_info(&device.0),
     })
     .await

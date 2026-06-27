@@ -15,12 +15,17 @@ describe("GET /", () => {
 				"/audio/status",
 				"/audio/check",
 				"/audio/extract",
+				"/audio/convert",
 				"/video/status",
 				"/video/probe",
 				"/video/thumbnail",
+				"/video/convert",
 				"/video/process",
+				"/video/edit",
 				"/video/process/:jobId/status",
 				"/video/process/:jobId/cancel",
+				"/video/cleanup",
+				"/video/force-cleanup",
 			],
 		});
 	});

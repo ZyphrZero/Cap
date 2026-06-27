@@ -31,20 +31,17 @@ export class Tinybird extends Effect.Service<Tinybird>()("Tinybird", {
 		const token = env.TINYBIRD_TOKEN;
 		const host = env.TINYBIRD_HOST;
 
-		if (!host) {
-			yield* Effect.die(new Error("TINYBIRD_HOST must be set"));
-		}
+		const enabled = Boolean(token && host);
 
 		yield* Effect.logDebug("Initializing Tinybird service", {
 			hasToken: Boolean(token),
-			host,
+			hasHost: Boolean(host),
+			enabled,
 		});
-
-		const enabled = Boolean(token);
 
 		if (!enabled) {
 			yield* Effect.logWarning(
-				"Tinybird is disabled: TINYBIRD_TOKEN is not set",
+				"Tinybird is disabled: TINYBIRD_TOKEN and/or TINYBIRD_HOST not set",
 			);
 		}
 
@@ -271,6 +268,20 @@ export class Tinybird extends Effect.Service<Tinybird>()("Tinybird", {
 			});
 		};
 
-		return { enabled, appendEvents, queryPipe, querySql } as const;
+		const deleteData = (name: string, deleteCondition: string) => {
+			if (!enabled || !deleteCondition.trim()) return Effect.void;
+			const body = new URLSearchParams({
+				delete_condition: deleteCondition,
+			});
+			return request(`/datasources/${encodeURIComponent(name)}/delete`, {
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+			}).pipe(Effect.asVoid);
+		};
+
+		return { enabled, appendEvents, queryPipe, querySql, deleteData } as const;
 	}),
 }) {}

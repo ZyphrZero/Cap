@@ -7,6 +7,7 @@ import { cx } from "cva";
 import {
 	type ComponentProps,
 	createEffect,
+	createMemo,
 	createSignal,
 	onCleanup,
 	onMount,
@@ -14,11 +15,13 @@ import {
 } from "solid-js";
 import { t } from "~/components/I18nProvider";
 import Tooltip from "~/components/Tooltip";
+import CaptionControlsMacOS from "~/components/titlebar/controls/CaptionControlsMacOS";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { trackEvent } from "~/utils/analytics";
 import { commands } from "~/utils/tauri";
 import { initializeTitlebar } from "~/utils/titlebar-state";
 import { useEditorContext } from "./context";
+import OrganizationDropdown from "./OrganizationDropdown";
 import PresetsDropdown from "./PresetsDropdown";
 import ShareButton from "./ShareButton";
 import { EditorButton } from "./ui";
@@ -45,7 +48,9 @@ export interface ExportEstimates {
 export function Header() {
 	const {
 		editorInstance,
+		project,
 		projectHistory,
+		dialog,
 		setDialog,
 		meta,
 		exportState,
@@ -67,6 +72,21 @@ export function Header() {
 		return true;
 	};
 
+	const hasTranscript = createMemo(() => {
+		const segments = project.captions?.segments ?? [];
+		return segments.some((seg) => seg.words && seg.words.length > 0);
+	});
+
+	const isTranscriptOpen = createMemo(() => {
+		const d = dialog();
+		return "type" in d && d.type === "transcript" && d.open;
+	});
+
+	const isClipsOpen = createMemo(() => {
+		const d = dialog();
+		return "type" in d && d.type === "clips" && d.open;
+	});
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -76,7 +96,8 @@ export function Header() {
 				data-tauri-drag-region
 				class={cx("flex flex-row flex-1 gap-2 items-center px-4 h-full")}
 			>
-				{ostype() === "macos" && <div class="h-full w-[4rem]" />}
+				{ostype() === "macos" && <div class="h-full w-16" />}
+				{ostype() === "linux" && <CaptionControlsMacOS class="mr-1" />}
 				<EditorButton
 					onClick={async () => {
 						clearTimelineSelection();
@@ -124,9 +145,10 @@ export function Header() {
 
 			<div
 				data-tauri-drag-region
-				class="flex flex-col justify-center px-4 border-x border-black-transparent-10"
+				class="flex flex-row items-center justify-center gap-2 px-4 border-x border-black-transparent-10"
 			>
 				<PresetsDropdown />
+				<OrganizationDropdown />
 			</div>
 
 			<div
@@ -165,8 +187,52 @@ export function Header() {
 					<ShareButton />
 				</Show>
 				<Button
-					variant="blue"
-					class="flex gap-1.5 justify-center h-[40px] w-full max-w-[100px]"
+					variant={isClipsOpen() ? "white" : "gray"}
+					class="flex gap-1.5 justify-center h-[40px]"
+					onClick={() => {
+						clearTimelineSelection();
+						if (isClipsOpen()) {
+							setDialog((d) => ({ ...d, open: false }));
+						} else {
+							setDialog({ type: "clips", open: true });
+						}
+					}}
+				>
+					<IconCapClapperboard class="size-4" />
+					Clips
+				</Button>
+				<Show when={hasTranscript()}>
+					<Button
+						variant={isTranscriptOpen() ? "white" : "gray"}
+						class="flex gap-1.5 justify-center h-[40px]"
+						onClick={() => {
+							clearTimelineSelection();
+							if (isTranscriptOpen()) {
+								setDialog((d) => ({ ...d, open: false }));
+							} else {
+								setDialog({ type: "transcript", open: true });
+							}
+						}}
+					>
+						<Show
+							when={isTranscriptOpen()}
+							fallback={<IconCapCaptions class="size-4" />}
+						>
+							<IconLucideArrowLeft class="size-4" />
+						</Show>
+						{isTranscriptOpen() ? "Back" : "Transcript"}
+					</Button>
+				</Show>
+				<button
+					type="button"
+					class={cx(
+						"flex gap-1.5 justify-center items-center px-4 w-full h-[40px] max-w-[100px] text-[0.8125rem] font-medium text-white rounded-xl outline-hidden",
+						"bg-linear-to-b from-[#3b82f6] to-[#2563eb]",
+						"shadow-[0_4px_14px_-6px_rgba(37,99,235,0.5),inset_0_1px_0_0_rgba(255,255,255,0.22)]",
+						"transition-[box-shadow,filter] duration-200 ease-out",
+						"hover:brightness-[1.08] hover:shadow-[0_8px_22px_-8px_rgba(37,99,235,0.6),inset_0_1px_0_0_rgba(255,255,255,0.28)]",
+						"active:brightness-95",
+					)}
 					onClick={() => {
 						clearTimelineSelection();
 
@@ -177,8 +243,8 @@ export function Header() {
 					}}
 				>
 					<UploadIcon class="size-4" />
-					{t("editor.header.export")}
-				</Button>
+					Export
+				</button>
 				{ostype() === "windows" && <CaptionControlsWindows11 />}
 			</div>
 		</div>
@@ -245,7 +311,7 @@ function NameEditor(props: { name: string }) {
 				<input
 					ref={prettyNameRef}
 					class={cx(
-						"absolute inset-0 px-px m-0 opacity-0 overflow-hidden focus:opacity-100 bg-transparent border-b border-transparent focus:border-gray-7 focus:outline-none peer whitespace-pre",
+						"absolute inset-0 px-px m-0 opacity-0 overflow-hidden focus:opacity-100 bg-transparent border-b border-transparent focus:border-gray-7 focus:outline-hidden peer whitespace-pre",
 						truncated() && "truncate",
 						(prettyName().length < 5 || prettyName().length > 100) &&
 							"focus:border-red-500",

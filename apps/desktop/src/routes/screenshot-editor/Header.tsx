@@ -5,8 +5,8 @@ import { remove } from "@tauri-apps/plugin-fs";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
-import { createEffect, createMemo, onCleanup, Show, Suspense } from "solid-js";
-import { t } from "~/components/I18nProvider";
+import { createEffect, onCleanup, Suspense } from "solid-js";
+import CaptionControlsMacOS from "~/components/titlebar/controls/CaptionControlsMacOS";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import IconCapCrop from "~icons/cap/crop";
 import IconCapTrash from "~icons/cap/trash";
@@ -34,36 +34,20 @@ import { useScreenshotExport } from "./useScreenshotExport";
 
 export function Header() {
 	const ctx = useScreenshotEditorContext();
-	const { setDialog, project, originalImageSize } = ctx;
+	const {
+		setDialog,
+		project,
+		originalImageSize,
+		isImageFileReady,
+		selectedAnnotationId,
+	} = ctx;
 	const path = () => ctx.editorInstance()?.path ?? "";
 
 	const { exportImage, isExporting } = useScreenshotExport();
 
-	const showStylingControls = createMemo(() => {
-		const source = project.background.source;
-		const sourceType = source.type;
-
-		if (sourceType === "wallpaper") {
-			return source.path !== null && source.path !== "";
-		}
-		if (sourceType === "image") {
-			return source.path !== null && source.path !== "";
-		}
-		if (sourceType === "gradient") {
-			return true;
-		}
-		if (sourceType === "color") {
-			const alpha = source.alpha ?? 255;
-			if (alpha === 0) return false;
-			const value = source.value;
-			const isWhite = value[0] === 255 && value[1] === 255 && value[2] === 255;
-			return !(isWhite && alpha === 255);
-		}
-		return false;
-	});
-
 	createEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.defaultPrevented) return;
 			const target = e.target as HTMLElement | null;
 			if (
 				target &&
@@ -77,6 +61,13 @@ export function Header() {
 			if (!e.metaKey && !e.ctrlKey) return;
 			const key = e.key.toLowerCase();
 			if (key === "c") {
+				if (selectedAnnotationId()) {
+					return;
+				}
+				const selection = window.getSelection();
+				if (selection && !selection.isCollapsed && selection.toString()) {
+					return;
+				}
 				e.preventDefault();
 				if (!isExporting()) exportImage("clipboard");
 			} else if (key === "s") {
@@ -100,7 +91,7 @@ export function Header() {
 		});
 	};
 
-	const isCropDisabled = () => !originalImageSize();
+	const isCropDisabled = () => !originalImageSize() || !isImageFileReady();
 
 	return (
 		<div
@@ -109,6 +100,7 @@ export function Header() {
 		>
 			<div class="flex items-center gap-4">
 				{ostype() === "macos" && <div class="w-14" />}
+				{ostype() === "linux" && <CaptionControlsMacOS />}
 			</div>
 
 			<div class="flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
@@ -123,12 +115,10 @@ export function Header() {
 				<AnnotationTools />
 				<div class="w-px h-6 bg-gray-4 mx-1" />
 				<BackgroundSettingsPopover />
-				<Show when={showStylingControls()}>
-					<PaddingPopover />
-					<RoundingPopover />
-					<ShadowPopover />
-					<BorderPopover />
-				</Show>
+				<PaddingPopover />
+				<RoundingPopover />
+				<ShadowPopover />
+				<BorderPopover />
 			</div>
 
 			<div

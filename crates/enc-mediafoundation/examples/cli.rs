@@ -11,21 +11,21 @@ mod win {
     use scap_targets::Display;
     use std::{
         path::Path,
-        sync::{atomic::AtomicBool, Arc},
+        sync::{Arc, atomic::AtomicBool},
         time::Duration,
     };
     use windows::{
-        core::{Result, RuntimeName, HSTRING},
         Foundation::{Metadata::ApiInformation, TimeSpan},
         Graphics::Capture::GraphicsCaptureSession,
         Win32::{
-            Media::MediaFoundation::{MFStartup, MFSTARTUP_FULL},
+            Media::MediaFoundation::{MFSTARTUP_FULL, MFStartup},
             System::{
                 Diagnostics::Debug::{DebugBreak, IsDebuggerPresent},
                 Threading::GetCurrentProcessId,
-                WinRT::{RoInitialize, RO_INIT_MULTITHREADED},
+                WinRT::{RO_INIT_MULTITHREADED, RoInitialize},
             },
         },
+        core::{HSTRING, Result, RuntimeName},
     };
 
     #[allow(clippy::too_many_arguments)]
@@ -290,10 +290,10 @@ mod win {
     mod hotkey {
         use std::sync::atomic::{AtomicI32, Ordering};
         use windows::{
-            core::Result,
             Win32::UI::Input::KeyboardAndMouse::{
-                RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS,
+                HOT_KEY_MODIFIERS, RegisterHotKey, UnregisterHotKey,
             },
+            core::Result,
         };
 
         static HOT_KEY_ID: AtomicI32 = AtomicI32::new(0);

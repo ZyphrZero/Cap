@@ -32,14 +32,23 @@ export function RoundingPopover() {
 	const { project, setProject, activePopover, setActivePopover } =
 		useScreenshotEditorContext();
 
+	const handleRoundingChange = (v: number[]) => {
+		setProject("background", "rounding", v[0]);
+	};
+
 	return (
 		<Popover
 			placement="bottom-start"
 			open={activePopover() === "rounding"}
-			onOpenChange={(open) => setActivePopover(open ? "rounding" : null)}
+			onOpenChange={(open) => {
+				if (!open && activePopover() === "rounding") setActivePopover(null);
+			}}
 		>
-			<Popover.Trigger
+			<Popover.Anchor
 				as={EditorButton}
+				onClick={() =>
+					setActivePopover(activePopover() === "rounding" ? null : "rounding")
+				}
 				leftIcon={<IconCapCorners class="size-4" />}
 				tooltipText={t("screenshotEditor.appearance.rounding.title")}
 				kbd={["U"]}
@@ -53,7 +62,7 @@ export function RoundingPopover() {
 							</span>
 							<Slider
 								value={[project.background.rounding]}
-								onChange={(v) => setProject("background", "rounding", v[0])}
+								onChange={handleRoundingChange}
 								minValue={0}
 								maxValue={100}
 								step={1}
@@ -112,14 +121,14 @@ function CornerStyleSelect(props: {
 					<KSelect.Value<{
 						name: string;
 						value: CornerRoundingType;
-					}> class="flex-1 text-sm text-left truncate text-[--gray-500] font-normal">
+					}> class="flex-1 text-sm text-left truncate text-(--gray-500) font-normal">
 						{(state) => <span>{state.selectedOption().name}</span>}
 					</KSelect.Value>
 					<KSelect.Icon<ValidComponent>
 						as={(iconProps) => (
 							<IconCapChevronDown
 								{...iconProps}
-								class="size-4 shrink-0 transform transition-transform ui-expanded:rotate-180 text-[--gray-500]"
+								class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)"
 							/>
 						)}
 					/>

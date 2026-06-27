@@ -1,7 +1,7 @@
 [package]
 name = "cap-export"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 cap-utils = { path = "../utils" }
@@ -15,8 +15,9 @@ cap-enc-gif = { path = "../enc-gif" }
 cap-media-info = { path = "../media-info" }
 
 tokio.workspace = true
-tempfile = "3.27.0"
-image = "0.25.10"
+tempfile = "3.12.0"
+image = "0.25.2"
+base64 = "0.22.1"
 mp4 = "0.14.0"
 thiserror.workspace = true
 futures = { workspace = true }
@@ -31,11 +32,13 @@ rgb = "0.8"
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [dev-dependencies]
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
+chrono = "0.4"
 directories = "6.0.0"
 inquire = "0.9.4"
 tokio.workspace = true
 serde_json.workspace = true
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [lints]
 workspace = true

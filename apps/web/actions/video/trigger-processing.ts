@@ -2,11 +2,33 @@
 
 import { db } from "@cap/database";
 import { getCurrentUser } from "@cap/database/auth/session";
-import { videos, videoUploads } from "@cap/database/schema";
+import { videos } from "@cap/database/schema";
+import { Storage } from "@cap/web-backend";
 import type { Video } from "@cap/web-domain";
 import { eq } from "drizzle-orm";
-import { start } from "workflow/api";
-import { processVideoWorkflow } from "@/workflows/process-video";
+import { Effect, Schedule } from "effect";
+import { runPromise } from "@/lib/server";
+import { startVideoProcessingWorkflow } from "@/lib/video-processing";
+import { decodeStorageVideo } from "@/lib/video-storage";
+
+async function verifyRawFileUploaded(
+	video: typeof videos.$inferSelect,
+	rawFileKey: string,
+) {
+	const [bucket] = await Storage.getAccessForVideo(
+		decodeStorageVideo(video),
+	).pipe(runPromise);
+	const head = await bucket
+		.headObject(rawFileKey)
+		.pipe(
+			Effect.retry({ times: 3, schedule: Schedule.exponential("100 millis") }),
+			runPromise,
+		);
+
+	if ((head.ContentLength ?? 0) <= 0) {
+		throw new Error("Uploaded video file is empty");
+	}
+}
 
 export async function triggerVideoProcessing({
 	videoId,
@@ -28,25 +50,16 @@ export async function triggerVideoProcessing({
 	if (!video) throw new Error("Video not found");
 	if (video.ownerId !== user.id) throw new Error("Unauthorized");
 
-	await db()
-		.update(videoUploads)
-		.set({
-			phase: "processing",
-			processingProgress: 0,
-			processingMessage: "Starting video processing...",
-			rawFileKey,
-			updatedAt: new Date(),
-		})
-		.where(eq(videoUploads.videoId, videoId));
+	await verifyRawFileUploaded(video, rawFileKey);
 
-	await start(processVideoWorkflow, [
-		{
-			videoId,
-			userId: user.id,
-			rawFileKey,
-			bucketId,
-		},
-	]);
+	await startVideoProcessingWorkflow({
+		videoId,
+		userId: user.id,
+		rawFileKey,
+		bucketId,
+		processingMessage: "Starting video processing...",
+		startFailureMessage: "Video processing could not start.",
+	});
 
 	return { success: true };
 }

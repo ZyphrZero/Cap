@@ -15,9 +15,9 @@
 //! // Create corrector with default settings
 //! let mut corrector = LatencyCorrector::new(hint, LatencyCorrectionConfig::default());
 //!
-//! // Apply initial compensation to audio playhead
+//! // Apply initial output latency to audio playhead
 //! let base_playhead = 5.0; // Current playback position in seconds
-//! let compensated_playhead = base_playhead + corrector.initial_compensation_secs();
+//! let compensated_playhead = base_playhead + corrector.initial_output_latency_secs();
 //! // audio_renderer.set_playhead(compensated_playhead);
 //!
 //! // In audio callback, update latency estimate
@@ -140,6 +140,10 @@ impl LatencyCorrector {
     /// Get the initial latency compensation value (with safety multiplier applied)
     pub fn initial_compensation_secs(&self) -> f64 {
         self.estimator.current_secs().unwrap_or_default() * self.config.initial_safety_multiplier
+    }
+
+    pub fn initial_output_latency_secs(&self) -> f64 {
+        self.estimator.current_secs().unwrap_or_default()
     }
 
     /// Update latency estimate from audio callback and return corrected latency
@@ -549,13 +553,13 @@ mod macos {
     #[cfg(target_os = "macos")]
     use super::AIRPLAY_MIN_LATENCY_SECS;
     use super::{
-        transport_constraints, InputLatencyInfo, OutputLatencyHint, OutputTransportKind,
-        MAX_LATENCY_SECS, WIRELESS_FALLBACK_LATENCY_SECS, WIRELESS_MIN_LATENCY_SECS,
+        InputLatencyInfo, MAX_LATENCY_SECS, OutputLatencyHint, OutputTransportKind,
+        WIRELESS_FALLBACK_LATENCY_SECS, WIRELESS_MIN_LATENCY_SECS, transport_constraints,
     };
     use cidre::{
         core_audio::{
-            hardware::{Device, Stream, System},
             DeviceTransportType, PropElement, PropScope, PropSelector,
+            hardware::{Device, Stream, System},
         },
         os,
     };
@@ -687,14 +691,10 @@ mod macos {
 
         match transport_kind {
             OutputTransportKind::Airplay => {
-                if latency_secs < AIRPLAY_MIN_LATENCY_SECS {
-                    latency_secs = AIRPLAY_MIN_LATENCY_SECS;
-                }
+                latency_secs = latency_secs.max(AIRPLAY_MIN_LATENCY_SECS);
             }
             OutputTransportKind::Wireless | OutputTransportKind::ContinuityWireless => {
-                if latency_secs < WIRELESS_MIN_LATENCY_SECS {
-                    latency_secs = WIRELESS_MIN_LATENCY_SECS;
-                }
+                latency_secs = latency_secs.max(WIRELESS_MIN_LATENCY_SECS);
             }
             _ => {}
         }
@@ -747,14 +747,14 @@ mod windows {
     use super::{InputLatencyInfo, OutputTransportKind, WIRELESS_MIN_LATENCY_SECS};
     use tracing::{debug, trace};
     use windows::{
-        core::PCWSTR,
         Win32::Devices::FunctionDiscovery::PKEY_Device_EnumeratorName,
         Win32::Media::Audio::{
-            eCapture, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE,
+            DEVICE_STATE, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, eCapture,
         },
         Win32::System::Com::{
-            CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ,
+            CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, STGM_READ,
         },
+        core::PCWSTR,
     };
 
     const BLUETOOTH_DEVICE_PATTERNS: &[&str] = &[
@@ -1007,7 +1007,27 @@ mod tests {
         let corrector = LatencyCorrector::new(Some(hint), config);
 
         let initial = corrector.initial_compensation_secs();
-        assert_eq!(initial, 0.05 * 2.0); // Default multiplier is 2.0
+        assert_eq!(initial, 0.05 * 2.0);
+        assert_eq!(corrector.initial_output_latency_secs(), 0.05);
+    }
+
+    #[test]
+    fn latency_corrector_reports_floor_constrained_initial_latency() {
+        let hint = OutputLatencyHint::new(0.05, OutputTransportKind::Wireless);
+        let config = LatencyCorrectionConfig {
+            initial_safety_multiplier: 3.0,
+            ..Default::default()
+        };
+        let corrector = LatencyCorrector::new(Some(hint), config);
+
+        assert_eq!(
+            corrector.initial_output_latency_secs(),
+            WIRELESS_MIN_LATENCY_SECS
+        );
+        assert_eq!(
+            corrector.initial_compensation_secs(),
+            WIRELESS_MIN_LATENCY_SECS * 3.0
+        );
     }
 
     #[test]

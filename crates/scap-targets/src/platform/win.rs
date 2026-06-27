@@ -1,29 +1,28 @@
 use std::{ffi::OsString, mem, os::windows::ffi::OsStringExt, path::PathBuf, str::FromStr};
 use tracing::error;
 use windows::{
-    core::{BOOL, PCWSTR, PWSTR},
     Graphics::Capture::GraphicsCaptureItem,
     Win32::{
         Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT, TRUE, WPARAM},
         Graphics::{
-            Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
+            Dwm::{DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute},
             Gdi::{
-                CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC,
-                DeleteObject, EnumDisplayDevicesW, EnumDisplayMonitors, EnumDisplaySettingsW,
-                FillRect, GetDC, GetDIBits, GetMonitorInfoW, GetObjectA, MonitorFromPoint,
-                MonitorFromWindow, ReleaseDC, SelectObject, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
-                BI_RGB, DEVMODEW, DIB_RGB_COLORS, DISPLAY_DEVICEW, DISPLAY_DEVICE_STATE_FLAGS,
-                ENUM_CURRENT_SETTINGS, HBRUSH, HDC, HGDIOBJ, HMONITOR, MONITORINFOEXW,
-                MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTONULL,
+                BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap,
+                CreateCompatibleDC, CreateSolidBrush, DEVMODEW, DIB_RGB_COLORS,
+                DISPLAY_DEVICE_STATE_FLAGS, DISPLAY_DEVICEW, DeleteDC, DeleteObject,
+                ENUM_CURRENT_SETTINGS, EnumDisplayDevicesW, EnumDisplayMonitors,
+                EnumDisplaySettingsW, FillRect, GetDC, GetDIBits, GetMonitorInfoW, GetObjectA,
+                HBRUSH, HDC, HGDIOBJ, HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTONULL,
+                MONITORINFOEXW, MonitorFromPoint, MonitorFromWindow, ReleaseDC, SelectObject,
             },
         },
         Storage::FileSystem::{
-            GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW, FILE_FLAGS_AND_ATTRIBUTES,
+            FILE_FLAGS_AND_ATTRIBUTES, GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
         },
         System::{
             Threading::{
-                GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
-                PROCESS_QUERY_LIMITED_INFORMATION,
+                GetCurrentProcessId, OpenProcess, PROCESS_NAME_FORMAT,
+                PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
             },
             WinRT::Graphics::Capture::IGraphicsCaptureItemInterop,
         },
@@ -33,24 +32,27 @@ use windows::{
                 PROCESS_PER_MONITOR_DPI_AWARE,
             },
             Shell::{
-                ExtractIconExW, SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON,
-                SHGFI_SMALLICON,
+                ExtractIconExW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_SMALLICON,
+                SHGetFileInfoW,
             },
             WindowsAndMessaging::{
-                DestroyIcon, DrawIconEx, EnumChildWindows, EnumWindows, GetClassLongPtrW,
-                GetClassNameW, GetClientRect, GetCursorPos, GetDesktopWindow, GetIconInfo,
+                DI_FLAGS, DestroyIcon, DrawIconEx, EnumChildWindows, EnumWindows, GCLP_HICON,
+                GW_HWNDNEXT, GWL_EXSTYLE, GWL_STYLE, GetClassLongPtrW, GetClassNameW,
+                GetClientRect, GetCursorPos, GetDesktopWindow, GetIconInfo,
                 GetLayeredWindowAttributes, GetWindow, GetWindowLongPtrW, GetWindowLongW,
                 GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-                IsIconic, IsWindowVisible, PrivateExtractIconsW, SendMessageW, WindowFromPoint,
-                DI_FLAGS, GCLP_HICON, GWL_EXSTYLE, GWL_STYLE, GW_HWNDNEXT, HICON, ICONINFO,
+                HICON, ICONINFO, IsIconic, IsWindowVisible, PrivateExtractIconsW, SendMessageW,
                 WM_GETICON, WS_CHILD, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-                WS_EX_TRANSPARENT,
+                WS_EX_TRANSPARENT, WindowFromPoint,
             },
         },
     },
+    core::{BOOL, PCWSTR, PWSTR},
 };
 
-use crate::bounds::{LogicalSize, PhysicalBounds, PhysicalPosition, PhysicalSize};
+use crate::bounds::{
+    LogicalBounds, LogicalPosition, LogicalSize, PhysicalBounds, PhysicalPosition, PhysicalSize,
+};
 
 // All of this assumes PROCESS_PER_MONITOR_DPI_AWARE
 //
@@ -124,7 +126,7 @@ impl DisplayImpl {
     }
 
     pub fn raw_id(&self) -> DisplayIdImpl {
-        DisplayIdImpl(self.0 .0 as u64)
+        DisplayIdImpl(self.0.0 as u64)
     }
 
     pub fn from_id(id: String) -> Option<Self> {
@@ -146,6 +148,29 @@ impl DisplayImpl {
         Some(LogicalSize::new(
             physical_size.width() / scale,
             physical_size.height() / scale,
+        ))
+    }
+
+    pub fn logical_bounds(&self) -> Option<LogicalBounds> {
+        let physical_bounds = self.physical_bounds()?;
+
+        let dpi = unsafe {
+            let mut dpi_x = 0;
+            GetDpiForMonitor(self.0, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut 0).ok()?;
+            dpi_x
+        };
+
+        let scale = dpi as f64 / 96.0;
+
+        Some(LogicalBounds::new(
+            LogicalPosition::new(
+                physical_bounds.position().x() / scale,
+                physical_bounds.position().y() / scale,
+            ),
+            LogicalSize::new(
+                physical_bounds.size().width() / scale,
+                physical_bounds.size().height() / scale,
+            ),
         ))
     }
 
@@ -424,7 +449,7 @@ impl WindowImpl {
     }
 
     pub fn id(&self) -> WindowIdImpl {
-        WindowIdImpl(self.0 .0 as u64)
+        WindowIdImpl(self.0.0 as u64)
     }
 
     pub fn level(&self) -> Option<i32> {
@@ -1029,6 +1054,30 @@ impl WindowImpl {
                 },
             })
         }
+    }
+
+    pub fn logical_bounds(&self) -> Option<LogicalBounds> {
+        let physical_bounds = self.physical_bounds()?;
+
+        const BASE_DPI: f64 = 96.0;
+        let dpi = unsafe {
+            match GetDpiForWindow(self.0) {
+                0 => BASE_DPI as u32,
+                dpi => dpi,
+            }
+        } as f64;
+        let scale_factor = dpi / BASE_DPI;
+
+        Some(LogicalBounds::new(
+            LogicalPosition::new(
+                physical_bounds.position().x() / scale_factor,
+                physical_bounds.position().y() / scale_factor,
+            ),
+            LogicalSize::new(
+                physical_bounds.size().width() / scale_factor,
+                physical_bounds.size().height() / scale_factor,
+            ),
+        ))
     }
 
     pub fn physical_size(&self) -> Option<PhysicalSize> {

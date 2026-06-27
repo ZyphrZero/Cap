@@ -222,8 +222,9 @@ const features: Feature[] = [
 
 	{
 		icon: faServer,
-		title: "Custom S3 Bucket",
-		description: "Use your own S3 storage for complete data ownership",
+		title: "Bring Your Own Storage",
+		description:
+			"Connect your own Google Drive or S3 bucket for complete data ownership",
 		category: "privacy",
 		isPro: true,
 	},
@@ -250,6 +251,14 @@ const features: Feature[] = [
 		category: "privacy",
 	},
 
+	{
+		icon: faDownload,
+		title: "Loom Video Importer",
+		description:
+			"Switching from Loom? Import your existing Loom recordings directly into Cap and keep all your content in one place",
+		category: "platform",
+		size: "medium",
+	},
 	{
 		icon: faMobileAlt,
 		title: "Cross-Platform",

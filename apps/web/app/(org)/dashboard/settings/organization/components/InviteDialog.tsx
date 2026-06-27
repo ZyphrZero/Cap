@@ -8,100 +8,125 @@ import {
 	DialogHeader,
 	DialogTitle,
 	Input,
+	Select,
+	Switch,
 } from "@cap/ui";
-import type { Organisation } from "@cap/web-domain";
 import { faUserGroup } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { sendOrganizationInvites } from "@/actions/organization/send-invites";
-import { calculateSeats } from "@/utils/organization";
 import { useDashboardContext } from "../../../Contexts";
 
 interface InviteDialogProps {
 	isOpen: boolean;
-	setIsOpen: (isOpen: boolean) => void;
-	isOwner: boolean;
-	showOwnerToast: () => void;
-	handleManageBilling: () => Promise<void>;
+	setIsOpen: (open: boolean) => void;
 }
 
-export const InviteDialog = ({
-	isOpen,
-	setIsOpen,
-	isOwner,
-	showOwnerToast,
-	handleManageBilling,
-}: InviteDialogProps) => {
+type InviteRole = "admin" | "member";
+type InviteEmail = {
+	email: string;
+	role: InviteRole;
+};
+
+const roleOptions = [
+	{ value: "member", label: "Member" },
+	{ value: "admin", label: "Admin" },
+];
+
+export const InviteDialog = ({ isOpen, setIsOpen }: InviteDialogProps) => {
 	const router = useRouter();
 	const { activeOrganization } = useDashboardContext();
-	const [inviteEmails, setInviteEmails] = useState<string[]>([]);
+	const [inviteEmails, setInviteEmails] = useState<InviteEmail[]>([]);
 	const [emailInput, setEmailInput] = useState("");
-	const [upgradeLoading, setUpgradeLoading] = useState(false);
+	const [sendEmailNotifications, setSendEmailNotifications] = useState(true);
+	const emailInputId = useId();
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-	const { inviteQuota, remainingSeats } = calculateSeats(
-		activeOrganization || {},
-	);
+	useEffect(() => {
+		if (!isOpen) {
+			setInviteEmails([]);
+			setEmailInput("");
+			setSendEmailNotifications(true);
+		}
+	}, [isOpen]);
 
-	const handleAddEmails = () => {
+	const buildInviteEmailsWithPendingInput = () => {
 		const newEmails = emailInput
 			.split(",")
-			.map((email) => email.trim())
+			.map((email) => email.trim().toLowerCase())
 			.filter((email) => email !== "");
 
-		if (inviteEmails.length + newEmails.length > remainingSeats) {
+		const invalidEmails = newEmails.filter((email) => !emailRegex.test(email));
+		if (invalidEmails.length > 0) {
 			toast.error(
-				`Not enough seats available. You have ${remainingSeats} seats remaining.`,
+				`Invalid email${invalidEmails.length > 1 ? "s" : ""}: ${invalidEmails.join(", ")}`,
 			);
-			return;
+			return null;
 		}
 
-		setInviteEmails([...new Set([...inviteEmails, ...newEmails])]);
+		const validEmails = newEmails.filter((email) => emailRegex.test(email));
+		const inviteMap = new Map(
+			inviteEmails.map((invite) => [invite.email, invite]),
+		);
+
+		for (const email of validEmails) {
+			if (!inviteMap.has(email)) {
+				inviteMap.set(email, { email, role: "member" });
+			}
+		}
+
+		return Array.from(inviteMap.values());
+	};
+
+	const handleAddEmails = () => {
+		const nextInviteEmails = buildInviteEmailsWithPendingInput();
+		if (!nextInviteEmails) return;
+
+		setInviteEmails(nextInviteEmails);
 		setEmailInput("");
 	};
 
 	const handleRemoveEmail = (email: string) => {
-		setInviteEmails(inviteEmails.filter((e) => e !== email));
+		setInviteEmails(inviteEmails.filter((invite) => invite.email !== email));
 	};
 
-	const handleUpgradePlan = async () => {
-		if (!isOwner) {
-			showOwnerToast();
-			return;
-		}
-
-		setUpgradeLoading(true);
-		setIsOpen(false);
-		try {
-			await handleManageBilling();
-		} catch (_error) {
-			setUpgradeLoading(false);
-		}
+	const handleUpdateEmailRole = (email: string, role: InviteRole) => {
+		setInviteEmails(
+			inviteEmails.map((invite) =>
+				invite.email === email ? { ...invite, role } : invite,
+			),
+		);
 	};
 
 	const sendInvites = useMutation({
-		mutationFn: async () => {
-			if (!isOwner) {
-				showOwnerToast();
-				throw new Error("Not authorized");
+		mutationFn: async (emails: InviteEmail[]) => {
+			if (!activeOrganization?.organization.id) {
+				throw new Error("No active organization");
 			}
-
-			if (inviteEmails.length > remainingSeats) {
-				throw new Error(
-					`Not enough seats available. You have ${remainingSeats} seats remaining.`,
-				);
-			}
-
 			return await sendOrganizationInvites(
-				inviteEmails,
-				activeOrganization?.organization.id as Organisation.OrganisationId,
+				emails,
+				activeOrganization.organization.id,
+				"member",
+				{ sendEmailNotifications },
 			);
 		},
-		onSuccess: () => {
-			toast.success("Invites sent successfully");
-			setInviteEmails([]);
+		onSuccess: (result) => {
+			if (result.failedEmails.length > 0) {
+				toast.warning(
+					sendEmailNotifications
+						? `Invites sent, but delivery failed for: ${result.failedEmails.join(", ")}`
+						: `Users added, but provisioning failed for: ${result.failedEmails.join(", ")}`,
+				);
+			} else {
+				toast.success(
+					sendEmailNotifications
+						? "Invites sent successfully"
+						: "Users added successfully",
+				);
+			}
 			setIsOpen(false);
 			router.refresh();
 		},
@@ -114,6 +139,17 @@ export const InviteDialog = ({
 			);
 		},
 	});
+
+	const handleSendInvites = () => {
+		const nextInviteEmails = buildInviteEmailsWithPendingInput();
+		if (!nextInviteEmails || nextInviteEmails.length === 0) return;
+
+		setInviteEmails(nextInviteEmails);
+		setEmailInput("");
+		sendInvites.mutate(nextInviteEmails);
+	};
+
+	const hasPendingEmailInput = emailInput.trim() !== "";
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -130,66 +166,80 @@ export const InviteDialog = ({
 					</DialogTitle>
 				</DialogHeader>
 				<div className="p-5">
-					{remainingSeats > 0 ? (
-						<>
-							<Input
-								id="emails"
-								value={emailInput}
-								onChange={(e) => setEmailInput(e.target.value)}
-								placeholder="name@company.com"
-								onBlur={handleAddEmails}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === ",") {
-										e.preventDefault();
-										handleAddEmails();
-									}
-								}}
-							/>
-							<div className="flex overflow-y-auto flex-col gap-2.5 mt-4 max-h-60">
-								{inviteEmails.map((email) => (
-									<div
-										key={email}
-										className="flex justify-between items-center p-3 rounded-xl border transition-colors duration-200 cursor-pointer border-gray-4 hover:bg-gray-3"
-									>
-										<span className="text-sm text-gray-12">{email}</span>
-										<Button
-											style={
-												{
-													"--gradient-border-radius": "8px",
-												} as React.CSSProperties
-											}
-											type="button"
-											variant="destructive"
-											size="xs"
-											onClick={() => handleRemoveEmail(email)}
-											disabled={!isOwner}
-										>
-											Remove
-										</Button>
-									</div>
-								))}
-							</div>
-						</>
-					) : (
-						<div className="flex flex-col gap-2 p-4 bg-amber-50 rounded-xl border border-amber-200">
-							<p className="font-medium text-amber-800">No Seats Available</p>
-							<p className="text-sm text-amber-700">
-								You've reached your seat limit. Please upgrade your plan or
-								remove existing members to invite new ones.
-							</p>
-							<Button
-								type="button"
-								size="sm"
-								variant="dark"
-								className="self-start mt-2"
-								spinner={upgradeLoading}
-								disabled={upgradeLoading || !isOwner}
-								onClick={handleUpgradePlan}
+					<Input
+						id={emailInputId}
+						value={emailInput}
+						onChange={(e) => setEmailInput(e.target.value)}
+						placeholder="name@company.com"
+						onBlur={(e) => {
+							const relatedTarget = e.relatedTarget;
+							if (
+								relatedTarget instanceof HTMLElement &&
+								relatedTarget.dataset.inviteSubmit === "true"
+							) {
+								return;
+							}
+							handleAddEmails();
+						}}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === ",") {
+								e.preventDefault();
+								handleAddEmails();
+							}
+						}}
+					/>
+					<div className="flex overflow-y-auto flex-col gap-2.5 mt-4 max-h-60">
+						{inviteEmails.map((invite) => (
+							<div
+								key={invite.email}
+								className="flex gap-3 justify-between items-center p-3 rounded-xl border transition-colors duration-200 border-gray-4 hover:bg-gray-3"
 							>
-								Upgrade Plan
-							</Button>
+								<span className="min-w-0 text-sm truncate text-gray-12">
+									{invite.email}
+								</span>
+								<Select
+									value={invite.role}
+									placeholder="Role"
+									options={roleOptions}
+									size="sm"
+									variant="gray"
+									onValueChange={(value) =>
+										handleUpdateEmailRole(
+											invite.email,
+											value === "admin" ? "admin" : "member",
+										)
+									}
+								/>
+								<Button
+									style={
+										{
+											"--gradient-border-radius": "8px",
+										} as React.CSSProperties
+									}
+									type="button"
+									variant="destructive"
+									size="xs"
+									onClick={() => handleRemoveEmail(invite.email)}
+								>
+									Remove
+								</Button>
+							</div>
+						))}
+					</div>
+					<div className="flex gap-3 justify-between items-center p-3 mt-4 rounded-lg border border-gray-4 bg-gray-1">
+						<div>
+							<p className="text-sm font-medium text-gray-12">
+								Send invite email
+							</p>
+							<p className="mt-1 text-xs text-gray-10">
+								Turn off to add users without emailing them.
+							</p>
 						</div>
-					)}
+						<Switch
+							checked={sendEmailNotifications}
+							onCheckedChange={setSendEmailNotifications}
+						/>
+					</div>
 				</div>
 				<DialogFooter className="p-5 border-t border-gray-4">
 					<Button
@@ -207,12 +257,12 @@ export const InviteDialog = ({
 						spinner={sendInvites.isPending}
 						disabled={
 							sendInvites.isPending ||
-							inviteEmails.length === 0 ||
-							remainingSeats === 0
+							(inviteEmails.length === 0 && !hasPendingEmailInput)
 						}
-						onClick={() => sendInvites.mutate()}
+						data-invite-submit="true"
+						onClick={handleSendInvites}
 					>
-						Send Invites
+						{sendEmailNotifications ? "Send Invites" : "Add Users"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

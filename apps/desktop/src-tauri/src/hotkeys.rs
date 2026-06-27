@@ -1,10 +1,10 @@
 use crate::{
-    recording,
+    RequestOpenRecordingPicker, RequestStartRecording, recording,
     recording_settings::{RecordingSettingsStore, RecordingTargetMode},
     tray,
     windows::ShowCapWindow,
-    RequestOpenRecordingPicker, RequestStartRecording,
 };
+use cap_recording::screen_capture::ScreenCaptureTarget;
 use global_hotkey::HotKeyState;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -61,6 +61,9 @@ pub enum HotkeyAction {
     OpenRecordingPickerDisplay,
     OpenRecordingPickerWindow,
     OpenRecordingPickerArea,
+    ScreenshotDisplay,
+    ScreenshotWindow,
+    ScreenshotArea,
     #[serde(other)]
     Other,
 }
@@ -195,6 +198,53 @@ async fn handle_hotkey(app: AppHandle, action: HotkeyAction) -> Result<(), Strin
             Ok(())
         }
         HotkeyAction::OpenRecordingPickerArea => {
+            let _ = RequestOpenRecordingPicker {
+                target_mode: Some(RecordingTargetMode::Area),
+            }
+            .emit(&app);
+            Ok(())
+        }
+        HotkeyAction::ScreenshotDisplay => {
+            use scap_targets::Display;
+
+            let display = Display::get_containing_cursor().unwrap_or_else(Display::primary);
+            let target = ScreenCaptureTarget::Display { id: display.id() };
+
+            match recording::take_screenshot(app.clone(), target.clone()).await {
+                Ok(path) => {
+                    if crate::automation::should_open_screenshot_editor(&app, &target) {
+                        let _ = ShowCapWindow::ScreenshotEditor { path }.show(&app).await;
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(format!("Failed to take screenshot: {e}")),
+            }
+        }
+        HotkeyAction::ScreenshotWindow => {
+            use scap_targets::Window;
+
+            let target = {
+                let window = Window::get_topmost_at_cursor()
+                    .ok_or_else(|| "No window found under cursor".to_string())?;
+                ScreenCaptureTarget::Window { id: window.id() }
+            };
+
+            match recording::take_screenshot(app.clone(), target.clone()).await {
+                Ok(path) => {
+                    if crate::automation::should_open_screenshot_editor(&app, &target) {
+                        let _ = ShowCapWindow::ScreenshotEditor { path }.show(&app).await;
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(format!("Failed to take screenshot: {e}")),
+            }
+        }
+        HotkeyAction::ScreenshotArea => {
+            RecordingSettingsStore::set_mode(&app, cap_recording::RecordingMode::Screenshot)
+                .map_err(|e| format!("Failed to set screenshot mode: {e}"))?;
+
+            tray::update_tray_icon_for_mode(&app, cap_recording::RecordingMode::Screenshot);
+
             let _ = RequestOpenRecordingPicker {
                 target_mode: Some(RecordingTargetMode::Area),
             }

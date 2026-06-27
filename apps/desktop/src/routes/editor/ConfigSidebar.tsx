@@ -14,7 +14,12 @@ import { createEventListenerMap } from "@solid-primitives/event-listener";
 import { createWritableMemo } from "@solid-primitives/memo";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, resolveResource } from "@tauri-apps/api/path";
-import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
+import {
+	BaseDirectory,
+	exists,
+	readDir,
+	writeFile,
+} from "@tauri-apps/plugin-fs";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
@@ -42,36 +47,73 @@ import transparentBg from "~/assets/illustrations/transparent.webp";
 import { t } from "~/components/I18nProvider";
 import { Toggle } from "~/components/Toggle";
 import { generalSettingsStore } from "~/store";
+import { normalizeOpaqueHexColor } from "~/utils/hex-color";
 import {
+	createSelectedOrganization,
+	getOrganizationBrandColorSwatches,
+	type OrganizationBrandColorSwatch,
+} from "~/utils/organization-branding";
+import {
+	type BackgroundBlurMode,
 	type BackgroundSource,
 	type CameraShape,
+	type CameraXPosition,
+	type CameraYPosition,
+	type CaptionTrackSegment,
 	type ClipOffsets,
 	type CursorAnimationStyle,
 	type CursorType,
 	commands,
+	type KeyboardTrackSegment,
+	type SceneMode,
 	type SceneSegment,
+	type SplitLayout,
 	type StereoMode,
 	type TimelineSegment,
+	type XY,
 	type ZoomSegment,
 } from "~/utils/tauri";
 import IconLucideBoxSelect from "~icons/lucide/box-select";
+import IconLucideColumns2 from "~icons/lucide/columns-2";
+import IconLucideEyeOff from "~icons/lucide/eye-off";
 import IconLucideGauge from "~icons/lucide/gauge";
 import IconLucideGrid from "~icons/lucide/grid";
+import IconLucideImageOff from "~icons/lucide/image-off";
+import IconLucideKeyboard from "~icons/lucide/keyboard";
 import IconLucideMonitor from "~icons/lucide/monitor";
 import IconLucideMoon from "~icons/lucide/moon";
+import IconLucideMusic from "~icons/lucide/music";
 import IconLucidePalette from "~icons/lucide/palette";
 import IconLucideRabbit from "~icons/lucide/rabbit";
 import IconLucideSparkles from "~icons/lucide/sparkles";
 import IconLucideTimer from "~icons/lucide/timer";
 import IconLucideType from "~icons/lucide/type";
+import IconLucideVideo from "~icons/lucide/video";
+import IconLucideVolume2 from "~icons/lucide/volume-2";
 import IconLucideWind from "~icons/lucide/wind";
+import { AudioLibraryPanel } from "./AudioLibrary";
+import {
+	AUDIO_TRACK_BG_CLASS,
+	type AudioTrackSegment,
+	MAX_VOLUME_DB,
+	MIN_VOLUME_DB,
+} from "./audio";
+import { BrandColorsDropdown } from "./BrandColorsDropdown";
 import { CaptionsTab } from "./CaptionsTab";
+import { syncCaptionWordsWithText } from "./captions";
+import { getColorPreviewBorderColor, hexToRgb, RgbInput } from "./color-utils";
 import { type CornerRoundingType, useEditorContext } from "./context";
+import { GradientEditor } from "./GradientEditor";
+import { KeyboardTab } from "./KeyboardTab";
 import { evaluateMask, type MaskKind, type MaskSegment } from "./masks";
 import {
+	DEFAULT_BACKGROUND_PADDING,
+	DEFAULT_BACKGROUND_ROUNDING,
+	DEFAULT_CAMERA_SCALE_DURING_ZOOM,
 	DEFAULT_GRADIENT_FROM,
 	DEFAULT_GRADIENT_TO,
-	type RGBColor,
+	DEFAULT_SCENE_TRANSITION,
+	DEFAULT_SPLIT_LAYOUT,
 } from "./projectConfig";
 import ShadowSettings from "./ShadowSettings";
 import { TextInput } from "./TextInput";
@@ -80,6 +122,7 @@ import {
 	ComingSoonTooltip,
 	EditorButton,
 	Field,
+	Input,
 	MenuItem,
 	MenuItemList,
 	PopperContent,
@@ -87,21 +130,18 @@ import {
 	Subfield,
 	topSlideAnimateClasses,
 } from "./ui";
+import { formatTime } from "./utils";
+
+type BackgroundSourceTab = BackgroundSource["type"] | "desktop" | "none";
 
 const BACKGROUND_SOURCES = {
-	get wallpaper() {
-		return t("editor.sidebar.backgroundSources.wallpaper");
-	},
-	get image() {
-		return t("editor.sidebar.backgroundSources.image");
-	},
-	get color() {
-		return t("editor.sidebar.backgroundSources.color");
-	},
-	get gradient() {
-		return t("editor.sidebar.backgroundSources.gradient");
-	},
-} satisfies Record<BackgroundSource["type"], string>;
+	desktop: "Desktop",
+	wallpaper: "Wallpaper",
+	image: "Image",
+	color: "Color",
+	gradient: "Gradient",
+	none: "None",
+} satisfies Record<BackgroundSourceTab, string>;
 
 const BACKGROUND_ICONS = {
 	wallpaper: imageBg,
@@ -110,12 +150,28 @@ const BACKGROUND_ICONS = {
 	gradient: gradientBg,
 } satisfies Record<BackgroundSource["type"], string>;
 
-const BACKGROUND_SOURCES_LIST = [
+const BACKGROUND_SOURCES_ROW_ONE = [
+	"desktop",
 	"wallpaper",
 	"image",
+] satisfies Array<BackgroundSourceTab>;
+
+const BACKGROUND_SOURCES_ROW_TWO = [
 	"color",
 	"gradient",
-] satisfies Array<BackgroundSource["type"]>;
+	"none",
+] satisfies Array<BackgroundSourceTab>;
+
+const BACKGROUND_IMAGE_ACCEPT =
+	"image/apng, image/avif, image/jpeg, image/png, image/webp";
+const BACKGROUND_IMAGE_EXTENSIONS = [
+	"jpg",
+	"jpeg",
+	"png",
+	"gif",
+	"webp",
+	"bmp",
+] as const;
 
 const BACKGROUND_COLORS = [
 	"#FF0000", // Red
@@ -136,27 +192,6 @@ const BACKGROUND_COLORS = [
 	"#000000", // Black
 	"#00000000", // Transparent
 ];
-
-const BACKGROUND_GRADIENTS = [
-	{ from: [15, 52, 67], to: [52, 232, 158] }, // Dark Blue to Teal
-	{ from: [34, 193, 195], to: [253, 187, 45] }, // Turquoise to Golden Yellow
-	{ from: [29, 253, 251], to: [195, 29, 253] }, // Cyan to Purple
-	{ from: [69, 104, 220], to: [176, 106, 179] }, // Blue to Violet
-	{ from: [106, 130, 251], to: [252, 92, 125] }, // Soft Blue to Pinkish Red
-	{ from: [131, 58, 180], to: [253, 29, 29] }, // Purple to Red
-	{ from: [249, 212, 35], to: [255, 78, 80] }, // Yellow to Coral Red
-	{ from: [255, 94, 0], to: [255, 42, 104] }, // Orange to Reddish Pink
-	{ from: [255, 0, 150], to: [0, 204, 255] }, // Pink to Sky Blue
-	{ from: [0, 242, 96], to: [5, 117, 230] }, // Green to Blue
-	{ from: [238, 205, 163], to: [239, 98, 159] }, // Peach to Soft Pink
-	{ from: [44, 62, 80], to: [52, 152, 219] }, // Dark Gray Blue to Light Blue
-	{ from: [168, 239, 255], to: [238, 205, 163] }, // Light Blue to Peach
-	{ from: [74, 0, 224], to: [143, 0, 255] }, // Deep Blue to Bright Purple
-	{ from: [252, 74, 26], to: [247, 183, 51] }, // Deep Orange to Soft Yellow
-	{ from: [0, 255, 255], to: [255, 20, 147] }, // Cyan to Deep Pink
-	{ from: [255, 127, 0], to: [255, 255, 0] }, // Orange to Yellow
-	{ from: [255, 0, 255], to: [0, 255, 0] }, // Magenta to Green
-] satisfies Array<{ from: RGBColor; to: RGBColor }>;
 
 const WALLPAPER_NAMES = [
 	// macOS wallpapers
@@ -192,6 +227,14 @@ const WALLPAPER_NAMES = [
 	"purple/4",
 	"purple/5",
 	"purple/6",
+	"cities/liverpool",
+	"cities/santorini",
+	"cities/miami",
+	"cities/monaco",
+	"cities/london",
+	"cities/rome",
+	"cities/sf",
+	"cities/nyc",
 	// Dark wallpapers
 	"dark/1",
 	"dark/2",
@@ -210,6 +253,32 @@ const WALLPAPER_NAMES = [
 	"orange/8",
 	"orange/9",
 ] as const;
+
+const CURRENT_DESKTOP_BACKGROUND_ID = "current-desktop-background";
+const CURRENT_DESKTOP_BACKGROUND_BASENAME = "current-desktop-background";
+const getCurrentDesktopBackgroundLabel = () => {
+	const os = ostype();
+	if (os === "macos") return "This Mac";
+	if (os === "windows") return "This PC";
+	return "This device";
+};
+
+type WallpaperOption = {
+	id: string;
+	url: string;
+	rawPath: string;
+	label?: string;
+};
+
+const isCurrentDesktopBackgroundPath = (path: string | null | undefined) => {
+	if (!path) return false;
+	const filename = path.split(/[\\/]/).pop();
+	if (!filename) return false;
+	return (
+		filename.startsWith(`${CURRENT_DESKTOP_BACKGROUND_BASENAME}.`) ||
+		filename.startsWith(`${CURRENT_DESKTOP_BACKGROUND_BASENAME}-`)
+	);
+};
 
 const STEREO_MODES = [
 	{
@@ -247,6 +316,13 @@ const CAMERA_SHAPES = [
 	},
 ] satisfies Array<{ name: string; value: CameraShape }>;
 
+const CAMERA_X_POSITIONS = [
+	"left",
+	"center",
+	"right",
+] satisfies CameraXPosition[];
+const CAMERA_Y_POSITIONS = ["top", "bottom"] satisfies CameraYPosition[];
+
 const CORNER_STYLE_OPTIONS = [
 	{
 		get name() {
@@ -263,21 +339,12 @@ const CORNER_STYLE_OPTIONS = [
 ] satisfies Array<{ name: string; value: CornerRoundingType }>;
 
 const BACKGROUND_THEMES = {
-	get macOS() {
-		return t("editor.sidebar.backgroundThemes.macOS");
-	},
-	get dark() {
-		return t("editor.sidebar.backgroundThemes.dark");
-	},
-	get blue() {
-		return t("editor.sidebar.backgroundThemes.blue");
-	},
-	get purple() {
-		return t("editor.sidebar.backgroundThemes.purple");
-	},
-	get orange() {
-		return t("editor.sidebar.backgroundThemes.orange");
-	},
+	macOS: "macOS",
+	dark: "Dark",
+	blue: "Blue",
+	cities: "Cities",
+	purple: "Purple",
+	orange: "Orange",
 };
 
 type CursorPresetValues = {
@@ -286,7 +353,7 @@ type CursorPresetValues = {
 	friction: number;
 };
 
-const DEFAULT_CURSOR_MOTION_BLUR = 0.5;
+const DEFAULT_MOTION_BLUR = 0.5;
 
 const CURSOR_TYPE_OPTIONS = [
 	{
@@ -321,6 +388,12 @@ const CURSOR_ANIMATION_STYLE_OPTIONS = [
 		preset: { tension: 65, mass: 1.8, friction: 16 },
 	},
 	{
+		value: "smooth",
+		label: "Smooth",
+		description: "Ultra-smooth cinematic feel with high damping.",
+		preset: { tension: 80, mass: 2.5, friction: 28 },
+	},
+	{
 		value: "mellow",
 		get label() {
 			return t("editor.sidebar.animationStyles.mellow");
@@ -329,6 +402,12 @@ const CURSOR_ANIMATION_STYLE_OPTIONS = [
 			return t("editor.sidebar.animationStyles.mellowDescription");
 		},
 		preset: { tension: 120, mass: 1.1, friction: 18 },
+	},
+	{
+		value: "fast",
+		label: "Fast",
+		description: "Quick, responsive smoothing for fast-paced content.",
+		preset: { tension: 380, mass: 1.0, friction: 30 },
 	},
 	{
 		value: "custom",
@@ -375,7 +454,9 @@ const TAB_IDS = {
 	transcript: "transcript",
 	audio: "audio",
 	cursor: "cursor",
+	keyboard: "keyboard",
 	hotkeys: "hotkeys",
+	captions: "captions",
 } as const;
 
 export function ConfigSidebar() {
@@ -388,6 +469,12 @@ export function ConfigSidebar() {
 		editorState,
 		meta,
 	} = useEditorContext();
+	const organizationSelection = createSelectedOrganization();
+	const brandColorSwatches = createMemo(() =>
+		getOrganizationBrandColorSwatches(
+			organizationSelection.selectedOrganization(),
+		),
+	);
 
 	const cursorIdleDelay = () =>
 		((project.cursor as { hideWhenIdleDelay?: number }).hideWhenIdleDelay ??
@@ -437,6 +524,7 @@ export function ConfigSidebar() {
 			| "transcript"
 			| "audio"
 			| "cursor"
+			| "keyboard"
 			| "hotkeys"
 			| "captions",
 	});
@@ -445,10 +533,15 @@ export function ConfigSidebar() {
 
 	return (
 		<KTabs
-			value={editorState.timeline.selection ? undefined : state.selectedTab}
-			class="flex flex-col min-h-0 shrink-0 flex-1 max-w-[26rem] overflow-hidden rounded-xl z-10 bg-gray-1 dark:bg-gray-2 border border-gray-3"
+			value={
+				editorState.timeline.selection ||
+				editorState.timeline.audioPicker !== null
+					? undefined
+					: state.selectedTab
+			}
+			class="flex flex-col min-h-0 shrink-0 flex-1 max-w-104 overflow-hidden rounded-xl z-10 bg-gray-1 dark:bg-gray-2 border border-gray-3"
 		>
-			<KTabs.List class="flex overflow-hidden sticky top-0 z-[60] flex-row items-center h-16 text-lg border-b border-gray-3 shrink-0 bg-gray-1 dark:bg-gray-2">
+			<KTabs.List class="flex overflow-hidden sticky top-0 z-60 flex-row items-center h-16 text-lg border-b border-gray-3 shrink-0 bg-gray-1 dark:bg-gray-2">
 				<For
 					each={[
 						{ id: TAB_IDS.background, icon: IconCapImage },
@@ -463,14 +556,16 @@ export function ConfigSidebar() {
 						{
 							id: TAB_IDS.cursor,
 							icon: IconCapCursor,
-							disabled: !(
-								meta().type === "multiple" && (meta() as any).segments[0].cursor
-							),
+							disabled: !meta().hasRecordedCursorData,
 						},
-						// {
-						// 	id: "captions" as const,
-						// 	icon: IconCapMessageBubble,
-						// },
+						{
+							id: TAB_IDS.keyboard,
+							icon: IconLucideKeyboard,
+						},
+						{
+							id: TAB_IDS.captions,
+							icon: IconCapMessageBubble,
+						},
 						// { id: "hotkeys" as const, icon: IconCapHotkeys },
 					].filter(Boolean)}
 				>
@@ -478,15 +573,21 @@ export function ConfigSidebar() {
 						<KTabs.Trigger
 							value={item.id}
 							class={cx(
-								"flex relative z-10 flex-1 justify-center items-center px-4 py-2 transition-colors group disabled:opacity-50 focus:outline-none",
+								"flex relative z-10 flex-1 justify-center items-center px-4 py-2 transition-colors group disabled:opacity-50 focus:outline-hidden",
 								editorState.timeline.selection
 									? "text-gray-11"
-									: "text-gray-11 ui-selected:text-gray-12",
+									: "text-gray-11 data-selected:text-gray-12",
 							)}
 							onClick={() => {
 								// Clear any active selection first
 								if (editorState.timeline.selection) {
 									setEditorState("timeline", "selection", null);
+								}
+								if (editorState.timeline.audioPicker !== null) {
+									setEditorState("timeline", "audioPicker", null);
+								}
+								if (editorState.timeline.audioReplace !== null) {
+									setEditorState("timeline", "audioReplace", null);
 								}
 								setState("selectedTab", item.id);
 								scrollRef.scrollTo({
@@ -509,7 +610,12 @@ export function ConfigSidebar() {
 				</For>
 
 				{/** Center the indicator with the icon */}
-				<Show when={!editorState.timeline.selection}>
+				<Show
+					when={
+						!editorState.timeline.selection &&
+						editorState.timeline.audioPicker === null
+					}
+				>
 					<KTabs.Indicator class="absolute top-0 left-0 w-full h-full transition-transform duration-200 ease-in-out pointer-events-none will-change-transform">
 						<div class="absolute top-1/2 left-1/2 rounded-lg transform -translate-x-1/2 -translate-y-1/2 bg-gray-3 will-change-transform size-9" />
 					</KTabs.Indicator>
@@ -522,10 +628,16 @@ export function ConfigSidebar() {
 				}}
 				class="custom-scroll overflow-x-hidden overflow-y-scroll text-[0.875rem] flex-1 min-h-0"
 				classList={{
-					hidden: !!editorState.timeline.selection,
+					hidden:
+						!!editorState.timeline.selection ||
+						editorState.timeline.audioPicker !== null ||
+						editorState.timeline.audioReplace !== null,
 				}}
 			>
-				<BackgroundConfig scrollRef={scrollRef} />
+				<BackgroundConfig
+					scrollRef={scrollRef}
+					brandColorSwatches={brandColorSwatches()}
+				/>
 				<CameraConfig scrollRef={scrollRef} />
 				<KTabs.Content
 					value="audio"
@@ -569,14 +681,14 @@ export function ConfigSidebar() {
 										<KSelect.Value<{
 											name: string;
 											value: StereoMode;
-										}> class="flex-1 text-sm text-left truncate text-[--gray-500] font-normal">
+										}> class="flex-1 text-sm text-left truncate text-(--gray-500) font-normal">
 											{(state) => <span>{state.selectedOption().name}</span>}
 										</KSelect.Value>
 										<KSelect.Icon<ValidComponent>
 											as={(props) => (
 												<IconCapChevronDown
 													{...props}
-													class="size-4 shrink-0 transform transition-transform ui-expanded:rotate-180 text-[--gray-500]"
+													class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)"
 												/>
 											)}
 										/>
@@ -655,8 +767,7 @@ export function ConfigSidebar() {
 					class="flex flex-col flex-1 gap-6 p-4 min-h-0"
 				>
 					<Field
-						name={t("editor.sidebar.cursor")}
-						icon={<IconCapCursor />}
+						name="Show cursor"
 						value={
 							<Toggle
 								checked={!project.cursor.hide}
@@ -681,11 +792,11 @@ export function ConfigSidebar() {
 								{CURSOR_TYPE_OPTIONS.map((option) => (
 									<RadioGroup.Item
 										value={option.value}
-										class="rounded-lg border border-gray-3 transition-colors ui-checked:border-blue-8 ui-checked:bg-blue-3/40"
+										class="rounded-lg border border-gray-3 transition-colors data-checked:border-blue-8 data-checked:bg-blue-3/40"
 									>
 										<RadioGroup.ItemInput class="sr-only" />
 										<RadioGroup.ItemLabel class="flex cursor-pointer items-start gap-3 p-3">
-											<RadioGroup.ItemControl class="mt-1 size-4 rounded-full border border-gray-7 ui-checked:border-blue-9 ui-checked:bg-blue-9" />
+											<RadioGroup.ItemControl class="mt-1 size-4 rounded-full border border-gray-7 data-checked:border-blue-9 data-checked:bg-blue-9" />
 											<div class="flex flex-col text-left">
 												<span class="text-sm font-medium text-gray-12">
 													{option.label}
@@ -711,6 +822,16 @@ export function ConfigSidebar() {
 								step={1}
 							/>
 						</Field>
+						<Field name="Tilt" icon={<IconLucideRotate3d class="size-4" />}>
+							<Slider
+								value={[project.cursor.rotationAmount ?? 0.15]}
+								onChange={(v) => setProject("cursor", "rotationAmount", v[0])}
+								minValue={0}
+								maxValue={1}
+								step={0.01}
+								formatTooltip={(value) => `${Math.round(value * 100)}%`}
+							/>
+						</Field>
 						<Field
 							name={t("editor.sidebar.hideWhenIdle")}
 							icon={<IconLucideTimer class="size-4" />}
@@ -734,7 +855,7 @@ export function ConfigSidebar() {
 										value={[cursorIdleDelay()]}
 										onChange={(v) => {
 											const rounded = clampIdleDelay(v[0]);
-											setProject("cursor", "hideWhenIdleDelay" as any, rounded);
+											setProject("cursor", "hideWhenIdleDelay", rounded);
 										}}
 										minValue={0.5}
 										maxValue={5}
@@ -761,11 +882,11 @@ export function ConfigSidebar() {
 								{CURSOR_ANIMATION_STYLE_OPTIONS.map((option) => (
 									<RadioGroup.Item
 										value={option.value}
-										class="rounded-lg border border-gray-3 transition-colors ui-checked:border-blue-8 ui-checked:bg-blue-3/40"
+										class="rounded-lg border border-gray-3 transition-colors data-checked:border-blue-8 data-checked:bg-blue-3/40"
 									>
 										<RadioGroup.ItemInput class="sr-only" />
 										<RadioGroup.ItemLabel class="flex cursor-pointer items-start gap-3 p-3">
-											<RadioGroup.ItemControl class="mt-1 size-4 rounded-full border border-gray-7 ui-checked:border-blue-9 ui-checked:bg-blue-9" />
+											<RadioGroup.ItemControl class="mt-1 size-4 rounded-full border border-gray-7 data-checked:border-blue-9 data-checked:bg-blue-9" />
 											<div class="flex flex-col text-left">
 												<span class="text-sm font-medium text-gray-12">
 													{option.label}
@@ -792,7 +913,7 @@ export function ConfigSidebar() {
 									/>
 								}
 							/>
-							<KCollapsible.Content class="overflow-hidden border-b opacity-0 transition-opacity border-gray-3 animate-collapsible-up ui-expanded:animate-collapsible-down ui-expanded:opacity-100">
+							<KCollapsible.Content class="overflow-hidden border-b opacity-0 transition-opacity border-gray-3 animate-collapsible-up data-expanded:animate-collapsible-down data-expanded:opacity-100">
 								{/* if Content has padding or margin the animation doesn't look as good */}
 								<div class="flex flex-col gap-4 pt-4 pb-6">
 									<Field name={t("editor.sidebar.tension")}>
@@ -830,9 +951,9 @@ export function ConfigSidebar() {
 							icon={<IconLucideSparkles />}
 							value={
 								<Toggle
-									checked={(project.cursor as any).useSvg ?? true}
+									checked={project.cursor.useSvg ?? true}
 									onChange={(value) => {
-										setProject("cursor", "useSvg" as any, value);
+										setProject("cursor", "useSvg", value);
 									}}
 								/>
 							}
@@ -894,12 +1015,18 @@ export function ConfigSidebar() {
 						</ComingSoonTooltip>
 					</Field>
 				</KTabs.Content>
-				{/* <KTabs.Content
-					value="captions"
+				<KTabs.Content
+					value={TAB_IDS.captions}
 					class="flex flex-col flex-1 gap-6 p-4 min-h-0"
 				>
-					<CaptionsTab />
-				</KTabs.Content> */}
+					<CaptionsTab brandColorSwatches={brandColorSwatches()} />
+				</KTabs.Content>
+				<KTabs.Content
+					value={TAB_IDS.keyboard}
+					class="flex flex-col flex-1 gap-6 p-4 min-h-0"
+				>
+					<KeyboardTab brandColorSwatches={brandColorSwatches()} />
+				</KTabs.Content>
 			</div>
 			<div
 				style={{
@@ -907,14 +1034,204 @@ export function ConfigSidebar() {
 				}}
 				class="custom-scroll p-4 top-16 left-0 right-0 bottom-0 text-[0.875rem] space-y-4 bg-gray-1 dark:bg-gray-2 z-50"
 				classList={{
-					hidden: !editorState.timeline.selection,
+					hidden:
+						!editorState.timeline.selection &&
+						editorState.timeline.audioPicker === null &&
+						editorState.timeline.audioReplace === null,
 					"animate-in slide-in-from-bottom-2 fade-in":
-						!!editorState.timeline.selection,
+						!!editorState.timeline.selection ||
+						editorState.timeline.audioPicker !== null ||
+						editorState.timeline.audioReplace !== null,
 				}}
 			>
-				<Show when={editorState.timeline.selection}>
+				<Show
+					when={
+						editorState.timeline.audioPicker !== null &&
+						!editorState.timeline.selection &&
+						editorState.timeline.audioReplace === null
+					}
+				>
+					<AudioLibraryPanel
+						mode={{
+							type: "add",
+							lane: editorState.timeline.audioPicker ?? 0,
+						}}
+						onClose={() => setEditorState("timeline", "audioPicker", null)}
+					/>
+				</Show>
+				<Show
+					when={(() => {
+						const index = editorState.timeline.audioReplace;
+						if (index === null) return null;
+						const segment = project.timeline?.audioSegments?.[index];
+						if (!segment) {
+							setEditorState("timeline", "audioReplace", null);
+							return null;
+						}
+						return { index };
+					})()}
+				>
+					{(value) => (
+						<AudioLibraryPanel
+							mode={{ type: "replace", index: value().index }}
+							onClose={() => setEditorState("timeline", "audioReplace", null)}
+						/>
+					)}
+				</Show>
+				<Show
+					when={
+						editorState.timeline.audioReplace === null
+							? editorState.timeline.selection
+							: null
+					}
+				>
 					{(selection) => (
 						<Suspense>
+							<Show
+								when={(() => {
+									const captionSelection = selection();
+									if (captionSelection.type !== "caption") return;
+
+									const segments = captionSelection.indices
+										.map((index) => ({
+											index,
+											segment: project.timeline?.captionSegments?.[index],
+										}))
+										.filter(
+											(
+												item,
+											): item is {
+												index: number;
+												segment: CaptionTrackSegment;
+											} => item.segment !== undefined,
+										);
+
+									if (segments.length === 0) {
+										setEditorState("timeline", "selection", null);
+										return;
+									}
+
+									return { selection: captionSelection, segments };
+								})()}
+							>
+								{(value) => (
+									<div class="space-y-4">
+										<div class="flex flex-row justify-between items-center">
+											<div class="flex gap-2 items-center">
+												<EditorButton
+													onClick={() =>
+														setEditorState("timeline", "selection", null)
+													}
+													leftIcon={<IconLucideCheck />}
+												>
+													Done
+												</EditorButton>
+												<span class="text-sm text-gray-10">
+													{value().segments.length} caption{" "}
+													{value().segments.length === 1
+														? "segment"
+														: "segments"}{" "}
+													selected
+												</span>
+											</div>
+											<EditorButton
+												variant="danger"
+												onClick={() =>
+													projectActions.deleteCaptionSegments(
+														value().segments.map((s) => s.index),
+													)
+												}
+												leftIcon={<IconCapTrash />}
+											>
+												Delete
+											</EditorButton>
+										</div>
+										<For each={value().segments}>
+											{(item) => (
+												<div class="p-4 rounded-lg border border-gray-200">
+													<CaptionSegmentConfig
+														segment={item.segment}
+														segmentIndex={item.index}
+													/>
+												</div>
+											)}
+										</For>
+									</div>
+								)}
+							</Show>
+							<Show
+								when={(() => {
+									const keyboardSelection = selection();
+									if (keyboardSelection.type !== "keyboard") return;
+
+									const segments = keyboardSelection.indices
+										.map((index) => ({
+											index,
+											segment: project.timeline?.keyboardSegments?.[index],
+										}))
+										.filter(
+											(
+												item,
+											): item is {
+												index: number;
+												segment: KeyboardTrackSegment;
+											} => item.segment !== undefined,
+										);
+
+									if (segments.length === 0) {
+										setEditorState("timeline", "selection", null);
+										return;
+									}
+
+									return { selection: keyboardSelection, segments };
+								})()}
+							>
+								{(value) => (
+									<div class="space-y-4">
+										<div class="flex flex-row justify-between items-center">
+											<div class="flex gap-2 items-center">
+												<EditorButton
+													onClick={() => {
+														setEditorState("timeline", "selection", null);
+														setState("selectedTab", TAB_IDS.keyboard);
+													}}
+													leftIcon={<IconLucideCheck />}
+												>
+													Done
+												</EditorButton>
+												<span class="text-sm text-gray-10">
+													{value().segments.length} keyboard{" "}
+													{value().segments.length === 1
+														? "segment"
+														: "segments"}{" "}
+													selected
+												</span>
+											</div>
+											<EditorButton
+												variant="danger"
+												onClick={() =>
+													projectActions.deleteKeyboardSegments(
+														value().segments.map((s) => s.index),
+													)
+												}
+												leftIcon={<IconCapTrash />}
+											>
+												Delete
+											</EditorButton>
+										</div>
+										<For each={value().segments}>
+											{(item) => (
+												<div class="p-4 rounded-lg border border-gray-200">
+													<KeyboardSegmentConfig
+														segment={item.segment}
+														segmentIndex={item.index}
+													/>
+												</div>
+											)}
+										</For>
+									</div>
+								)}
+							</Show>
 							<Show
 								when={(() => {
 									const textSelection = selection();
@@ -971,6 +1288,78 @@ export function ConfigSidebar() {
 											{(item) => (
 												<div class="p-4 rounded-lg border border-gray-200">
 													<TextSegmentConfig
+														segment={item.segment}
+														segmentIndex={item.index}
+														brandColorSwatches={brandColorSwatches()}
+													/>
+												</div>
+											)}
+										</For>
+									</div>
+								)}
+							</Show>
+							<Show
+								when={(() => {
+									const audioSelection = selection();
+									if (audioSelection.type !== "audio") return;
+
+									const segments = audioSelection.indices
+										.map((index) => ({
+											index,
+											segment: project.timeline?.audioSegments?.[index],
+										}))
+										.filter(
+											(
+												item,
+											): item is {
+												index: number;
+												segment: AudioTrackSegment;
+											} => item.segment !== undefined,
+										);
+
+									if (segments.length === 0) {
+										setEditorState("timeline", "selection", null);
+										return;
+									}
+									return { selection: audioSelection, segments };
+								})()}
+							>
+								{(value) => (
+									<div class="space-y-4">
+										<div class="flex flex-row justify-between items-center">
+											<div class="flex gap-2 items-center">
+												<EditorButton
+													onClick={() =>
+														setEditorState("timeline", "selection", null)
+													}
+													leftIcon={<IconLucideCheck />}
+												>
+													Done
+												</EditorButton>
+												<span class="text-sm text-gray-10">
+													{value().segments.length} audio{" "}
+													{value().segments.length === 1
+														? "segment"
+														: "segments"}{" "}
+													selected
+												</span>
+											</div>
+											<EditorButton
+												variant="danger"
+												onClick={() =>
+													projectActions.deleteAudioSegments(
+														value().segments.map((s) => s.index),
+													)
+												}
+												leftIcon={<IconCapTrash />}
+											>
+												Delete
+											</EditorButton>
+										</div>
+										<For each={value().segments}>
+											{(item) => (
+												<div class="p-4 rounded-lg border border-gray-200">
+													<AudioSegmentConfig
 														segment={item.segment}
 														segmentIndex={item.index}
 													/>
@@ -1138,59 +1527,66 @@ export function ConfigSidebar() {
 											segment: project.timeline?.sceneSegments?.[idx],
 											index: idx,
 										}))
-										.filter((s) => s.segment !== undefined);
+										.filter(
+											(s): s is { segment: SceneSegment; index: number } =>
+												s.segment !== undefined,
+										);
 
 									if (segments.length === 0) return;
 									return { selection: sceneSelection, segments };
 								})()}
 							>
 								{(value) => (
-									<Show
-										when={value().segments.length > 1}
-										fallback={
-											<SceneSegmentConfig
-												segment={value().segments[0].segment!}
-												segmentIndex={value().segments[0].index}
-											/>
-										}
-									>
-										<div class="space-y-4">
-											<div class="flex flex-row justify-between items-center">
-												<div class="flex gap-2 items-center">
-													<EditorButton
-														onClick={() =>
-															setEditorState("timeline", "selection", null)
-														}
-														leftIcon={<IconLucideCheck />}
-													>
-														Done
-													</EditorButton>
-													<span class="text-sm text-gray-10">
-														{value().segments.length} scene{" "}
-														{value().segments.length === 1
-															? "segment"
-															: "segments"}{" "}
-														selected
-													</span>
-												</div>
-												<EditorButton
-													variant="danger"
-													onClick={() => {
-														const indices = value().selection.indices;
+									<Show when={value().segments[0]}>
+										{(firstSegment) => (
+											<Show
+												when={value().segments.length > 1}
+												fallback={
+													<SceneSegmentConfig
+														segment={firstSegment().segment}
+														segmentIndex={firstSegment().index}
+													/>
+												}
+											>
+												<div class="space-y-4">
+													<div class="flex flex-row justify-between items-center">
+														<div class="flex gap-2 items-center">
+															<EditorButton
+																onClick={() =>
+																	setEditorState("timeline", "selection", null)
+																}
+																leftIcon={<IconLucideCheck />}
+															>
+																Done
+															</EditorButton>
+															<span class="text-sm text-gray-10">
+																{value().segments.length} scene{" "}
+																{value().segments.length === 1
+																	? "segment"
+																	: "segments"}{" "}
+																selected
+															</span>
+														</div>
+														<EditorButton
+															variant="danger"
+															onClick={() => {
+																const indices = value().selection.indices;
 
-														// Delete segments in reverse order to maintain indices
-														[...indices]
-															.sort((a, b) => b - a)
-															.forEach((idx) => {
-																projectActions.deleteSceneSegment(idx);
-															});
-													}}
-													leftIcon={<IconCapTrash />}
-												>
-													Delete
-												</EditorButton>
-											</div>
-										</div>
+																// Delete segments in reverse order to maintain indices
+																[...indices]
+																	.sort((a, b) => b - a)
+																	.forEach((idx) => {
+																		projectActions.deleteSceneSegment(idx);
+																	});
+															}}
+															leftIcon={<IconCapTrash />}
+														>
+															Delete
+														</EditorButton>
+													</div>
+												</div>
+											</Show>
+										)}
 									</Show>
 								)}
 							</Show>
@@ -1204,59 +1600,66 @@ export function ConfigSidebar() {
 											segment: project.timeline?.segments?.[idx],
 											index: idx,
 										}))
-										.filter((s) => s.segment !== undefined);
+										.filter(
+											(s): s is { segment: TimelineSegment; index: number } =>
+												s.segment !== undefined,
+										);
 
 									if (segments.length === 0) return;
 									return { selection: clipSelection, segments };
 								})()}
 							>
 								{(value) => (
-									<Show
-										when={value().segments.length > 1}
-										fallback={
-											<ClipSegmentConfig
-												segment={value().segments[0].segment!}
-												segmentIndex={value().segments[0].index}
-											/>
-										}
-									>
-										<div class="space-y-4">
-											<div class="flex flex-row justify-between items-center">
-												<div class="flex gap-2 items-center">
-													<EditorButton
-														onClick={() =>
-															setEditorState("timeline", "selection", null)
-														}
-														leftIcon={<IconLucideCheck />}
-													>
-														Done
-													</EditorButton>
-													<span class="text-sm text-gray-10">
-														{value().segments.length} clip{" "}
-														{value().segments.length === 1
-															? "segment"
-															: "segments"}{" "}
-														selected
-													</span>
-												</div>
-												<EditorButton
-													variant="danger"
-													onClick={() => {
-														const indices = value().selection.indices;
+									<Show when={value().segments[0]}>
+										{(firstSegment) => (
+											<Show
+												when={value().segments.length > 1}
+												fallback={
+													<ClipSegmentConfig
+														segment={firstSegment().segment}
+														segmentIndex={firstSegment().index}
+													/>
+												}
+											>
+												<div class="space-y-4">
+													<div class="flex flex-row justify-between items-center">
+														<div class="flex gap-2 items-center">
+															<EditorButton
+																onClick={() =>
+																	setEditorState("timeline", "selection", null)
+																}
+																leftIcon={<IconLucideCheck />}
+															>
+																Done
+															</EditorButton>
+															<span class="text-sm text-gray-10">
+																{value().segments.length} clip{" "}
+																{value().segments.length === 1
+																	? "segment"
+																	: "segments"}{" "}
+																selected
+															</span>
+														</div>
+														<EditorButton
+															variant="danger"
+															onClick={() => {
+																const indices = value().selection.indices;
 
-														// Delete segments in reverse order to maintain indices
-														[...indices]
-															.sort((a, b) => b - a)
-															.forEach((idx) => {
-																projectActions.deleteClipSegment(idx);
-															});
-													}}
-													leftIcon={<IconCapTrash />}
-												>
-													Delete
-												</EditorButton>
-											</div>
-										</div>
+																// Delete segments in reverse order to maintain indices
+																[...indices]
+																	.sort((a, b) => b - a)
+																	.forEach((idx) => {
+																		projectActions.deleteClipSegment(idx);
+																	});
+															}}
+															leftIcon={<IconCapTrash />}
+														>
+															Delete
+														</EditorButton>
+													</div>
+												</div>
+											</Show>
+										)}
 									</Show>
 								)}
 							</Show>
@@ -1268,12 +1671,48 @@ export function ConfigSidebar() {
 	);
 }
 
-function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
-	const { project, setProject, projectHistory } = useEditorContext();
+function BackgroundConfig(props: {
+	scrollRef: HTMLDivElement;
+	brandColorSwatches: OrganizationBrandColorSwatch[];
+}) {
+	const { project, setProject, editorInstance, projectHistory } =
+		useEditorContext();
+	const isNoneBackground = () =>
+		project.background.padding === 0 && project.background.rounding === 0;
+	const initialCurrentDesktopBackgroundPath = () => {
+		const source = project.background.source;
+		if (source.type !== "wallpaper" || !source.path) return null;
+		return isCurrentDesktopBackgroundPath(source.path) ? source.path : null;
+	};
+	const [currentDesktopBackgroundPath, setCurrentDesktopBackgroundPath] =
+		createSignal<string | null>(initialCurrentDesktopBackgroundPath());
 
-	// Background tabs
 	const [backgroundTab, setBackgroundTab] =
 		createSignal<keyof typeof BACKGROUND_THEMES>("macOS");
+	const projectBackgroundSourceTab = createMemo<BackgroundSourceTab>(() => {
+		const source = project.background.source;
+		if (
+			source.type === "wallpaper" &&
+			isCurrentDesktopBackgroundPath(source.path)
+		) {
+			return "desktop";
+		}
+
+		return source.type;
+	});
+	const [backgroundSourceTab, setBackgroundSourceTab] =
+		createSignal<BackgroundSourceTab>(
+			isNoneBackground() ? "none" : projectBackgroundSourceTab(),
+		);
+
+	// "None" is a sticky selection: nudging the padding/rounding sliders must not
+	// swap the panel back to the underlying source tab (that reflow moves the very
+	// slider being dragged), so only re-sync when the user isn't sitting on "None".
+	createEffect(
+		on(projectBackgroundSourceTab, (tab) => {
+			if (backgroundSourceTab() !== "none") setBackgroundSourceTab(tab);
+		}),
+	);
 
 	const [wallpapers] = createResource(async () => {
 		// Only load visible wallpapers initially
@@ -1289,23 +1728,103 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 		// Load initial batch
 		const initialPaths = await Promise.all(visibleWallpaperPaths);
 
-		return initialPaths
-			.filter((p) => p.path !== null)
-			.map(({ id, path }) => ({
+		return initialPaths.flatMap(({ id, path }) => {
+			if (path === null) return [];
+			return {
 				id,
-				url: convertFileSrc(path!),
-				rawPath: path!,
-			}));
+				url: convertFileSrc(path),
+				rawPath: path,
+			} satisfies WallpaperOption;
+		});
 	});
 
-	// set padding if background is selected
-	const ensurePaddingForBackground = () => {
-		if (project.background.padding === 0)
-			setProject("background", "padding", 10);
+	const currentDesktopBackground = createMemo<WallpaperOption | null>(() => {
+		const path = currentDesktopBackgroundPath();
+		if (!path) return null;
+
+		return {
+			id: CURRENT_DESKTOP_BACKGROUND_ID,
+			url: convertFileSrc(path),
+			rawPath: path,
+			label: getCurrentDesktopBackgroundLabel(),
+		};
+	});
+
+	const findStoredCurrentDesktopBackgroundPath = async () => {
+		if (currentDesktopBackgroundPath()) return currentDesktopBackgroundPath();
+
+		const assetsDir = `${editorInstance.path}/assets`;
+
+		try {
+			const importedPrefix = `${CURRENT_DESKTOP_BACKGROUND_BASENAME}-`;
+			let newest: { path: string; timestamp: number } | null = null;
+			for (const entry of await readDir(assetsDir)) {
+				if (!entry.isFile || entry.name.includes(".pending.")) continue;
+				if (!entry.name.startsWith(importedPrefix)) continue;
+				const timestamp = Number(entry.name.match(/-(\d+)\./)?.[1] ?? 0);
+				if (!newest || timestamp > newest.timestamp) {
+					newest = { path: `${assetsDir}/${entry.name}`, timestamp };
+				}
+			}
+			if (newest) return newest.path;
+		} catch {}
+
+		for (const extension of BACKGROUND_IMAGE_EXTENSIONS) {
+			const path = `${assetsDir}/${CURRENT_DESKTOP_BACKGROUND_BASENAME}.${extension}`;
+			if (await exists(path)) return path;
+		}
+
+		return null;
 	};
 
-	// Validate background source path on mount
+	const wallpaperOptions = createMemo(() => wallpapers() ?? []);
+
+	const selectedWallpaper = createMemo(() => {
+		if (project.background.source.type !== "wallpaper") return null;
+
+		const path = project.background.source.path;
+		if (!path) return null;
+		if (isCurrentDesktopBackgroundPath(path)) return null;
+
+		return wallpapers()?.find((w) => path.includes(w.id)) ?? null;
+	});
+
+	// Leaving "None" seeds default padding AND rounding; real→real switches only
+	// ensure padding so an intentionally-square background keeps rounding 0. Keyed
+	// off `fromNone` because rounding is already 0 once the slider has left None.
+	const ensureBackgroundPresentation = (fromNone = false) => {
+		batch(() => {
+			if (project.background.padding === 0)
+				setProject("background", "padding", DEFAULT_BACKGROUND_PADDING);
+			if (fromNone && project.background.rounding === 0)
+				setProject("background", "rounding", DEFAULT_BACKGROUND_ROUNDING);
+		});
+	};
+
+	const setBackgroundDimension = (
+		key: "padding" | "rounding",
+		value: number,
+	) => {
+		batch(() => {
+			// Revealing padding/rounding out of "None" shows a clean white canvas
+			// rather than resurrecting the hidden source. The tab stays on "None".
+			if (value > 0 && backgroundSourceTab() === "none" && isNoneBackground())
+				setProject("background", "source", {
+					type: "color",
+					value: [255, 255, 255],
+					alpha: 255,
+				});
+			setProject("background", key, value);
+		});
+	};
+
 	onMount(async () => {
+		const storedCurrentDesktopBackgroundPath =
+			await findStoredCurrentDesktopBackgroundPath();
+		if (storedCurrentDesktopBackgroundPath) {
+			setCurrentDesktopBackgroundPath(storedCurrentDesktopBackgroundPath);
+		}
+
 		if (
 			project.background.source.type === "wallpaper" ||
 			project.background.source.type === "image"
@@ -1314,25 +1833,20 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 
 			if (path) {
 				if (project.background.source.type === "wallpaper") {
-					// If the path is just the wallpaper ID (e.g. "sequoia-dark"), get the full path
 					if (
 						WALLPAPER_NAMES.includes(path as (typeof WALLPAPER_NAMES)[number])
 					) {
-						// Wait for wallpapers to load
 						const loadedWallpapers = wallpapers();
 						if (!loadedWallpapers) return;
 
-						// Find the wallpaper with matching ID
 						const wallpaper = loadedWallpapers.find((w) => w.id === path);
 						if (!wallpaper?.url) return;
 
-						// Directly trigger the radio group's onChange handler
 						const radioGroupOnChange = async (photoUrl: string) => {
 							try {
 								const wallpaper = wallpapers()?.find((w) => w.url === photoUrl);
 								if (!wallpaper) return;
 
-								// Get the raw path without any URL prefixes
 								const rawPath = decodeURIComponent(
 									photoUrl.replace("file://", ""),
 								);
@@ -1410,6 +1924,115 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 		});
 	};
 
+	const getValidBackgroundImageExtension = (file: File) => {
+		const extension = file.name.split(".").pop()?.toLowerCase();
+		return (
+			BACKGROUND_IMAGE_EXTENSIONS.find((value) => value === extension) ?? null
+		);
+	};
+
+	const [importingDesktopBackground, setImportingDesktopBackground] =
+		createSignal(false);
+
+	const importDesktopBackground = async () => {
+		if (importingDesktopBackground()) return;
+		setImportingDesktopBackground(true);
+		try {
+			const path = await commands.importCurrentDesktopBackground(
+				editorInstance.path,
+			);
+			const addingFromBlankBackground = isNoneBackground();
+			batch(() => {
+				setCurrentDesktopBackgroundPath(path);
+				setBackgroundSourceTab("desktop");
+				setWallpaperSource(path);
+				ensureBackgroundPresentation(addingFromBlankBackground);
+			});
+		} catch (_err) {
+			toast.error("Couldn't import your desktop wallpaper");
+		} finally {
+			setImportingDesktopBackground(false);
+		}
+	};
+
+	const renderBackgroundSourceIcon = (item: BackgroundSourceTab) => {
+		if (item === "none") {
+			return <IconLucideImageOff class="size-3.5" />;
+		}
+
+		if (item === "gradient") {
+			const source = project.background.source;
+			const angle = source.type === "gradient" ? source.angle : 90;
+			const fromColor =
+				source.type === "gradient" ? source.from : DEFAULT_GRADIENT_FROM;
+			const toColor =
+				source.type === "gradient" ? source.to : DEFAULT_GRADIENT_TO;
+			return (
+				<div
+					class="size-3.5 rounded-sm"
+					style={{
+						background: `linear-gradient(${angle}deg, rgb(${fromColor}), rgb(${toColor}))`,
+					}}
+				/>
+			);
+		}
+
+		if (item === "color") {
+			const source = project.background.source;
+			const backgroundColor =
+				source.type === "color" ? source.value : hexToRgb(BACKGROUND_COLORS[9]);
+			return (
+				<div
+					class="size-3.5 rounded-[5px]"
+					style={{ "background-color": `rgb(${backgroundColor})` }}
+				/>
+			);
+		}
+
+		let imageSrc: string =
+			item === "desktop" ? imageBg : BACKGROUND_ICONS[item];
+		const source = project.background.source;
+		if (item === "image" && source.type === "image" && source.path) {
+			const convertedPath = convertFileSrc(source.path);
+			if (convertedPath) imageSrc = convertedPath;
+		} else if (item === "desktop") {
+			const desktopBackground = currentDesktopBackground();
+			if (desktopBackground) imageSrc = desktopBackground.url;
+		} else if (
+			item === "wallpaper" &&
+			source.type === "wallpaper" &&
+			source.path
+		) {
+			const selected = selectedWallpaper();
+			if (selected?.url) imageSrc = selected.url;
+		}
+
+		return (
+			<img
+				loading="eager"
+				alt={BACKGROUND_SOURCES[item]}
+				class="size-3.5 rounded-sm"
+				src={imageSrc}
+			/>
+		);
+	};
+
+	const BackgroundSourceTrigger = (props: {
+		item: BackgroundSourceTab;
+		class?: string;
+	}) => (
+		<KTabs.Trigger
+			value={props.item}
+			class={cx(
+				"z-10 flex justify-center items-center gap-1.5 py-2.5 px-2 text-xs whitespace-nowrap text-gray-11 rounded-[10px] border transition-colors duration-200 outline-hidden data-selected:border-gray-3 data-selected:bg-gray-3 data-selected:text-gray-12 not-data-selected:hover:border-gray-7 peer",
+				props.class,
+			)}
+		>
+			{renderBackgroundSourceIcon(props.item)}
+			{BACKGROUND_SOURCES[props.item]}
+		</KTabs.Trigger>
+	);
+
 	const backgrounds: {
 		[K in BackgroundSource["type"]]: Extract<BackgroundSource, { type: K }>;
 	} = {
@@ -1432,7 +2055,35 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 		},
 	};
 
-	const hapticsEnabled = ostype() === "macos";
+	const setColorBackgroundSource = (color: string) => {
+		const rgbValue = hexToRgb(color);
+		if (!rgbValue) return;
+
+		const [r, g, b, a] = rgbValue;
+		backgrounds.color = {
+			type: "color",
+			value: [r, g, b],
+			alpha: a,
+		};
+
+		setProject("background", "source", backgrounds.color);
+	};
+
+	const setBackgroundBorderColor = (color: string) => {
+		const rgbValue = hexToRgb(color);
+		if (!rgbValue) return;
+		const [r, g, b] = rgbValue;
+
+		setProject("background", "border", {
+			...(project.background.border ?? {
+				enabled: true,
+				width: 5.0,
+				color: [0, 0, 0],
+				opacity: 50.0,
+			}),
+			color: [r, g, b],
+		});
+	};
 
 	return (
 		<KTabs.Content value={TAB_IDS.background} class="flex flex-col gap-6 p-4">
@@ -1441,10 +2092,27 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 				name={t("editor.sidebar.background")}
 			>
 				<KTabs
-					value={project.background.source.type}
+					value={backgroundSourceTab()}
 					onChange={(v) => {
-						const tab = v as BackgroundSource["type"];
-						ensurePaddingForBackground();
+						const tab = v as BackgroundSourceTab;
+						const fromNone = backgroundSourceTab() === "none";
+						setBackgroundSourceTab(tab);
+						if (tab === "none") {
+							batch(() => {
+								setProject("background", "padding", 0);
+								setProject("background", "rounding", 0);
+							});
+							return;
+						}
+						if (tab === "desktop") {
+							const desktopBackground = currentDesktopBackground();
+							if (desktopBackground) {
+								ensureBackgroundPresentation(fromNone);
+								setWallpaperSource(desktopBackground.rawPath);
+							}
+							return;
+						}
+						ensureBackgroundPresentation(fromNone);
 						switch (tab) {
 							case "image": {
 								setProject("background", "source", {
@@ -1485,137 +2153,102 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 								break;
 							}
 							case "wallpaper": {
+								const path =
+									project.background.source.type === "wallpaper" &&
+									!isCurrentDesktopBackgroundPath(
+										project.background.source.path,
+									)
+										? project.background.source.path
+										: null;
 								setProject("background", "source", {
 									type: "wallpaper",
-									path:
-										project.background.source.type === "wallpaper"
-											? project.background.source.path
-											: null,
+									path,
 								});
 								break;
 							}
 						}
 					}}
 				>
-					<KTabs.List class="flex flex-row gap-2 items-center rounded-[0.5rem] relative">
-						<For each={BACKGROUND_SOURCES_LIST}>
-							{(item) => {
-								const el = (props?: object) => (
-									<KTabs.Trigger
-										class="z-10 flex-1 py-2.5 px-2 text-xs text-gray-11  ui-selected:border-gray-3 ui-selected:bg-gray-3 ui-not-selected:hover:border-gray-7 rounded-[10px] transition-colors duration-200 outline-none border ui-selected:text-gray-12 peer"
-										value={item}
-										{...props}
-									>
-										<div class="flex gap-1.5 justify-center items-center">
-											{(() => {
-												const getGradientBackground = () => {
-													const angle =
-														project.background.source.type === "gradient"
-															? project.background.source.angle
-															: 90;
-													const fromColor =
-														project.background.source.type === "gradient"
-															? project.background.source.from
-															: DEFAULT_GRADIENT_FROM;
-													const toColor =
-														project.background.source.type === "gradient"
-															? project.background.source.to
-															: DEFAULT_GRADIENT_TO;
-
-													return (
-														<div
-															class="size-3.5 rounded"
-															style={{
-																background: `linear-gradient(${angle}deg, rgb(${fromColor}), rgb(${toColor}))`,
-															}}
-														/>
-													);
-												};
-
-												const getColorBackground = () => {
-													const backgroundColor =
-														project.background.source.type === "color"
-															? project.background.source.value
-															: hexToRgb(BACKGROUND_COLORS[9]);
-
-													return (
-														<div
-															class="size-3.5 rounded-[5px]"
-															style={{
-																"background-color": `rgb(${backgroundColor})`,
-															}}
-														/>
-													);
-												};
-
-												const getImageBackground = () => {
-													// Always start with the default icon
-													let imageSrc: string = BACKGROUND_ICONS[item];
-
-													// Only override for "image" if a valid path exists
-													if (
-														item === "image" &&
-														project.background.source.type === "image" &&
-														project.background.source.path
-													) {
-														const convertedPath = convertFileSrc(
-															project.background.source.path,
-														);
-														// Only use converted path if it's valid
-														if (convertedPath) {
-															imageSrc = convertedPath;
-														}
-													}
-													// Only override for "wallpaper" if a valid wallpaper is found
-													else if (
-														item === "wallpaper" &&
-														project.background.source.type === "wallpaper" &&
-														project.background.source.path
-													) {
-														const selectedWallpaper = wallpapers()?.find((w) =>
-															(
-																project.background.source as { path?: string }
-															).path?.includes(w.id),
-														);
-														// Only use wallpaper URL if it exists
-														if (selectedWallpaper?.url) {
-															imageSrc = selectedWallpaper.url;
-														}
-													}
-
-													return (
-														<img
-															loading="eager"
-															alt={BACKGROUND_SOURCES[item]}
-															class="size-3.5 rounded"
-															src={imageSrc}
-														/>
-													);
-												};
-
-												switch (item) {
-													case "gradient":
-														return getGradientBackground();
-													case "color":
-														return getColorBackground();
-													case "image":
-													case "wallpaper":
-														return getImageBackground();
-													default:
-														return null;
-												}
-											})()}
-											{BACKGROUND_SOURCES[item]}
-										</div>
-									</KTabs.Trigger>
-								);
-
-								return el({});
-							}}
-						</For>
+					<KTabs.List class="flex relative flex-col gap-2">
+						<div class="flex flex-row gap-2 items-center">
+							<For each={BACKGROUND_SOURCES_ROW_ONE}>
+								{(item) => (
+									<BackgroundSourceTrigger item={item} class="flex-1" />
+								)}
+							</For>
+						</div>
+						<div class="flex flex-row gap-2 items-center">
+							<For each={BACKGROUND_SOURCES_ROW_TWO}>
+								{(item) => (
+									<BackgroundSourceTrigger item={item} class="flex-1" />
+								)}
+							</For>
+						</div>
 					</KTabs.List>
 					{/** Dashed divider */}
 					<div class="my-5 w-full border-t border-dashed border-gray-5" />
+					<KTabs.Content value="desktop">
+						<Show
+							when={currentDesktopBackground()}
+							fallback={
+								<div class="flex flex-col gap-3 items-center justify-center p-6 w-full rounded-lg border border-dashed bg-gray-2 border-gray-5">
+									<IconLucideMonitor class="size-6 text-gray-11" />
+									<span class="text-[13px] text-center text-gray-12">
+										Use the wallpaper from your desktop
+									</span>
+									<EditorButton
+										onClick={importDesktopBackground}
+										disabled={importingDesktopBackground()}
+										leftIcon={<IconLucideMonitor />}
+									>
+										{importingDesktopBackground()
+											? "Importing..."
+											: "Import desktop background"}
+									</EditorButton>
+								</div>
+							}
+						>
+							{(photo) => (
+								<div class="flex flex-col gap-3">
+									<button
+										type="button"
+										onClick={() => {
+											setWallpaperSource(photo().rawPath);
+											ensureBackgroundPresentation();
+										}}
+										class={cx(
+											"overflow-hidden relative w-full h-48 rounded-lg border transition cursor-pointer group",
+											project.background.source.type === "wallpaper" &&
+												project.background.source.path === photo().rawPath
+												? "border-blue-9 ring-2 ring-blue-9"
+												: "border-gray-5 hover:border-gray-7",
+										)}
+									>
+										<img
+											src={photo().url}
+											loading="eager"
+											class="object-cover w-full h-full"
+											alt={photo().label ?? getCurrentDesktopBackgroundLabel()}
+										/>
+										<span class="flex absolute right-2 bottom-2 justify-center items-center w-7 h-7 rounded-full text-white/95 bg-black/55 backdrop-blur-sm">
+											<IconLucideMonitor class="size-4" />
+										</span>
+									</button>
+									<div class="flex justify-end">
+										<EditorButton
+											onClick={importDesktopBackground}
+											disabled={importingDesktopBackground()}
+											leftIcon={<IconLucideMonitor />}
+										>
+											{importingDesktopBackground()
+												? "Importing..."
+												: "Re-import"}
+										</EditorButton>
+									</div>
+								</div>
+							)}
+						</Show>
+					</KTabs.Content>
 					<KTabs.Content value="wallpaper">
 						{/** Background Tabs */}
 						<KTabs class="overflow-hidden relative" value={backgroundTab()}>
@@ -1646,7 +2279,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 													)
 												}
 												value={key}
-												class="flex relative z-10 flex-1 justify-center items-center px-4 py-2 bg-transparent rounded-lg border transition-colors duration-200 text-gray-11 ui-not-selected:hover:border-gray-7 ui-selected:bg-gray-3 ui-selected:border-gray-3 group ui-selected:text-gray-12 disabled:opacity-50 focus:outline-none"
+												class="flex relative z-10 flex-1 justify-center items-center px-4 py-2 bg-transparent rounded-lg border transition-colors duration-200 text-gray-11 not-data-selected:hover:border-gray-7 data-selected:bg-gray-3 data-selected:border-gray-3 group data-selected:text-gray-12 disabled:opacity-50 focus:outline-hidden"
 											>
 												{value}
 											</KTabs.Trigger>
@@ -1659,16 +2292,12 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 						<KRadioGroup
 							value={
 								project.background.source.type === "wallpaper"
-									? (wallpapers()?.find((w) =>
-											(
-												project.background.source as { path?: string }
-											).path?.includes(w.id),
-										)?.url ?? undefined)
+									? (selectedWallpaper()?.url ?? undefined)
 									: undefined
 							}
 							onChange={(photoUrl) => {
 								try {
-									const wallpaper = wallpapers()?.find(
+									const wallpaper = wallpaperOptions().find(
 										(w) => w.url === photoUrl,
 									);
 									if (!wallpaper) return;
@@ -1677,7 +2306,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 
 									setWallpaperSource(wallpaper.rawPath);
 
-									ensurePaddingForBackground();
+									ensureBackgroundPresentation();
 								} catch (_err) {
 									toast.error(t("editor.sidebar.messages.wallpaperFailed"));
 								}
@@ -1698,13 +2327,13 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 								<For each={filteredWallpapers().slice(0, 21)}>
 									{(photo) => (
 										<KRadioGroup.Item
-											value={photo.url!}
+											value={photo.url}
 											class="relative aspect-square group"
 										>
 											<KRadioGroup.ItemInput class="peer" />
-											<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg transition cursor-pointer ui-not-checked:ring-offset-1 ui-not-checked:ring-offset-gray-200 ui-not-checked:hover:ring-1 ui-not-checked:hover:ring-gray-400 ui-checked:ring-2 ui-checked:ring-gray-500 ui-checked:ring-offset-2 ui-checked:ring-offset-gray-200">
+											<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg transition cursor-pointer not-data-checked:ring-offset-1 not-data-checked:ring-offset-gray-200 not-data-checked:hover:ring-1 not-data-checked:hover:ring-gray-400 data-checked:ring-2 data-checked:ring-gray-500 data-checked:ring-offset-2 data-checked:ring-offset-gray-200">
 												<img
-													src={photo.url!}
+													src={photo.url}
 													loading="eager"
 													class="object-cover w-full h-full"
 													alt="Wallpaper option"
@@ -1719,16 +2348,14 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 											<For each={filteredWallpapers()}>
 												{(photo) => (
 													<KRadioGroup.Item
-														value={photo.url!}
+														value={photo.url}
 														class="relative aspect-square group"
 													>
 														<KRadioGroup.ItemInput class="peer" />
-														<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg border cursor-pointer border-gray-5 ui-checked:border-blue-9 ui-checked:ring-2 ui-checked:ring-blue-9 peer-focus-visible:border-2 peer-focus-visible:border-blue-9">
+														<KRadioGroup.ItemControl class="overflow-hidden w-full h-full rounded-lg border cursor-pointer border-gray-5 data-checked:border-blue-9 data-checked:ring-2 data-checked:ring-blue-9 peer-focus-visible:border-2 peer-focus-visible:border-blue-9">
 															<img
-																src={photo.url!}
-																alt={t(
-																	"editor.sidebar.backgroundSources.wallpaper",
-																)}
+																src={photo.url}
+																alt="Wallpaper option"
 																class="object-cover w-full h-full"
 																loading="lazy"
 															/>
@@ -1752,7 +2379,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 								<button
 									type="button"
 									onClick={() => fileInput.click()}
-									class="p-6 bg-gray-2 text-[13px] w-full rounded-[0.5rem] border border-gray-5 border-dashed flex flex-col items-center justify-center gap-[0.5rem] hover:bg-gray-3 transition-colors duration-100"
+									class="p-6 bg-gray-2 text-[13px] w-full rounded-lg border border-gray-5 border-dashed flex flex-col items-center justify-center gap-2 hover:bg-gray-3 transition-colors duration-100"
 								>
 									<IconCapImage class="text-gray-11 size-6" />
 									<span class="text-gray-12">
@@ -1789,26 +2416,14 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 							type="file"
 							ref={fileInput}
 							class="hidden"
-							accept="image/apng, image/avif, image/jpeg, image/png, image/webp"
+							accept={BACKGROUND_IMAGE_ACCEPT}
 							onChange={async (e) => {
 								const file = e.currentTarget.files?.[0];
 								if (!file) return;
 
-								/*
-					this is a Tauri bug in WebKit so we need to validate the file type manually
-					https://github.com/tauri-apps/tauri/issues/9158
-					*/
-								const validExtensions = [
-									"jpg",
-									"jpeg",
-									"png",
-									"gif",
-									"webp",
-									"bmp",
-								];
-								const extension = file.name.split(".").pop()?.toLowerCase();
-								if (!extension || !validExtensions.includes(extension)) {
-									toast.error(t("editor.sidebar.messages.invalidImage"));
+								const extension = getValidBackgroundImageExtension(file);
+								if (!extension) {
+									toast.error("Invalid image file type");
 									return;
 								}
 
@@ -1841,7 +2456,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 							}
 						>
 							<div class="flex flex-col flex-wrap gap-3">
-								<div class="flex flex-row items-center w-full h-10">
+								<div class="flex flex-col gap-2">
 									<RgbInput
 										value={
 											project.background.source.type === "color"
@@ -1854,6 +2469,10 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 												value,
 											});
 										}}
+									/>
+									<BrandColorsDropdown
+										swatches={props.brandColorSwatches}
+										onSelect={setColorBackgroundSource}
 									/>
 								</div>
 
@@ -1886,7 +2505,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 													}}
 												/>
 												<div
-													class="rounded-lg transition-all duration-200 cursor-pointer size-8 peer-checked:hover:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
+													class="rounded-lg transition-all duration-200 cursor-pointer size-8 hover:peer-checked:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
 													style={{
 														background:
 															color === "#00000000"
@@ -1914,128 +2533,8 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 							</div>
 						</Show>
 					</KTabs.Content>
-					<KTabs.Content value="gradient" class="flex flex-row justify-between">
-						<Show
-							when={
-								project.background.source.type === "gradient" &&
-								project.background.source
-							}
-						>
-							{(source) => {
-								const max = 360;
-
-								const { projectHistory } = useEditorContext();
-
-								const angle = () => source().angle ?? 90;
-
-								return (
-									<div class="flex flex-col gap-3">
-										<div class="flex gap-5 h-10">
-											<RgbInput
-												value={source().from}
-												onChange={(from) => {
-													backgrounds.gradient.from = from;
-													setProject("background", "source", {
-														type: "gradient",
-														from,
-													});
-												}}
-											/>
-											<RgbInput
-												value={source().to}
-												onChange={(to) => {
-													backgrounds.gradient.to = to;
-													setProject("background", "source", {
-														type: "gradient",
-														to,
-													});
-												}}
-											/>
-											<div
-												class="flex relative flex-col items-center p-1 ml-auto rounded-full border bg-gray-1 border-gray-3 size-10 cursor-ns-resize shrink-0"
-												style={{ transform: `rotate(${angle()}deg)` }}
-												onMouseDown={(downEvent) => {
-													const start = angle();
-													const _resumeHistory = projectHistory.pause();
-
-													createRoot((dispose) =>
-														createEventListenerMap(window, {
-															mouseup: () => dispose(),
-															mousemove: (moveEvent) => {
-																const rawNewAngle =
-																	Math.round(
-																		start +
-																			(downEvent.clientY - moveEvent.clientY),
-																	) % max;
-																const newAngle = moveEvent.shiftKey
-																	? rawNewAngle
-																	: Math.round(rawNewAngle / 45) * 45;
-
-																if (
-																	!moveEvent.shiftKey &&
-																	hapticsEnabled &&
-																	project.background.source.type ===
-																		"gradient" &&
-																	project.background.source.angle !== newAngle
-																) {
-																	commands.performHapticFeedback(
-																		"alignment",
-																		"now",
-																	);
-																}
-
-																setProject("background", "source", {
-																	type: "gradient",
-																	angle:
-																		newAngle < 0 ? newAngle + max : newAngle,
-																});
-															},
-														}),
-													);
-												}}
-											>
-												<div class="bg-blue-9 rounded-full size-1.5" />
-											</div>
-										</div>
-										<div class="flex flex-wrap gap-2">
-											<For each={BACKGROUND_GRADIENTS}>
-												{(gradient) => (
-													<label class="relative">
-														<input
-															type="radio"
-															class="sr-only peer"
-															name="colorPicker"
-															onChange={(e) => {
-																if (e.target.checked) {
-																	backgrounds.gradient = {
-																		type: "gradient",
-																		from: gradient.from,
-																		to: gradient.to,
-																	};
-																	setProject(
-																		"background",
-																		"source",
-																		backgrounds.gradient,
-																	);
-																}
-															}}
-														/>
-														<div
-															class="rounded-lg transition-all duration-200 cursor-pointer size-8 peer-checked:hover:opacity-100 peer-hover:opacity-70 peer-checked:ring-2 peer-checked:ring-gray-500 peer-checked:ring-offset-2 peer-checked:ring-offset-gray-200"
-															style={{
-																background: `linear-gradient(${angle()}deg, rgb(${gradient.from.join(
-																	",",
-																)}), rgb(${gradient.to.join(",")}))`,
-															}}
-														/>
-													</label>
-												)}
-											</For>
-										</div>
-									</div>
-								);
-							}}
-						</Show>
+					<KTabs.Content value="gradient">
+						<GradientEditor brandColorSwatches={props.brandColorSwatches} />
 					</KTabs.Content>
 				</KTabs>
 			</Field>
@@ -2058,7 +2557,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 			>
 				<Slider
 					value={[project.background.padding]}
-					onChange={(v) => setProject("background", "padding", v[0])}
+					onChange={(v) => setBackgroundDimension("padding", v[0])}
 					minValue={0}
 					maxValue={40}
 					step={0.1}
@@ -2072,7 +2571,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 				<div class="flex flex-col gap-3">
 					<Slider
 						value={[project.background.rounding]}
-						onChange={(v) => setProject("background", "rounding", v[0])}
+						onChange={(v) => setBackgroundDimension("rounding", v[0])}
 						minValue={0}
 						maxValue={100}
 						step={0.1}
@@ -2092,8 +2591,18 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 				icon={<IconLucideWind class="size-4" />}
 			>
 				<Slider
-					value={[project.cursor.motionBlur ?? DEFAULT_CURSOR_MOTION_BLUR]}
-					onChange={(v) => setProject("cursor", "motionBlur" as any, v[0])}
+					value={[
+						project.screenMotionBlur ??
+							project.cursor.motionBlur ??
+							DEFAULT_MOTION_BLUR,
+					]}
+					onChange={(v) => {
+						const value = v[0] ?? 0;
+						batch(() => {
+							setProject("cursor", "motionBlur", value);
+							setProject("screenMotionBlur", value);
+						});
+					}}
 					minValue={0}
 					maxValue={1}
 					step={0.01}
@@ -2134,7 +2643,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 				}
 			/>
 			<KCollapsible open={project.background.border?.enabled ?? false}>
-				<KCollapsible.Content class="overflow-hidden opacity-0 transition-opacity animate-collapsible-up ui-expanded:animate-collapsible-down ui-expanded:opacity-100">
+				<KCollapsible.Content class="overflow-hidden opacity-0 transition-opacity animate-collapsible-up data-expanded:animate-collapsible-down data-expanded:opacity-100">
 					<div class="flex flex-col gap-6 pb-6">
 						<Field
 							name={t("editor.sidebar.borderWidth")}
@@ -2159,24 +2668,27 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 								formatTooltip="px"
 							/>
 						</Field>
-						<Field
-							name={t("editor.sidebar.borderColor")}
-							icon={<IconCapImage class="size-4" />}
-						>
-							<RgbInput
-								value={project.background.border?.color ?? [0, 0, 0]}
-								onChange={(color) =>
-									setProject("background", "border", {
-										...(project.background.border ?? {
-											enabled: true,
-											width: 5.0,
-											color: [0, 0, 0],
-											opacity: 50.0,
-										}),
-										color,
-									})
-								}
-							/>
+						<Field name="Border Color" icon={<IconCapImage class="size-4" />}>
+							<div class="flex flex-col gap-2">
+								<RgbInput
+									value={project.background.border?.color ?? [0, 0, 0]}
+									onChange={(color) =>
+										setProject("background", "border", {
+											...(project.background.border ?? {
+												enabled: true,
+												width: 5.0,
+												color: [0, 0, 0],
+												opacity: 50.0,
+											}),
+											color,
+										})
+									}
+								/>
+								<BrandColorsDropdown
+									swatches={props.brandColorSwatches}
+									onSelect={setBackgroundBorderColor}
+								/>
+							</div>
 						</Field>
 						<Field
 							name={t("editor.sidebar.borderOpacity")}
@@ -2209,7 +2721,7 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 				icon={<IconCapShadow class="size-4" />}
 			>
 				<Slider
-					value={[project.background.shadow!]}
+					value={[project.background.shadow ?? 0]}
 					onChange={(v) => {
 						batch(() => {
 							setProject("background", "shadow", v[0]);
@@ -2289,6 +2801,9 @@ function BackgroundConfig(props: { scrollRef: HTMLDivElement }) {
 
 function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 	const { project, setProject } = useEditorContext();
+	const cameraPositionValue = createMemo(
+		() => `${project.camera.position.x}:${project.camera.position.y}`,
+	);
 
 	return (
 		<KTabs.Content
@@ -2303,12 +2818,22 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 					<div>
 						<Subfield name={t("editor.sidebar.position")} />
 						<KRadioGroup
-							value={`${project.camera.position.x}:${project.camera.position.y}`}
+							value={cameraPositionValue()}
 							onChange={(v) => {
 								const [x, y] = v.split(":");
-								setProject("camera", "position", { x, y } as any);
+								const xPosition = CAMERA_X_POSITIONS.find(
+									(position) => position === x,
+								);
+								const yPosition = CAMERA_Y_POSITIONS.find(
+									(position) => position === y,
+								);
+								if (!xPosition || !yPosition) return;
+								setProject("camera", "position", {
+									x: xPosition,
+									y: yPosition,
+								});
 							}}
-							class="mt-[0.75rem] rounded-[0.5rem] border border-gray-3 bg-gray-2 w-full h-[7.5rem] relative"
+							class="mt-3 rounded-lg border border-gray-3 bg-gray-2 w-full h-30 relative"
 						>
 							<For
 								each={[
@@ -2320,24 +2845,29 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 									{ x: "right", y: "bottom" } as const,
 								]}
 							>
-								{(item) => (
-									<RadioGroup.Item value={`${item.x}:${item.y}`}>
-										<RadioGroup.ItemInput class="peer" />
-										<RadioGroup.ItemControl
-											class={cx(
-												"cursor-pointer size-6 shrink-0 rounded-[0.375rem] bg-gray-5 absolute flex justify-center items-center ui-checked:bg-blue-9 focus-visible:outline peer-focus-visible:outline outline-2 outline-blue-9 outline-offset-2 transition-colors duration-100",
-												item.x === "left"
-													? "left-2"
-													: item.x === "right"
-														? "right-2"
-														: "left-1/2 transform -translate-x-1/2",
-												item.y === "top" ? "top-2" : "bottom-2",
-											)}
-										>
-											<div class="size-[0.5rem] shrink-0 bg-solid-white rounded-full" />
-										</RadioGroup.ItemControl>
-									</RadioGroup.Item>
-								)}
+								{(item) => {
+									const itemValue = `${item.x}:${item.y}`;
+									const selected = () => cameraPositionValue() === itemValue;
+									return (
+										<RadioGroup.Item value={itemValue}>
+											<RadioGroup.ItemInput class="peer" />
+											<RadioGroup.ItemControl
+												class={cx(
+													"cursor-pointer size-6 shrink-0 rounded-md absolute flex justify-center items-center focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-9 focus-visible:outline-offset-2 peer-focus-visible:outline-solid peer-focus-visible:outline-2 peer-focus-visible:outline-blue-9 peer-focus-visible:outline-offset-2 transition-colors duration-100",
+													selected() ? "bg-blue-9" : "bg-gray-5",
+													item.x === "left"
+														? "left-2"
+														: item.x === "right"
+															? "right-2"
+															: "left-1/2 transform -translate-x-1/2",
+													item.y === "top" ? "top-2" : "bottom-2",
+												)}
+											>
+												<div class="size-2 shrink-0 bg-solid-white rounded-full" />
+											</RadioGroup.ItemControl>
+										</RadioGroup.Item>
+									);
+								}}
 							</For>
 						</KRadioGroup>
 					</div>
@@ -2353,7 +2883,75 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 							onChange={(mirror) => setProject("camera", "mirror", mirror)}
 						/>
 					</Subfield>
-					<Subfield name={t("editor.sidebar.cameraShape")}>
+					<Subfield name="Background Blur">
+						<KSelect<{ name: string; value: BackgroundBlurMode }>
+							options={[
+								{ name: "Off", value: "off" },
+								{ name: "Light Blur", value: "light" },
+								{ name: "Heavy Blur", value: "heavy" },
+							]}
+							optionValue="value"
+							optionTextValue="name"
+							value={
+								(
+									[
+										{ name: "Off", value: "off" },
+										{ name: "Light Blur", value: "light" },
+										{ name: "Heavy Blur", value: "heavy" },
+									] as const
+								).find(
+									(v) =>
+										v.value === (project.camera.backgroundBlur?.mode ?? "off"),
+								) ?? { name: "Off", value: "off" }
+							}
+							onChange={(v) => {
+								if (v)
+									setProject("camera", "backgroundBlur", {
+										mode: v.value,
+									});
+							}}
+							disallowEmptySelection
+							itemComponent={(props) => (
+								<MenuItem<typeof KSelect.Item>
+									as={KSelect.Item}
+									item={props.item}
+								>
+									<KSelect.ItemLabel class="flex-1">
+										{props.item.rawValue.name}
+									</KSelect.ItemLabel>
+								</MenuItem>
+							)}
+						>
+							<KSelect.Trigger class="flex flex-row gap-2 items-center px-2 w-full h-8 rounded-lg transition-colors bg-gray-3 disabled:text-gray-11">
+								<KSelect.Value<{
+									name: string;
+									value: string;
+								}> class="flex-1 text-sm text-left truncate text-(--gray-500) font-normal">
+									{(state) => <span>{state.selectedOption().name}</span>}
+								</KSelect.Value>
+								<KSelect.Icon<ValidComponent>
+									as={(iconProps) => (
+										<IconCapChevronDown
+											{...iconProps}
+											class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)"
+										/>
+									)}
+								/>
+							</KSelect.Trigger>
+							<KSelect.Portal>
+								<PopperContent<typeof KSelect.Content>
+									as={KSelect.Content}
+									class={cx(topSlideAnimateClasses, "z-50")}
+								>
+									<MenuItemList<typeof KSelect.Listbox>
+										class="overflow-y-auto max-h-32"
+										as={KSelect.Listbox}
+									/>
+								</PopperContent>
+							</KSelect.Portal>
+						</KSelect>
+					</Subfield>
+					<Subfield name="Shape">
 						<KSelect<{ name: string; value: CameraShape }>
 							options={CAMERA_SHAPES}
 							optionValue="value"
@@ -2380,14 +2978,14 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 								<KSelect.Value<{
 									name: string;
 									value: StereoMode;
-								}> class="flex-1 text-sm text-left truncate text-[--gray-500] font-normal">
+								}> class="flex-1 text-sm text-left truncate text-(--gray-500) font-normal">
 									{(state) => <span>{state.selectedOption().name}</span>}
 								</KSelect.Value>
 								<KSelect.Icon<ValidComponent>
 									as={(props) => (
 										<IconCapChevronDown
 											{...props}
-											class="size-4 shrink-0 transform transition-transform ui-expanded:rotate-180 text-[--gray-500]"
+											class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)"
 										/>
 									)}
 								/>
@@ -2442,13 +3040,25 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 					formatTooltip="%"
 				/>
 			</Field>
-			<Field
-				name={t("editor.sidebar.roundedCorners")}
-				icon={<IconCapCorners class="size-4" />}
-			>
+			<Subfield name="Keep original size during zoom">
+				<Toggle
+					checked={
+						(project.camera.scaleDuringZoom ??
+							DEFAULT_CAMERA_SCALE_DURING_ZOOM) >= 1
+					}
+					onChange={(keep) =>
+						setProject(
+							"camera",
+							"scaleDuringZoom",
+							keep ? 1 : DEFAULT_CAMERA_SCALE_DURING_ZOOM,
+						)
+					}
+				/>
+			</Subfield>
+			<Field name="Rounded Corners" icon={<IconCapCorners class="size-4" />}>
 				<div class="flex flex-col gap-3">
 					<Slider
-						value={[project.camera.rounding!]}
+						value={[project.camera.rounding ?? 0]}
 						onChange={(v) => setProject("camera", "rounding", v[0])}
 						minValue={0}
 						maxValue={100}
@@ -2468,7 +3078,7 @@ function CameraConfig(props: { scrollRef: HTMLDivElement }) {
 			>
 				<div class="space-y-8">
 					<Slider
-						value={[project.camera.shadow!]}
+						value={[project.camera.shadow ?? 0]}
 						onChange={(v) => setProject("camera", "shadow", v[0])}
 						minValue={0}
 						maxValue={100}
@@ -2572,14 +3182,14 @@ function CornerStyleSelect(props: {
 					<KSelect.Value<{
 						name: string;
 						value: CornerRoundingType;
-					}> class="flex-1 text-sm text-left truncate text-[--gray-500] font-normal">
+					}> class="flex-1 text-sm text-left truncate text-(--gray-500) font-normal">
 						{(state) => <span>{state.selectedOption().name}</span>}
 					</KSelect.Value>
 					<KSelect.Icon<ValidComponent>
 						as={(iconProps) => (
 							<IconCapChevronDown
 								{...iconProps}
-								class="size-4 shrink-0 transform transition-transform ui-expanded:rotate-180 text-[--gray-500]"
+								class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)"
 							/>
 						)}
 					/>
@@ -2600,66 +3210,71 @@ function CornerStyleSelect(props: {
 	);
 }
 
-const normalizeHexInput = (value: string, fallback: string) => {
-	const trimmed = value.trim();
-	const withHash = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
-	const shortMatch = /^#[0-9A-Fa-f]{3}$/.test(withHash);
-	if (shortMatch) {
-		const [, r, g, b] = withHash;
-		return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
-	}
-	const fullMatch = /^#[0-9A-Fa-f]{6}$/.test(withHash);
-	if (fullMatch) return withHash.toLowerCase();
-	return fallback;
-};
-
 function HexColorInput(props: {
 	value: string;
 	onChange: (value: string) => void;
+	brandColorSwatches?: OrganizationBrandColorSwatch[];
 }) {
 	const [text, setText] = createWritableMemo(() => props.value);
 	let prevColor = props.value;
 	let colorInput: HTMLInputElement | undefined;
+	const selectBrandColor = (color: string) => {
+		setText(color);
+		prevColor = color;
+		props.onChange(color);
+	};
 
 	return (
-		<div class="flex items-center gap-3">
-			<div class="relative">
-				<button
-					type="button"
-					class="w-10 h-10 rounded-md border border-gray-4 cursor-pointer hover:border-gray-5 transition-colors"
-					style={{ "background-color": text() }}
-					onClick={() => colorInput?.click()}
-				/>
-				<input
-					ref={(el) => {
-						colorInput = el;
-					}}
-					type="color"
-					class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+		<div class="flex flex-col gap-2">
+			<div class="flex items-center gap-3">
+				<div class="relative">
+					<button
+						type="button"
+						class="size-[2rem] rounded-[0.5rem] cursor-pointer transition-[box-shadow]"
+						style={{
+							"background-color": text(),
+							"box-shadow": `inset 0 0 0 1px ${getColorPreviewBorderColor(
+								text(),
+							)}`,
+						}}
+						onClick={() => colorInput?.click()}
+					/>
+					<input
+						ref={(el) => {
+							colorInput = el;
+						}}
+						type="color"
+						class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+						value={text()}
+						onInput={(e) => {
+							const next = e.currentTarget.value;
+							setText(next);
+							prevColor = next;
+							props.onChange(next);
+						}}
+					/>
+				</div>
+				<TextInput
+					class="flex-1 px-3 py-2 rounded-lg border border-gray-3 bg-gray-2 text-sm text-gray-12"
 					value={text()}
+					onFocus={() => {
+						prevColor = props.value;
+					}}
 					onInput={(e) => {
-						const next = e.currentTarget.value;
+						setText(e.currentTarget.value);
+					}}
+					onBlur={(e) => {
+						const next =
+							normalizeOpaqueHexColor(e.currentTarget.value) ?? prevColor;
 						setText(next);
 						prevColor = next;
 						props.onChange(next);
 					}}
 				/>
 			</div>
-			<TextInput
-				class="flex-1 px-3 py-2 rounded-lg border border-gray-3 bg-gray-2 text-sm text-gray-12"
-				value={text()}
-				onFocus={() => {
-					prevColor = props.value;
-				}}
-				onInput={(e) => {
-					setText(e.currentTarget.value);
-				}}
-				onBlur={(e) => {
-					const next = normalizeHexInput(e.currentTarget.value, prevColor);
-					setText(next);
-					prevColor = next;
-					props.onChange(next);
-				}}
+			<BrandColorsDropdown
+				swatches={props.brandColorSwatches ?? []}
+				onSelect={selectBrandColor}
 			/>
 		</div>
 	);
@@ -2668,6 +3283,7 @@ function HexColorInput(props: {
 function TextSegmentConfig(props: {
 	segmentIndex: number;
 	segment: TextSegment;
+	brandColorSwatches: OrganizationBrandColorSwatch[];
 }) {
 	const { setProject } = useEditorContext();
 	const clampNumber = (value: number, min: number, max: number) =>
@@ -2785,8 +3401,8 @@ function TextSegmentConfig(props: {
 							</MenuItem>
 						)}
 					>
-						<KSelect.Trigger class="flex w-full items-center justify-between rounded-md border border-gray-3 bg-gray-2 px-3 py-2 text-sm text-gray-12 transition-colors hover:border-gray-4 hover:bg-gray-3 focus:border-blue-9 focus:outline-none focus:ring-1 focus:ring-blue-9">
-							<KSelect.Value<any> class="truncate">
+						<KSelect.Trigger class="flex w-full items-center justify-between rounded-md border border-gray-3 bg-gray-2 px-3 py-2 text-sm text-gray-12 transition-colors hover:border-gray-4 hover:bg-gray-3 focus:border-blue-9 focus:outline-hidden focus:ring-1 focus:ring-blue-9">
+							<KSelect.Value<{ label: string; value: number }> class="truncate">
 								{(state) => {
 									const selected = state.selectedOption();
 									if (selected) return selected.label;
@@ -2812,7 +3428,7 @@ function TextSegmentConfig(props: {
 								}}
 							</KSelect.Value>
 							<KSelect.Icon>
-								<IconCapChevronDown class="size-4 shrink-0 transform transition-transform ui-expanded:rotate-180 text-[--gray-500]" />
+								<IconCapChevronDown class="size-4 shrink-0 transform transition-transform data-expanded:rotate-180 text-(--gray-500)" />
 							</KSelect.Icon>
 						</KSelect.Trigger>
 						<KSelect.Portal>
@@ -2849,6 +3465,7 @@ function TextSegmentConfig(props: {
 			>
 				<HexColorInput
 					value={props.segment.color}
+					brandColorSwatches={props.brandColorSwatches}
 					onChange={(value) =>
 						updateSegment((segment) => {
 							segment.color = value;
@@ -2872,6 +3489,347 @@ function TextSegmentConfig(props: {
 					step={0.01}
 					formatTooltip="s"
 				/>
+			</Field>
+		</div>
+	);
+}
+
+function AudioSegmentConfig(props: {
+	segmentIndex: number;
+	segment: AudioTrackSegment;
+}) {
+	const { setProject, setEditorState } = useEditorContext();
+	const clampNumber = (value: number, min: number, max: number) =>
+		Math.min(Math.max(Number.isFinite(value) ? value : min, min), max);
+
+	const updateSegment = (fn: (segment: AudioTrackSegment) => void) => {
+		setProject(
+			"timeline",
+			"audioSegments",
+			produce((segments) => {
+				const target = segments?.[props.segmentIndex];
+				if (!target) return;
+				fn(target);
+			}),
+		);
+	};
+
+	const segmentDuration = () =>
+		Math.max(props.segment.end - props.segment.start, 0);
+	const fadeMax = () => Math.max(0.1, segmentDuration());
+
+	return (
+		<div class="space-y-4">
+			<Field
+				name={`Audio ${props.segmentIndex + 1}`}
+				icon={<IconLucideMusic class="size-4" />}
+			>
+				<div class="flex flex-col gap-3">
+					<button
+						type="button"
+						onClick={() =>
+							setEditorState("timeline", "audioReplace", props.segmentIndex)
+						}
+						class="flex gap-3 items-center p-2 w-full text-left rounded-xl border transition-colors group border-gray-3 bg-gray-2 hover:border-gray-5 hover:bg-gray-3"
+					>
+						<span
+							class={cx(
+								"rounded-lg ring-1 shrink-0 size-10 ring-black/10",
+								AUDIO_TRACK_BG_CLASS,
+							)}
+						/>
+						<div class="flex flex-col flex-1 min-w-0">
+							<span class="text-sm font-medium truncate text-gray-12">
+								{props.segment.name || "Audio"}
+							</span>
+							<span class="text-xs text-gray-10">Tap to change track</span>
+						</div>
+						<span class="flex gap-1 items-center px-2 h-7 text-xs font-medium rounded-lg border transition-colors shrink-0 border-gray-3 bg-gray-1 text-gray-11 group-hover:text-gray-12">
+							<IconLucideRefreshCw class="size-3.5" />
+							Change
+						</span>
+					</button>
+					<div class="flex gap-3 items-center">
+						<input
+							class="flex-1 px-3 py-2 rounded-lg border border-gray-3 bg-gray-2 text-gray-12"
+							value={props.segment.name ?? ""}
+							placeholder="Audio"
+							onInput={(e) =>
+								updateSegment((segment) => {
+									segment.name = e.currentTarget.value;
+								})
+							}
+						/>
+						<div class="flex flex-col gap-2 items-center">
+							<span class="text-xs text-gray-11">Enabled</span>
+							<Toggle
+								checked={props.segment.enabled}
+								onChange={(value) =>
+									updateSegment((segment) => {
+										segment.enabled = value;
+									})
+								}
+							/>
+						</div>
+					</div>
+				</div>
+			</Field>
+			<Field name="Volume" icon={<IconLucideVolume2 class="size-4" />}>
+				<Slider
+					value={[
+						clampNumber(props.segment.volumeDb, MIN_VOLUME_DB, MAX_VOLUME_DB),
+					]}
+					onChange={([value]) =>
+						updateSegment((segment) => {
+							segment.volumeDb = clampNumber(
+								value,
+								MIN_VOLUME_DB,
+								MAX_VOLUME_DB,
+							);
+						})
+					}
+					minValue={MIN_VOLUME_DB}
+					maxValue={MAX_VOLUME_DB}
+					step={1}
+					formatTooltip="dB"
+				/>
+			</Field>
+			<Field name="Fade In" icon={<IconLucideTimer class="size-4" />}>
+				<Slider
+					value={[clampNumber(props.segment.fadeIn, 0, fadeMax())]}
+					onChange={([value]) =>
+						updateSegment((segment) => {
+							segment.fadeIn = clampNumber(value, 0, segmentDuration());
+						})
+					}
+					minValue={0}
+					maxValue={fadeMax()}
+					step={0.05}
+					formatTooltip="s"
+				/>
+			</Field>
+			<Field name="Fade Out" icon={<IconLucideTimer class="size-4" />}>
+				<Slider
+					value={[clampNumber(props.segment.fadeOut, 0, fadeMax())]}
+					onChange={([value]) =>
+						updateSegment((segment) => {
+							segment.fadeOut = clampNumber(value, 0, segmentDuration());
+						})
+					}
+					minValue={0}
+					maxValue={fadeMax()}
+					step={0.05}
+					formatTooltip="s"
+				/>
+			</Field>
+		</div>
+	);
+}
+
+function KeyboardSegmentConfig(props: {
+	segmentIndex: number;
+	segment: KeyboardTrackSegment;
+}) {
+	const { setProject } = useEditorContext();
+
+	const updateSegment = (fn: (segment: KeyboardTrackSegment) => void) => {
+		setProject(
+			"timeline",
+			"keyboardSegments",
+			produce((segments) => {
+				const segment = segments?.[props.segmentIndex];
+				if (!segment) return;
+				fn(segment);
+			}),
+		);
+	};
+
+	return (
+		<div class="space-y-4">
+			<Field
+				name={`Keyboard ${props.segmentIndex + 1}`}
+				icon={<IconLucideKeyboard class="size-4" />}
+			>
+				<Input
+					type="text"
+					value={props.segment.displayText}
+					onChange={(e) =>
+						updateSegment((segment) => {
+							segment.displayText = e.currentTarget.value;
+						})
+					}
+				/>
+			</Field>
+			<Field name="Timing" icon={<IconLucideTimer class="size-4" />}>
+				<div class="rounded-xl border border-gray-3 bg-gray-2/70 p-3 space-y-3">
+					<div class="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
+						<div class="rounded-lg border border-gray-3 bg-gray-1/80 p-2.5 space-y-2">
+							<div class="flex items-center justify-between text-[10px] uppercase tracking-[0.08em] text-gray-10">
+								<span>Start</span>
+								<span>{formatTime(props.segment.start)}</span>
+							</div>
+							<Input
+								type="number"
+								value={props.segment.start.toFixed(2)}
+								step="0.1"
+								min={0}
+								onChange={(e) =>
+									updateSegment((segment) => {
+										segment.start = Number.parseFloat(e.currentTarget.value);
+									})
+								}
+							/>
+						</div>
+						<div class="pt-10 text-xs font-medium text-gray-10">to</div>
+						<div class="rounded-lg border border-gray-3 bg-gray-1/80 p-2.5 space-y-2">
+							<div class="flex items-center justify-between text-[10px] uppercase tracking-[0.08em] text-gray-10">
+								<span>End</span>
+								<span>{formatTime(props.segment.end)}</span>
+							</div>
+							<Input
+								type="number"
+								value={props.segment.end.toFixed(2)}
+								step="0.1"
+								min={props.segment.start}
+								onChange={(e) =>
+									updateSegment((segment) => {
+										segment.end = Number.parseFloat(e.currentTarget.value);
+									})
+								}
+							/>
+						</div>
+					</div>
+					<div class="flex items-center justify-between rounded-lg bg-gray-1/70 px-3 py-2 text-xs text-gray-11">
+						<span>Duration</span>
+						<span class="font-medium text-gray-12">
+							{Math.max(0, props.segment.end - props.segment.start).toFixed(2)}s
+						</span>
+					</div>
+				</div>
+			</Field>
+			<Field name="Fade Duration" icon={<IconLucideTimer class="size-4" />}>
+				<Slider
+					value={[(props.segment.fadeDurationOverride ?? 0.15) * 100]}
+					onChange={([value]) =>
+						updateSegment((segment) => {
+							segment.fadeDurationOverride = value / 100;
+						})
+					}
+					minValue={0}
+					maxValue={50}
+					step={1}
+				/>
+			</Field>
+		</div>
+	);
+}
+
+function CaptionSegmentConfig(props: {
+	segmentIndex: number;
+	segment: CaptionTrackSegment;
+}) {
+	const { setProject } = useEditorContext();
+
+	const updateSegment = (fn: (segment: CaptionTrackSegment) => void) => {
+		setProject(
+			produce((project) => {
+				const timelineSegment =
+					project.timeline?.captionSegments?.[props.segmentIndex];
+				if (!timelineSegment) return;
+
+				fn(timelineSegment);
+
+				const captionSegment = project.captions?.segments?.[props.segmentIndex];
+				if (!captionSegment) return;
+
+				captionSegment.start = timelineSegment.start;
+				captionSegment.end = timelineSegment.end;
+				captionSegment.text = timelineSegment.text;
+				captionSegment.words = timelineSegment.words?.map((word) => ({
+					...word,
+				}));
+			}),
+		);
+	};
+
+	return (
+		<div class="space-y-4">
+			<Field
+				name={`Transcript ${props.segmentIndex + 1}`}
+				icon={<IconCapMessageBubble />}
+			>
+				<textarea
+					class="flex-1 px-3 py-2 rounded-lg border border-gray-3 bg-gray-2 text-gray-12 resize-none min-h-[96px] w-full"
+					value={props.segment.text}
+					onInput={(e) =>
+						updateSegment((segment) => {
+							segment.text = e.currentTarget.value;
+							segment.words = syncCaptionWordsWithText(
+								e.currentTarget.value,
+								segment.words,
+								segment.start,
+								segment.end,
+							);
+						})
+					}
+				/>
+			</Field>
+			<Field name="Timing" icon={<IconLucideTimer class="size-4" />}>
+				<div class="rounded-xl border border-gray-3 bg-gray-2/70 p-3 space-y-3">
+					<div class="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
+						<div class="rounded-lg border border-gray-3 bg-gray-1/80 p-2.5 space-y-2">
+							<div class="flex items-center justify-between text-[10px] uppercase tracking-[0.08em] text-gray-10">
+								<span>Start</span>
+								<span>{formatTime(props.segment.start)}</span>
+							</div>
+							<Input
+								type="number"
+								value={props.segment.start.toFixed(2)}
+								step="0.1"
+								min={0}
+								onChange={(
+									e: Event & {
+										currentTarget: HTMLInputElement;
+										target: HTMLInputElement;
+									},
+								) =>
+									updateSegment((segment) => {
+										segment.start = Number.parseFloat(e.target.value);
+									})
+								}
+							/>
+						</div>
+						<div class="pt-10 text-xs font-medium text-gray-10">to</div>
+						<div class="rounded-lg border border-gray-3 bg-gray-1/80 p-2.5 space-y-2">
+							<div class="flex items-center justify-between text-[10px] uppercase tracking-[0.08em] text-gray-10">
+								<span>End</span>
+								<span>{formatTime(props.segment.end)}</span>
+							</div>
+							<Input
+								type="number"
+								value={props.segment.end.toFixed(2)}
+								step="0.1"
+								min={props.segment.start}
+								onChange={(
+									e: Event & {
+										currentTarget: HTMLInputElement;
+										target: HTMLInputElement;
+									},
+								) =>
+									updateSegment((segment) => {
+										segment.end = Number.parseFloat(e.target.value);
+									})
+								}
+							/>
+						</div>
+					</div>
+					<div class="flex items-center justify-between rounded-lg bg-gray-1/70 px-3 py-2 text-xs text-gray-11">
+						<span>Duration</span>
+						<span class="font-medium text-gray-12">
+							{Math.max(0, props.segment.end - props.segment.start).toFixed(2)}s
+						</span>
+					</div>
+				</div>
 			</Field>
 		</div>
 	);
@@ -2958,6 +3916,7 @@ function MaskSegmentConfig(props: {
 									segment.opacity = 1;
 								} else {
 									segment.feather = 0.1;
+									segment.fadeDuration = 0;
 								}
 							})
 						}
@@ -2971,11 +3930,11 @@ function MaskSegmentConfig(props: {
 						].map((option) => (
 							<RadioGroup.Item
 								value={option.value}
-								class="rounded-lg border border-gray-3 transition-colors ui-checked:border-blue-8 ui-checked:bg-blue-3/40"
+								class="rounded-lg border border-gray-3 transition-colors data-checked:border-blue-8 data-checked:bg-blue-3/40"
 							>
 								<RadioGroup.ItemInput class="sr-only" />
 								<RadioGroup.ItemLabel class="flex cursor-pointer items-center gap-2 p-2 text-sm text-gray-12">
-									<RadioGroup.ItemControl class="size-4 rounded-full border border-gray-7 ui-checked:border-blue-9 ui-checked:bg-blue-9" />
+									<RadioGroup.ItemControl class="size-4 rounded-full border border-gray-7 data-checked:border-blue-9 data-checked:bg-blue-9" />
 									{option.label}
 								</RadioGroup.ItemLabel>
 							</RadioGroup.Item>
@@ -3047,23 +4006,22 @@ function MaskSegmentConfig(props: {
 					/>
 				</Field>
 			</Show>
-			<Field
-				name={t("editor.sidebar.fadeDuration")}
-				icon={<IconLucideTimer class="size-4" />}
-			>
-				<Slider
-					value={[props.segment.fadeDuration ?? 0.15]}
-					onChange={([v]) =>
-						updateSegment((segment) => {
-							segment.fadeDuration = v;
-						})
-					}
-					minValue={0}
-					maxValue={1}
-					step={0.01}
-					formatTooltip="s"
-				/>
-			</Field>
+			<Show when={props.segment.maskType === "highlight"}>
+				<Field name="Fade Duration" icon={<IconLucideTimer class="size-4" />}>
+					<Slider
+						value={[props.segment.fadeDuration ?? 0.15]}
+						onChange={([v]) =>
+							updateSegment((segment) => {
+								segment.fadeDuration = v;
+							})
+						}
+						minValue={0}
+						maxValue={1}
+						step={0.01}
+						formatTooltip="s"
+					/>
+				</Field>
+			</Show>
 		</div>
 	);
 }
@@ -3163,7 +4121,7 @@ function ZoomSegmentPreview(props: {
 				<div class="text-xs font-medium text-center text-gray-12">
 					{t("editor.sidebar.zoomSegment", { index: props.segmentIndex + 1 })}
 				</div>
-				<div class="overflow-hidden relative rounded border aspect-video border-gray-3 bg-gray-3">
+				<div class="overflow-hidden relative rounded-sm border aspect-video border-gray-3 bg-gray-3">
 					<canvas
 						ref={canvasRef}
 						width={160}
@@ -3191,13 +4149,8 @@ function ZoomSegmentConfig(props: {
 	segment: ZoomSegment;
 }) {
 	const generalSettings = generalSettingsStore.createQuery();
-	const {
-		project,
-		setProject,
-		editorInstance,
-		setEditorState,
-		projectHistory,
-	} = useEditorContext();
+	const { project, setProject, editorInstance, projectHistory } =
+		useEditorContext();
 
 	const states = {
 		manual:
@@ -3245,21 +4198,21 @@ function ZoomSegmentConfig(props: {
 						);
 					}}
 				>
-					<KTabs.List class="flex flex-row items-center rounded-[0.5rem] relative border">
+					<KTabs.List class="flex flex-row items-center rounded-lg relative border">
 						<KTabs.Trigger
 							value="auto"
-							class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-none ui-selected:text-gray-12 peer"
+							class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-hidden data-selected:text-gray-12 peer"
 							disabled={!generalSettings.data?.custom_cursor_capture2}
 						>
 							{t("editor.sidebar.cameraLayouts.auto")}
 						</KTabs.Trigger>
 						<KTabs.Trigger
 							value="manual"
-							class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-none ui-selected:text-gray-12 peer"
+							class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-hidden data-selected:text-gray-12 peer"
 						>
 							{t("editor.sidebar.cameraLayouts.manual")}
 						</KTabs.Trigger>
-						<KTabs.Indicator class="absolute flex p-px inset-0 transition-transform peer-focus-visible:outline outline-2 outline-blue-9 outline-offset-2 rounded-[0.6rem] overflow-hidden">
+						<KTabs.Indicator class="absolute flex p-px inset-0 transition-transform peer-focus-visible:outline-solid outline-2 outline-blue-9 outline-offset-2 rounded-[0.6rem] overflow-hidden">
 							<div class="flex-1 bg-gray-3" />
 						</KTabs.Indicator>
 					</KTabs.List>
@@ -3362,8 +4315,8 @@ function ZoomSegmentConfig(props: {
 										croppedSize().y,
 										0,
 										0,
-										canvasRef.width!,
-										canvasRef.height!,
+										canvasRef.width,
+										canvasRef.height,
 									);
 								};
 
@@ -3407,7 +4360,7 @@ function ZoomSegmentConfig(props: {
 								};
 
 								const visualHeight = () =>
-									(bounds.width! / croppedSize().x) * croppedSize().y;
+									((bounds.width ?? 0) / croppedSize().x) * croppedSize().y;
 
 								return (
 									<div
@@ -3507,7 +4460,8 @@ function ClipSegmentConfig(props: {
 
 		setProject(
 			produce((proj) => {
-				const clips = (proj.clips ??= []);
+				if (!proj.clips) proj.clips = [];
+				const clips = proj.clips;
 				let clip = clips.find(
 					(clip) => clip.index === (props.segment.recordingSegment ?? 0),
 				);
@@ -3537,13 +4491,7 @@ function ClipSegmentConfig(props: {
 					onClick={() => {
 						projectActions.deleteClipSegment(props.segmentIndex);
 					}}
-					disabled={
-						(
-							project.timeline?.segments.filter(
-								(s) => s.recordingSegment === props.segment.recordingSegment,
-							) ?? []
-						).length < 2
-					}
+					disabled={(project.timeline?.segments.length ?? 0) < 2}
 					leftIcon={<IconCapTrash />}
 				>
 					{t("behaviours.delete")}
@@ -3576,7 +4524,7 @@ function ClipSegmentConfig(props: {
 					<For each={[0.25, 0.5, 1, 1.5, 2, 4, 8]}>
 						{(mult) => (
 							<KRadioGroup.Item value={mult.toString()}>
-								<KRadioGroup.ItemControl class="px-2 py-1 text-gray-11 hover:text-gray-12 bg-gray-1 border border-gray-3 rounded-md ui-checked:bg-gray-3 ui-checked:border-gray-4 ui-checked:text-gray-12">
+								<KRadioGroup.ItemControl class="px-2 py-1 text-gray-11 hover:text-gray-12 bg-gray-1 border border-gray-3 rounded-md data-checked:bg-gray-3 data-checked:border-gray-4 data-checked:text-gray-12">
 									{mult}x
 								</KRadioGroup.ItemControl>
 							</KRadioGroup.Item>
@@ -3663,7 +4611,7 @@ function SourceOffsetField(props: {
 									props.onChange(0);
 								}
 							}}
-							class="w-[5rem] p-[0.375rem] border rounded-[0.5rem] bg-gray-1 focus-visible:outline-none"
+							class="w-20 p-1.5 border rounded-lg bg-gray-1 focus-visible:outline-hidden"
 						/>
 					</NumberField.Root>
 					<span class="text-gray-11">ms</span>
@@ -3677,7 +4625,7 @@ function SourceOffsetField(props: {
 								props.onChange(currentValue);
 								setValue(currentValue.toString());
 							}}
-							class="text-gray-11 hover:text-gray-12 text-xs px-1 py-0.5 bg-gray-1 border border-gray-3 rounded"
+							class="text-gray-11 hover:text-gray-12 text-xs px-1 py-0.5 bg-gray-1 border border-gray-3 rounded-sm"
 						>
 							{Math.sign(v) > 0 ? "+" : "-"}
 							{Math.abs(v)}ms
@@ -3689,11 +4637,90 @@ function SourceOffsetField(props: {
 	);
 }
 
+const SCENE_MODE_TRIGGER_CLASS =
+	"z-10 flex justify-center items-center gap-1.5 py-2.5 px-2 text-xs whitespace-nowrap text-gray-11 rounded-[10px] border border-transparent transition-colors duration-200 outline-hidden data-selected:border-gray-3 data-selected:bg-gray-3 data-selected:text-gray-12 not-data-selected:hover:border-gray-7 disabled:opacity-40 disabled:cursor-not-allowed";
+
+// 2D drag pad for a normalized focal point (mirrors the manual-zoom position
+// picker): click/drag anywhere to set {x,y} in 0..1, pausing history so the
+// whole drag is one undo step.
+function PositionPad(props: {
+	value: () => XY<number>;
+	onChange: (pos: XY<number>) => void;
+}) {
+	const { projectHistory } = useEditorContext();
+
+	const onPick = (downEvent: MouseEvent) => {
+		downEvent.preventDefault();
+		const bounds = downEvent.currentTarget as HTMLElement;
+		const rect = bounds.getBoundingClientRect();
+		const resumeHistory = projectHistory.pause();
+		const apply = (e: MouseEvent) => {
+			props.onChange({
+				x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+				y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+			});
+		};
+		apply(downEvent);
+		createRoot((dispose) =>
+			createEventListenerMap(window, {
+				mousemove: apply,
+				mouseup: () => {
+					resumeHistory();
+					dispose();
+				},
+			}),
+		);
+	};
+
+	return (
+		<div
+			class="overflow-hidden relative w-full h-28 rounded-lg border border-gray-3 bg-gray-2 cursor-crosshair"
+			onMouseDown={onPick}
+		>
+			<div class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-3 pointer-events-none" />
+			<div class="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-3 pointer-events-none" />
+			<div
+				class="flex absolute z-10 justify-center items-center w-6 h-6 rounded-full border border-gray-400 -translate-x-1/2 -translate-y-1/2 bg-gray-1 pointer-events-none"
+				style={{
+					left: `${props.value().x * 100}%`,
+					top: `${props.value().y * 100}%`,
+				}}
+			>
+				<div class="rounded-full size-1.5 bg-gray-5" />
+			</div>
+		</div>
+	);
+}
+
 function SceneSegmentConfig(props: {
 	segmentIndex: number;
 	segment: SceneSegment;
 }) {
-	const { setProject, setEditorState, projectActions } = useEditorContext();
+	const { setProject, setEditorState, projectActions, editorInstance } =
+		useEditorContext();
+
+	const hasCamera = () =>
+		!editorInstance.recordings.segments.every((s) => s.camera === null);
+
+	const description = () => {
+		switch (props.segment.mode) {
+			case "cameraOnly":
+				return "Shows only the camera feed";
+			case "hideCamera":
+				return "Shows only the screen recording";
+			case "splitScreen":
+				return "Screen and camera side by side (auto-stacks in portrait)";
+			default:
+				return "Shows both screen and camera";
+		}
+	};
+
+	const split = () => props.segment.splitLayout ?? DEFAULT_SPLIT_LAYOUT;
+	const updateSplit = (patch: Partial<SplitLayout>) =>
+		setProject("timeline", "sceneSegments", props.segmentIndex, "splitLayout", {
+			...split(),
+			...patch,
+		});
 
 	return (
 		<>
@@ -3721,178 +4748,140 @@ function SceneSegmentConfig(props: {
 				icon={<IconLucideLayout />}
 			>
 				<KTabs
-					class="space-y-6"
+					class="space-y-3"
 					value={props.segment.mode || "default"}
 					onChange={(v) => {
-						setProject(
-							"timeline",
-							"sceneSegments",
-							props.segmentIndex,
-							"mode",
-							v as "default" | "cameraOnly" | "hideCamera",
-						);
+						const mode = v as SceneMode;
+						batch(() => {
+							setProject(
+								"timeline",
+								"sceneSegments",
+								props.segmentIndex,
+								"mode",
+								mode,
+							);
+							// Seed identity overrides so the new split segment renders
+							// correctly and the fine-tune controls have values to bind to.
+							if (mode === "splitScreen" && !props.segment.splitLayout)
+								setProject(
+									"timeline",
+									"sceneSegments",
+									props.segmentIndex,
+									"splitLayout",
+									{ ...DEFAULT_SPLIT_LAYOUT },
+								);
+						});
 					}}
 				>
-					<KTabs.List class="flex flex-col gap-3">
-						<div class="flex flex-row items-center rounded-[0.5rem] relative border">
-							<KTabs.Trigger
-								value="default"
-								class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-none ui-selected:text-gray-12 peer"
-							>
-								{t("editor.sidebar.cameraLayouts.default")}
-							</KTabs.Trigger>
-							<KTabs.Trigger
-								value="cameraOnly"
-								class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-none ui-selected:text-gray-12 peer"
-							>
-								{t("editor.sidebar.cameraLayouts.cameraOnly")}
-							</KTabs.Trigger>
-							<KTabs.Trigger
-								value="hideCamera"
-								class="z-10 flex-1 py-2.5 text-gray-11 transition-colors duration-100 outline-none ui-selected:text-gray-12 peer"
-							>
-								{t("editor.sidebar.cameraLayouts.hideCamera")}
-							</KTabs.Trigger>
-							<KTabs.Indicator class="absolute flex p-px inset-0 transition-transform peer-focus-visible:outline outline-2 outline-blue-9 outline-offset-2 rounded-[0.6rem] overflow-hidden">
-								<div class="flex-1 bg-gray-3" />
-							</KTabs.Indicator>
-						</div>
-
-						<div class="relative">
-							<div
-								class="absolute -top-3 w-px h-3 transition-all duration-200 bg-gray-3"
-								style={{
-									left:
-										props.segment.mode === "cameraOnly"
-											? "50%"
-											: props.segment.mode === "hideCamera"
-												? "83.33%"
-												: "16.67%",
-								}}
-							/>
-							<div
-								class="absolute -top-1 w-2 h-2 rounded-full transition-all duration-200 -translate-x-1/2 bg-gray-3"
-								style={{
-									left:
-										props.segment.mode === "cameraOnly"
-											? "50%"
-											: props.segment.mode === "hideCamera"
-												? "83.33%"
-												: "16.67%",
-								}}
-							/>
-							<div class="p-2.5 rounded-md bg-gray-2 border border-gray-3">
-								<div class="text-xs text-center text-gray-11">
-									{props.segment.mode === "cameraOnly"
-										? t("editor.sidebar.cameraLayouts.cameraOnlyDescription")
-										: props.segment.mode === "hideCamera"
-											? t("editor.sidebar.cameraLayouts.hideCameraDescription")
-											: t("editor.sidebar.cameraLayouts.defaultDescription")}
-								</div>
-							</div>
-						</div>
+					<KTabs.List class="grid grid-cols-2 gap-2">
+						<KTabs.Trigger value="default" class={SCENE_MODE_TRIGGER_CLASS}>
+							<IconLucideMonitor class="size-3.5" />
+							Default
+						</KTabs.Trigger>
+						<KTabs.Trigger value="cameraOnly" class={SCENE_MODE_TRIGGER_CLASS}>
+							<IconLucideVideo class="size-3.5" />
+							Camera Only
+						</KTabs.Trigger>
+						<KTabs.Trigger value="hideCamera" class={SCENE_MODE_TRIGGER_CLASS}>
+							<IconLucideEyeOff class="size-3.5" />
+							Hide Camera
+						</KTabs.Trigger>
+						<KTabs.Trigger
+							value="splitScreen"
+							disabled={!hasCamera()}
+							class={SCENE_MODE_TRIGGER_CLASS}
+						>
+							<IconLucideColumns2 class="size-3.5" />
+							Split Screen
+						</KTabs.Trigger>
 					</KTabs.List>
+					<div class="p-2.5 rounded-md bg-gray-2 border border-gray-3">
+						<div class="text-xs text-center text-gray-11">{description()}</div>
+					</div>
 				</KTabs>
 			</Field>
+
+			<Field name="Transition" icon={<IconLucideTimer class="size-4" />}>
+				<div class="flex flex-col gap-3">
+					<Subfield name="In">
+						<Slider
+							class="flex-1 ml-4"
+							value={[props.segment.transitionIn ?? DEFAULT_SCENE_TRANSITION]}
+							onChange={(v) =>
+								setProject(
+									"timeline",
+									"sceneSegments",
+									props.segmentIndex,
+									"transitionIn",
+									v[0],
+								)
+							}
+							minValue={0}
+							maxValue={2}
+							step={0.05}
+							formatTooltip={(v) => `${v.toFixed(2)}s`}
+						/>
+					</Subfield>
+					<Subfield name="Out">
+						<Slider
+							class="flex-1 ml-4"
+							value={[props.segment.transitionOut ?? DEFAULT_SCENE_TRANSITION]}
+							onChange={(v) =>
+								setProject(
+									"timeline",
+									"sceneSegments",
+									props.segmentIndex,
+									"transitionOut",
+									v[0],
+								)
+							}
+							minValue={0}
+							maxValue={2}
+							step={0.05}
+							formatTooltip={(v) => `${v.toFixed(2)}s`}
+						/>
+					</Subfield>
+				</div>
+			</Field>
+
+			<Show when={props.segment.mode === "splitScreen"}>
+				<div class="w-full border-t border-dashed border-gray-5" />
+				<Field name="Screen Zoom" icon={<IconCapEnlarge class="size-4" />}>
+					<Slider
+						value={[split().screenZoom * 100]}
+						onChange={(v) => updateSplit({ screenZoom: v[0] / 100 })}
+						minValue={100}
+						maxValue={300}
+						step={1}
+						formatTooltip="%"
+					/>
+				</Field>
+				<Field name="Screen Position" icon={<IconLucideMove class="size-4" />}>
+					<PositionPad
+						value={() => split().screenPosition}
+						onChange={(pos) => updateSplit({ screenPosition: pos })}
+					/>
+				</Field>
+				<div class="w-full border-t border-dashed border-gray-5" />
+				<Field name="Camera Zoom" icon={<IconCapEnlarge class="size-4" />}>
+					<Slider
+						value={[split().cameraZoom * 100]}
+						onChange={(v) => updateSplit({ cameraZoom: v[0] / 100 })}
+						minValue={100}
+						maxValue={300}
+						step={1}
+						formatTooltip="%"
+					/>
+				</Field>
+				<Field name="Camera Position" icon={<IconLucideMove class="size-4" />}>
+					<PositionPad
+						value={() => split().cameraPosition}
+						onChange={(pos) => updateSplit({ cameraPosition: pos })}
+					/>
+				</Field>
+			</Show>
 		</>
 	);
-}
-
-function RgbInput(props: {
-	value: [number, number, number];
-	onChange: (value: [number, number, number]) => void;
-}) {
-	const [text, setText] = createWritableMemo(() => rgbToHex(props.value));
-	let prevHex = rgbToHex(props.value);
-
-	let colorInput!: HTMLInputElement;
-
-	return (
-		<div class="flex flex-row items-center gap-[0.75rem] relative">
-			<button
-				type="button"
-				class="size-[2rem] rounded-[0.5rem]"
-				style={{
-					"background-color": rgbToHex(props.value),
-				}}
-				onClick={() => colorInput.click()}
-			/>
-			<input
-				ref={colorInput}
-				type="color"
-				class="absolute left-0 bottom-0 w-[3rem] opacity-0"
-				value={rgbToHex(props.value)}
-				onChange={(e) => {
-					const value = hexToRgb(e.target.value);
-					if (!value) return;
-
-					// RgbInput only handles RGB values, so extract RGB part if RGBA is returned
-					const [r, g, b] = value;
-					props.onChange([r, g, b]);
-				}}
-			/>
-			<TextInput
-				class="w-[4.60rem] p-[0.375rem] text-gray-12 text-[13px] border rounded-[0.5rem] bg-gray-1 outline-none focus:ring-1 transition-shadows duration-200 focus:ring-gray-500 focus:ring-offset-1 focus:ring-offset-gray-200"
-				value={text()}
-				onFocus={() => {
-					prevHex = rgbToHex(props.value);
-				}}
-				onInput={(e) => {
-					setText(e.currentTarget.value);
-
-					const value = hexToRgb(e.target.value);
-					if (!value) return;
-
-					const [r, g, b] = value;
-					props.onChange([r, g, b]);
-				}}
-				onBlur={(e) => {
-					const value = hexToRgb(e.target.value);
-					if (value) {
-						const [r, g, b] = value;
-						// RgbInput only handles RGB values, so extract RGB part if RGBA is returned
-						props.onChange([r, g, b]);
-					} else {
-						setText(prevHex);
-						const fallbackValue = hexToRgb(text());
-						if (!fallbackValue) return;
-
-						const [r, g, b] = fallbackValue;
-						props.onChange([r, g, b]);
-					}
-				}}
-			/>
-		</div>
-	);
-}
-
-function rgbToHex(rgb: [number, number, number]) {
-	return `#${rgb
-		.map((c) => c.toString(16).padStart(2, "0"))
-		.join("")
-		.toUpperCase()}`;
-}
-
-function hexToRgb(hex: string): [number, number, number, number] | null {
-	// Support both 6-digit (RGB) and 8-digit (RGBA) hex colors
-	const match = hex.match(
-		/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})?$/i,
-	);
-	if (!match) return null;
-
-	const [, r, g, b, a] = match;
-	const rgb = [
-		Number.parseInt(r, 16),
-		Number.parseInt(g, 16),
-		Number.parseInt(b, 16),
-	] as const;
-
-	// If alpha is provided, return RGBA tuple
-	if (a) {
-		return [...rgb, Number.parseInt(a, 16)];
-	}
-
-	return [...rgb, 255];
 }
 
 const CHECKERED_BUTTON_BACKGROUND = `url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='8' height='8' fill='%23a0a0a0'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23a0a0a0'/%3E%3C/svg%3E")`;

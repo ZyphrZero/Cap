@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use ffmpeg::{
+    Packet,
     codec::encoder,
     format::{self},
-    frame, Packet,
+    frame,
 };
 
 pub struct EncoderBase {
@@ -11,6 +12,7 @@ pub struct EncoderBase {
     stream_index: usize,
     first_pts: Option<i64>,
     last_pts: Option<i64>,
+    last_written_dts: Option<i64>,
 }
 
 impl EncoderBase {
@@ -20,6 +22,7 @@ impl EncoderBase {
             first_pts: None,
             last_pts: None,
             stream_index,
+            last_written_dts: None,
         }
     }
 
@@ -94,6 +97,26 @@ impl EncoderBase {
                 encoder.time_base(),
                 output.stream(self.stream_index).unwrap().time_base(),
             );
+
+            if let (Some(dts), Some(last_dts)) = (self.packet.dts(), self.last_written_dts)
+                && dts <= last_dts
+            {
+                let fixed_dts = last_dts + 1;
+                self.packet.set_dts(Some(fixed_dts));
+                if let Some(pts) = self.packet.pts()
+                    && pts < fixed_dts
+                {
+                    self.packet.set_pts(Some(fixed_dts));
+                }
+            }
+
+            if let (Some(pts), Some(dts)) = (self.packet.pts(), self.packet.dts())
+                && pts < dts
+            {
+                self.packet.set_pts(Some(dts));
+            }
+
+            self.last_written_dts = self.packet.dts();
             self.packet.write_interleaved(output)?;
         }
 

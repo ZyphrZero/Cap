@@ -1887,6 +1887,8 @@ declare global {
 		FLAGS: Flags;
 		__CAP__: {
 			cameraWsPort: number;
+			cameraOnlyMode?: boolean;
+			enableNativeCameraPreview?: boolean;
 		};
 	}
 }

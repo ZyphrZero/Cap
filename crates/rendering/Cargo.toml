@@ -1,14 +1,15 @@
 [package]
 name = "cap-rendering"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lints]
 workspace = true
 
 [dependencies]
 anyhow.workspace = true
-bytemuck = { version = "1.25", features = ["derive"] }
+bytemuck = { version = "1.7", features = ["derive"] }
+cap-camera-effects = { path = "../camera-effects" }
 cap-flags = { path = "../flags" }
 cap-project = { path = "../project" }
 cap-video-decode = { path = "../video-decode" }

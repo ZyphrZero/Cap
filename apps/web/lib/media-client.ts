@@ -8,27 +8,65 @@ interface MediaServerError {
 
 const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY_MS = 2000;
+const DEFAULT_RETRYABLE_STATUSES = new Set([502, 503, 504]);
 
-function isRetryableStatus(status: number): boolean {
-	return status === 503 || status === 504 || status === 502;
+interface FetchRetryOptions {
+	maxRetries?: number;
+	retryableStatuses?: Set<number>;
+}
+
+function isRetryableStatus(
+	status: number,
+	retryableStatuses: Set<number>,
+): boolean {
+	return retryableStatuses.has(status);
 }
 
 async function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getMediaServerConfig(): {
+	mediaServerUrl: string;
+	mediaServerSecret: string;
+} {
+	const env = serverEnv();
+	if (!env.MEDIA_SERVER_URL) {
+		throw new Error("MEDIA_SERVER_URL is not configured");
+	}
+	if (!env.MEDIA_SERVER_WEBHOOK_SECRET) {
+		throw new Error("MEDIA_SERVER_WEBHOOK_SECRET is not configured");
+	}
+	return {
+		mediaServerUrl: env.MEDIA_SERVER_URL,
+		mediaServerSecret: env.MEDIA_SERVER_WEBHOOK_SECRET,
+	};
+}
+
+function getMediaServerHeaders(
+	mediaServerSecret: string,
+): Record<string, string> {
+	return {
+		"Content-Type": "application/json",
+		"x-media-server-secret": mediaServerSecret,
+	};
+}
+
 async function fetchWithRetry(
 	url: string,
 	options: RequestInit,
-	maxRetries = MAX_RETRIES,
+	retryOptions: FetchRetryOptions = {},
 ): Promise<Response> {
 	let lastError: Error | undefined;
+	const maxRetries = retryOptions.maxRetries ?? MAX_RETRIES;
+	const retryableStatuses =
+		retryOptions.retryableStatuses ?? DEFAULT_RETRYABLE_STATUSES;
 
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
 		try {
 			const response = await fetch(url, options);
 
-			if (!isRetryableStatus(response.status)) {
+			if (!isRetryableStatus(response.status, retryableStatuses)) {
 				return response;
 			}
 
@@ -58,7 +96,8 @@ async function fetchWithRetry(
 }
 
 export function isMediaServerConfigured(): boolean {
-	return !!serverEnv().MEDIA_SERVER_URL;
+	const env = serverEnv();
+	return !!env.MEDIA_SERVER_URL && !!env.MEDIA_SERVER_WEBHOOK_SECRET;
 }
 
 export async function checkMediaServerHealth(): Promise<{
@@ -84,14 +123,11 @@ export async function checkMediaServerHealth(): Promise<{
 export async function checkHasAudioTrackViaMediaServer(
 	videoUrl: string,
 ): Promise<boolean> {
-	const mediaServerUrl = serverEnv().MEDIA_SERVER_URL;
-	if (!mediaServerUrl) {
-		throw new Error("MEDIA_SERVER_URL is not configured");
-	}
+	const { mediaServerUrl, mediaServerSecret } = getMediaServerConfig();
 
 	const response = await fetchWithRetry(`${mediaServerUrl}/audio/check`, {
 		method: "POST",
-		headers: { "Content-Type": "application/json" },
+		headers: getMediaServerHeaders(mediaServerSecret),
 		body: JSON.stringify({ videoUrl }),
 	});
 
@@ -107,15 +143,15 @@ export async function checkHasAudioTrackViaMediaServer(
 export async function extractAudioViaMediaServer(
 	videoUrl: string,
 ): Promise<Buffer> {
-	const mediaServerUrl = serverEnv().MEDIA_SERVER_URL;
-	if (!mediaServerUrl) {
-		throw new Error("MEDIA_SERVER_URL is not configured");
-	}
+	const { mediaServerUrl, mediaServerSecret } = getMediaServerConfig();
 
 	const response = await fetchWithRetry(`${mediaServerUrl}/audio/extract`, {
 		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ videoUrl }),
+		headers: getMediaServerHeaders(mediaServerSecret),
+		body: JSON.stringify({
+			videoUrl,
+			stream: true,
+		}),
 	});
 
 	if (!response.ok) {
@@ -138,4 +174,99 @@ export async function extractAudioViaMediaServer(
 
 	const arrayBuffer = await response.arrayBuffer();
 	return Buffer.from(arrayBuffer);
+}
+
+export interface MediaServerProbeResult {
+	duration: number;
+	width: number;
+	height: number;
+	fps: number;
+	videoCodec: string;
+	audioCodec: string | null;
+	audioChannels: number | null;
+	sampleRate: number | null;
+	bitrate: number;
+	fileSize: number;
+}
+
+export async function probeVideoViaMediaServer(
+	videoUrl: string,
+): Promise<MediaServerProbeResult> {
+	const { mediaServerUrl, mediaServerSecret } = getMediaServerConfig();
+
+	const response = await fetchWithRetry(`${mediaServerUrl}/video/probe`, {
+		method: "POST",
+		headers: getMediaServerHeaders(mediaServerSecret),
+		body: JSON.stringify({ videoUrl }),
+	});
+
+	if (!response.ok) {
+		let errorData: MediaServerError;
+		try {
+			errorData = (await response.json()) as MediaServerError;
+		} catch {
+			throw new Error(
+				`Video probe failed: ${response.status} ${response.statusText}`,
+			);
+		}
+		throw new Error(
+			errorData.details || errorData.error || "Video probe failed",
+		);
+	}
+
+	const data = (await response.json()) as { metadata: MediaServerProbeResult };
+	return data.metadata;
+}
+
+export async function convertAudioToMp3ViaMediaServer(
+	audioUrl: string,
+): Promise<Buffer> {
+	const { mediaServerUrl, mediaServerSecret } = getMediaServerConfig();
+
+	const response = await fetchWithRetry(`${mediaServerUrl}/audio/convert`, {
+		method: "POST",
+		headers: getMediaServerHeaders(mediaServerSecret),
+		body: JSON.stringify({
+			audioUrl,
+			outputFormat: "mp3",
+			bitrate: "128k",
+		}),
+	});
+
+	if (!response.ok) {
+		let errorData: MediaServerError;
+		try {
+			errorData = (await response.json()) as MediaServerError;
+		} catch {
+			throw new Error(
+				`Audio conversion failed: ${response.status} ${response.statusText}`,
+			);
+		}
+		throw new Error(
+			errorData.details || errorData.error || "Audio conversion failed",
+		);
+	}
+
+	const arrayBuffer = await response.arrayBuffer();
+	return Buffer.from(arrayBuffer);
+}
+
+export async function fetchConvertedVideoViaMediaServer(
+	videoUrl: string,
+	inputExtension?: string,
+): Promise<Response> {
+	const { mediaServerUrl, mediaServerSecret } = getMediaServerConfig();
+
+	return await fetchWithRetry(
+		`${mediaServerUrl}/video/convert`,
+		{
+			method: "POST",
+			headers: getMediaServerHeaders(mediaServerSecret),
+			body: JSON.stringify({
+				videoUrl,
+				...(inputExtension ? { inputExtension } : {}),
+			}),
+		},
+		{ maxRetries: 0 },
+	);
 }

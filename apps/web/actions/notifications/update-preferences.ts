@@ -14,6 +14,7 @@ export const updatePreferences = async ({
 		pauseReplies: boolean;
 		pauseViews: boolean;
 		pauseReactions: boolean;
+		pauseAnonViews?: boolean;
 	};
 }) => {
 	const currentUser = await getCurrentUser();
@@ -26,6 +27,7 @@ export const updatePreferences = async ({
 			.update(users)
 			.set({
 				preferences: {
+					...(currentUser.preferences ?? {}),
 					notifications,
 				},
 			})

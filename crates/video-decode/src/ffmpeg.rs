@@ -33,27 +33,29 @@ static HW_CAPABILITIES: OnceLock<HwDecoderCapabilities> = OnceLock::new();
 #[cfg(target_os = "windows")]
 fn query_d3d11_video_decoder_capabilities() -> HwDecoderCapabilities {
     use windows::{
-        core::Interface,
         Win32::{
             Foundation::HMODULE,
             Graphics::{
-                Direct3D::D3D_DRIVER_TYPE_HARDWARE,
+                Direct3D::D3D_DRIVER_TYPE_UNKNOWN,
                 Direct3D11::{
-                    D3D11CreateDevice, ID3D11VideoDevice, D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-                    D3D11_DECODER_PROFILE_H264_VLD_NOFGT, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN,
-                    D3D11_SDK_VERSION, D3D11_VIDEO_DECODER_DESC,
+                    D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_DECODER_PROFILE_H264_VLD_NOFGT,
+                    D3D11_DECODER_PROFILE_HEVC_VLD_MAIN, D3D11_SDK_VERSION,
+                    D3D11_VIDEO_DECODER_DESC, D3D11CreateDevice, ID3D11VideoDevice,
                 },
                 Dxgi::Common::DXGI_FORMAT_NV12,
             },
         },
+        core::Interface,
     };
 
     let result: Result<HwDecoderCapabilities, String> = (|| {
+        let selected = cap_d3d_adapter::select_capture_adapter(None)?;
+
         let mut device = None;
         unsafe {
             D3D11CreateDevice(
-                None,
-                D3D_DRIVER_TYPE_HARDWARE,
+                Some(&selected.adapter),
+                D3D_DRIVER_TYPE_UNKNOWN,
                 HMODULE::default(),
                 D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
                 None,
@@ -62,7 +64,12 @@ fn query_d3d11_video_decoder_capabilities() -> HwDecoderCapabilities {
                 None,
                 None,
             )
-            .map_err(|e| format!("D3D11CreateDevice failed: {e:?}"))?;
+            .map_err(|e| {
+                format!(
+                    "D3D11CreateDevice failed on '{}': {e:?}",
+                    selected.description
+                )
+            })?;
         }
 
         let device = device.ok_or("D3D11CreateDevice returned null")?;
@@ -145,30 +152,34 @@ pub fn get_hw_decoder_capabilities() -> &'static HwDecoderCapabilities {
 
 fn configure_software_threading(decoder: &mut avcodec::decoder::Video, width: u32, height: u32) {
     let pixel_count = (width as u64) * (height as u64);
+    let cpu_count = num_cpus::get();
 
     let thread_count = if pixel_count > 8294400 {
         0
     } else if pixel_count > 2073600 {
-        (num_cpus::get() / 2).max(2) as i32
+        cpu_count.clamp(2, 8) as i32
     } else {
-        2
+        cpu_count.clamp(2, 6) as i32
     };
+
+    let thread_type = ffmpeg::sys::FF_THREAD_FRAME | ffmpeg::sys::FF_THREAD_SLICE;
 
     unsafe {
         let codec_ctx = decoder.as_mut_ptr();
         if !codec_ctx.is_null() {
             (*codec_ctx).thread_count = thread_count;
-            (*codec_ctx).thread_type = ffmpeg::sys::FF_THREAD_FRAME;
+            (*codec_ctx).thread_type = thread_type;
         }
     }
 
     info!(
-        "Software decode configured: {width}x{height}, thread_count={}, thread_type=frame",
+        "Software decode configured: {width}x{height}, thread_count={}, thread_type=frame+slice, cpus={}",
         if thread_count == 0 {
             "auto".to_string()
         } else {
             thread_count.to_string()
-        }
+        },
+        cpu_count
     );
 }
 
@@ -367,11 +378,16 @@ impl<'a> Iterator for FramesIter<'a> {
             match self.decoder.receive_frame(&mut frame) {
                 Ok(()) => {
                     return match &self.hw_device {
-                        Some(hw_device) => Some(Ok(hw_device.get_hwframe(&frame).unwrap_or(frame))),
+                        Some(hw_device) => {
+                            let hw_result = hw_device.get_hwframe(&frame);
+                            Some(Ok(hw_result.unwrap_or(frame)))
+                        }
                         None => Some(Ok(frame)),
                     };
                 }
-                Err(ffmpeg::Error::Eof) => return None,
+                Err(ffmpeg::Error::Eof) => {
+                    return None;
+                }
                 Err(ffmpeg::Error::Other { errno }) if errno == EAGAIN => {}
                 Err(e) => return Some(Err(e)),
             }

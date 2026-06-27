@@ -1,108 +1,12 @@
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{broadcast, watch};
 use tokio_util::sync::CancellationToken;
 
-static TOTAL_BYTES_SENT: AtomicU64 = AtomicU64::new(0);
-static TOTAL_FRAMES_SENT: AtomicU32 = AtomicU32::new(0);
-static LAST_LOG_TIME: AtomicU64 = AtomicU64::new(0);
-
-const NV12_FORMAT_MAGIC: u32 = 0x4e563132;
-
-fn convert_to_nv12(data: &[u8], width: u32, height: u32, stride: u32) -> Vec<u8> {
-    let width = width & !1;
-    let height = height & !1;
-
-    if width == 0 || height == 0 {
-        return Vec::new();
-    }
-
-    let y_stride = width;
-    let uv_stride = width;
-    let y_size = (y_stride * height) as usize;
-    let uv_size = (uv_stride * (height / 2)) as usize;
-    let total_size = y_size + uv_size;
-
-    let stride_bytes = stride as usize;
-
-    let mut output = vec![0u8; total_size];
-    let (y_plane, uv_plane) = output.split_at_mut(y_size);
-
-    for y in 0..height as usize {
-        let src_row = y * stride_bytes;
-
-        if src_row >= data.len() {
-            continue;
-        }
-
-        let y_row_start = y * y_stride as usize;
-        let is_uv_row = y % 2 == 0;
-        let uv_row_start = if is_uv_row {
-            (y / 2) * uv_stride as usize
-        } else {
-            0
-        };
-
-        for x in 0..width as usize {
-            let px = src_row + x * 4;
-
-            if px + 2 < data.len() {
-                let r = data[px] as i32;
-                let g = data[px + 1] as i32;
-                let b = data[px + 2] as i32;
-
-                let y_val = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
-                y_plane[y_row_start + x] = y_val.clamp(0, 255) as u8;
-
-                if is_uv_row && x % 2 == 0 && x + 1 < width as usize {
-                    let px1 = src_row + (x + 1) * 4;
-
-                    let (r1, g1, b1) = if px1 + 2 < data.len() {
-                        (data[px1] as i32, data[px1 + 1] as i32, data[px1 + 2] as i32)
-                    } else {
-                        (r, g, b)
-                    };
-
-                    let avg_r = (r + r1) / 2;
-                    let avg_g = (g + g1) / 2;
-                    let avg_b = (b + b1) / 2;
-
-                    let u = ((-38 * avg_r - 74 * avg_g + 112 * avg_b + 128) >> 8) + 128;
-                    let v = ((112 * avg_r - 94 * avg_g - 18 * avg_b + 128) >> 8) + 128;
-
-                    let uv_idx = uv_row_start + x;
-                    if uv_idx + 1 < uv_plane.len() {
-                        uv_plane[uv_idx] = u.clamp(0, 255) as u8;
-                        uv_plane[uv_idx + 1] = v.clamp(0, 255) as u8;
-                    }
-                }
-            }
-        }
-    }
-
-    output
-}
-
-fn pack_nv12_frame(
-    data: Vec<u8>,
-    width: u32,
-    height: u32,
-    frame_number: u32,
-    target_time_ns: u64,
-) -> Vec<u8> {
-    let y_stride = width;
-    let metadata_size = 28;
-    let mut output = Vec::with_capacity(data.len() + metadata_size);
-    output.extend_from_slice(&data);
-    output.extend_from_slice(&y_stride.to_le_bytes());
-    output.extend_from_slice(&height.to_le_bytes());
-    output.extend_from_slice(&width.to_le_bytes());
-    output.extend_from_slice(&frame_number.to_le_bytes());
-    output.extend_from_slice(&target_time_ns.to_le_bytes());
-    output.extend_from_slice(&NV12_FORMAT_MAGIC.to_le_bytes());
-
-    output
-}
+const NV12_VIDEO_FORMAT_MAGIC: u32 = 0x4e563132;
+const NV12_FULL_FORMAT_MAGIC: u32 = 0x4e563146;
 
 fn pack_frame_data(
     mut data: Vec<u8>,
@@ -121,66 +25,179 @@ fn pack_frame_data(
     data
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum WSFrameFormat {
+    Rgba,
+    Nv12 { full_range: bool },
+}
+
 #[derive(Clone)]
 pub struct WSFrame {
-    pub data: Vec<u8>,
+    pub data: std::sync::Arc<Vec<u8>>,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
     pub frame_number: u32,
     pub target_time_ns: u64,
+    pub format: WSFrameFormat,
     #[allow(dead_code)]
     pub created_at: Instant,
 }
 
+fn pack_ws_frame(frame: &WSFrame) -> Vec<u8> {
+    let metadata_size = match frame.format {
+        WSFrameFormat::Nv12 { .. } => 28usize,
+        WSFrameFormat::Rgba => 24,
+    };
+    let mut buf = Vec::with_capacity(frame.data.len() + metadata_size);
+    buf.extend_from_slice(&frame.data);
+
+    match frame.format {
+        WSFrameFormat::Nv12 { full_range } => {
+            buf.extend_from_slice(&frame.stride.to_le_bytes());
+            buf.extend_from_slice(&frame.height.to_le_bytes());
+            buf.extend_from_slice(&frame.width.to_le_bytes());
+            buf.extend_from_slice(&frame.frame_number.to_le_bytes());
+            buf.extend_from_slice(&frame.target_time_ns.to_le_bytes());
+            let magic = if full_range {
+                NV12_FULL_FORMAT_MAGIC
+            } else {
+                NV12_VIDEO_FORMAT_MAGIC
+            };
+            buf.extend_from_slice(&magic.to_le_bytes());
+        }
+        WSFrameFormat::Rgba => {
+            buf.extend_from_slice(&frame.stride.to_le_bytes());
+            buf.extend_from_slice(&frame.height.to_le_bytes());
+            buf.extend_from_slice(&frame.width.to_le_bytes());
+            buf.extend_from_slice(&frame.frame_number.to_le_bytes());
+            buf.extend_from_slice(&frame.target_time_ns.to_le_bytes());
+        }
+    }
+
+    buf
+}
+
+fn duration_ns(duration: std::time::Duration) -> u64 {
+    duration.as_nanos().min(u128::from(u64::MAX)) as u64
+}
+
+#[derive(Default)]
+struct WsFrameStats {
+    total_bytes_sent: u64,
+    total_frames_sent: u32,
+    last_log_time_ms: u64,
+    total_pack_ns: u64,
+    max_pack_ns: u64,
+    total_send_ns: u64,
+    max_send_ns: u64,
+    total_created_to_sent_ns: u64,
+    max_created_to_sent_ns: u64,
+}
+
+impl WsFrameStats {
+    fn record(
+        &mut self,
+        packed_len: usize,
+        pack_duration: std::time::Duration,
+        send_duration: std::time::Duration,
+        created_to_sent: std::time::Duration,
+    ) {
+        self.total_bytes_sent += packed_len as u64;
+        self.total_frames_sent += 1;
+        let pack_ns = duration_ns(pack_duration);
+        let send_ns = duration_ns(send_duration);
+        let created_to_sent_ns = duration_ns(created_to_sent);
+        self.total_pack_ns += pack_ns;
+        self.max_pack_ns = self.max_pack_ns.max(pack_ns);
+        self.total_send_ns += send_ns;
+        self.max_send_ns = self.max_send_ns.max(send_ns);
+        self.total_created_to_sent_ns += created_to_sent_ns;
+        self.max_created_to_sent_ns = self.max_created_to_sent_ns.max(created_to_sent_ns);
+    }
+
+    fn reset_window(&mut self, now_ms: u64) -> WsFrameStatsWindow {
+        self.last_log_time_ms = now_ms;
+        WsFrameStatsWindow {
+            total_bytes_sent: std::mem::take(&mut self.total_bytes_sent),
+            total_frames_sent: std::mem::take(&mut self.total_frames_sent),
+            total_pack_ns: std::mem::take(&mut self.total_pack_ns),
+            max_pack_ns: std::mem::take(&mut self.max_pack_ns),
+            total_send_ns: std::mem::take(&mut self.total_send_ns),
+            max_send_ns: std::mem::take(&mut self.max_send_ns),
+            total_created_to_sent_ns: std::mem::take(&mut self.total_created_to_sent_ns),
+            max_created_to_sent_ns: std::mem::take(&mut self.max_created_to_sent_ns),
+        }
+    }
+}
+
+struct WsFrameStatsWindow {
+    total_bytes_sent: u64,
+    total_frames_sent: u32,
+    total_pack_ns: u64,
+    max_pack_ns: u64,
+    total_send_ns: u64,
+    max_send_ns: u64,
+    total_created_to_sent_ns: u64,
+    max_created_to_sent_ns: u64,
+}
+
+struct SubscriberCountGuard(Arc<AtomicUsize>);
+
+impl Drop for SubscriberCountGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 pub async fn create_watch_frame_ws(
-    frame_rx: watch::Receiver<Option<WSFrame>>,
+    frame_rx: watch::Receiver<Option<std::sync::Arc<WSFrame>>>,
+    subscribers: Arc<AtomicUsize>,
 ) -> (u16, CancellationToken) {
     use axum::{
         extract::{
-            ws::{Message, WebSocket, WebSocketUpgrade},
             State,
+            ws::{Message, WebSocket, WebSocketUpgrade},
         },
         response::IntoResponse,
         routing::get,
     };
 
-    type RouterState = watch::Receiver<Option<WSFrame>>;
+    type RouterState = (
+        watch::Receiver<Option<std::sync::Arc<WSFrame>>>,
+        Arc<AtomicUsize>,
+    );
 
     #[axum::debug_handler]
     async fn ws_handler(
         ws: WebSocketUpgrade,
-        State(state): State<RouterState>,
+        State((state, subscribers)): State<RouterState>,
     ) -> impl IntoResponse {
-        ws.on_upgrade(move |socket| handle_socket(socket, state))
+        ws.on_upgrade(move |socket| handle_socket(socket, state, subscribers))
     }
 
-    async fn handle_socket(mut socket: WebSocket, mut camera_rx: watch::Receiver<Option<WSFrame>>) {
+    async fn handle_socket(
+        mut socket: WebSocket,
+        mut camera_rx: watch::Receiver<Option<std::sync::Arc<WSFrame>>>,
+        subscribers: Arc<AtomicUsize>,
+    ) {
         tracing::info!("Socket connection established");
         let now = std::time::Instant::now();
+        let mut stats = WsFrameStats::default();
+
+        subscribers.fetch_add(1, Ordering::AcqRel);
+        let _subscriber_guard = SubscriberCountGuard(subscribers);
 
         {
-            let frame_opt = camera_rx.borrow().clone();
-            if let Some(frame) = frame_opt {
-                let width = frame.width & !1;
-                let height = frame.height & !1;
-                let nv12_data =
-                    convert_to_nv12(&frame.data, frame.width, frame.height, frame.stride);
-
-                if !nv12_data.is_empty() {
-                    let packed = pack_nv12_frame(
-                        nv12_data,
-                        width,
-                        height,
-                        frame.frame_number,
-                        frame.target_time_ns,
-                    );
-
-                    if let Err(e) = socket.send(Message::Binary(packed.into())).await {
-                        tracing::error!("Failed to send initial frame to socket: {:?}", e);
-                        return;
-                    }
-                }
+            let packed = {
+                let borrowed = camera_rx.borrow();
+                borrowed.as_deref().map(pack_ws_frame)
+            };
+            if let Some(packed) = packed
+                && let Err(e) = socket.send(Message::Binary(packed.into())).await
+            {
+                tracing::error!("Failed to send initial frame to socket: {:?}", e);
+                return;
             }
         }
 
@@ -200,43 +217,51 @@ pub async fn create_watch_frame_ws(
                     }
                 },
                 _ = camera_rx.changed() => {
-                    let frame_opt = camera_rx.borrow_and_update().clone();
-                    if let Some(frame) = frame_opt {
-                        let width = frame.width & !1;
-                        let height = frame.height & !1;
-                        let nv12_data = convert_to_nv12(&frame.data, frame.width, frame.height, frame.stride);
+                    let frame_arc = camera_rx.borrow_and_update().clone();
+                    if let Some(ref frame) = frame_arc {
+                        let width = frame.width;
+                        let height = frame.height;
+                        let format_label = match frame.format {
+                            WSFrameFormat::Nv12 { full_range: false } => "NV12",
+                            WSFrameFormat::Nv12 { full_range: true } => "NV12-full",
+                            WSFrameFormat::Rgba => "RGBA",
+                        };
 
-                        if nv12_data.is_empty() {
-                            continue;
-                        }
-
-                        let packed = pack_nv12_frame(
-                            nv12_data,
-                            width,
-                            height,
-                            frame.frame_number,
-                            frame.target_time_ns,
-                        );
-
+                        let pack_start = Instant::now();
+                        let packed = pack_ws_frame(frame);
+                        let pack_duration = pack_start.elapsed();
                         let packed_len = packed.len();
 
+                        let send_start = Instant::now();
                         match socket.send(Message::Binary(packed.into())).await {
                             Ok(()) => {
-                                TOTAL_BYTES_SENT.fetch_add(packed_len as u64, Ordering::Relaxed);
-                                TOTAL_FRAMES_SENT.fetch_add(1, Ordering::Relaxed);
-                                let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
-                                let last_log = LAST_LOG_TIME.load(Ordering::Relaxed);
-                                if now_ms - last_log > 2000 {
-                                    LAST_LOG_TIME.store(now_ms, Ordering::Relaxed);
-                                    let total_bytes = TOTAL_BYTES_SENT.swap(0, Ordering::Relaxed);
-                                    let total_frames = TOTAL_FRAMES_SENT.swap(0, Ordering::Relaxed);
-                                    let mb_per_sec = total_bytes as f64 / 1_000_000.0 / 2.0;
+                                let send_duration = send_start.elapsed();
+                                stats.record(
+                                    packed_len,
+                                    pack_duration,
+                                    send_duration,
+                                    frame.created_at.elapsed(),
+                                );
+                                let now_ms = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .map(|duration| duration.as_millis() as u64)
+                                    .unwrap_or_default();
+                                if now_ms.saturating_sub(stats.last_log_time_ms) > 2000 {
+                                    let window = stats.reset_window(now_ms);
+                                    let frames = window.total_frames_sent.max(1) as f64;
+                                    let mb_per_sec = window.total_bytes_sent as f64 / 1_000_000.0 / 2.0;
                                     tracing::info!(
-                                        fps = total_frames / 2,
+                                        fps = window.total_frames_sent / 2,
                                         mb_per_sec = format!("{:.1}", mb_per_sec),
-                                        avg_kb = format!("{:.1}", (total_bytes as f64 / total_frames.max(1) as f64) / 1024.0),
+                                        avg_kb = format!("{:.1}", (window.total_bytes_sent as f64 / window.total_frames_sent.max(1) as f64) / 1024.0),
+                                        pack_avg_ms = format!("{:.3}", window.total_pack_ns as f64 / frames / 1_000_000.0),
+                                        pack_max_ms = format!("{:.3}", window.max_pack_ns as f64 / 1_000_000.0),
+                                        send_avg_ms = format!("{:.3}", window.total_send_ns as f64 / frames / 1_000_000.0),
+                                        send_max_ms = format!("{:.3}", window.max_send_ns as f64 / 1_000_000.0),
+                                        created_to_sent_avg_ms = format!("{:.3}", window.total_created_to_sent_ns as f64 / frames / 1_000_000.0),
+                                        created_to_sent_max_ms = format!("{:.3}", window.max_created_to_sent_ns as f64 / 1_000_000.0),
                                         dims = format!("{}x{}", width, height),
-                                        format = "NV12",
+                                        format = format_label,
                                         "WS frame stats"
                                     );
                                 }
@@ -257,20 +282,32 @@ pub async fn create_watch_frame_ws(
 
     let router = axum::Router::new()
         .route("/", get(ws_handler))
-        .with_state(frame_rx);
-
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let port = listener.local_addr().unwrap().port();
-    tracing::info!("WebSocket server listening on port {}", port);
+        .with_state((frame_rx, subscribers));
 
     let cancel_token = CancellationToken::new();
     let cancel_token_child = cancel_token.child_token();
+    let listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
+        Ok(listener) => listener,
+        Err(err) => {
+            tracing::error!("Failed to bind watch frame websocket listener: {err}");
+            return (0, cancel_token_child);
+        }
+    };
+    let port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(err) => {
+            tracing::error!("Failed to read watch frame websocket listener address: {err}");
+            return (0, cancel_token_child);
+        }
+    };
+    tracing::info!("WebSocket server listening on port {}", port);
+
     tokio::spawn(async move {
         let server = axum::serve(listener, router.into_make_service());
         tokio::select! {
             _ = server => {},
             _ = cancel_token.cancelled() => {
-                println!("WebSocket server shutting down");
+                tracing::info!("WebSocket server shutting down");
             }
         }
     });
@@ -281,8 +318,8 @@ pub async fn create_watch_frame_ws(
 pub async fn create_frame_ws(frame_tx: broadcast::Sender<WSFrame>) -> (u16, CancellationToken) {
     use axum::{
         extract::{
-            ws::{Message, WebSocket, WebSocketUpgrade},
             State,
+            ws::{Message, WebSocket, WebSocketUpgrade},
         },
         response::IntoResponse,
         routing::get,
@@ -300,7 +337,6 @@ pub async fn create_frame_ws(frame_tx: broadcast::Sender<WSFrame>) -> (u16, Canc
     }
 
     async fn handle_socket(mut socket: WebSocket, mut camera_rx: broadcast::Receiver<WSFrame>) {
-        println!("socket connection established");
         tracing::info!("Socket connection established");
         let now = std::time::Instant::now();
 
@@ -325,7 +361,7 @@ pub async fn create_frame_ws(frame_tx: broadcast::Sender<WSFrame>) -> (u16, Canc
                     match incoming_frame {
                         Ok(frame) => {
                             let packed = pack_frame_data(
-                                frame.data,
+                                std::sync::Arc::unwrap_or_clone(frame.data),
                                 frame.stride,
                                 frame.height,
                                 frame.width,
@@ -353,7 +389,6 @@ pub async fn create_frame_ws(frame_tx: broadcast::Sender<WSFrame>) -> (u16, Canc
         }
 
         let elapsed = now.elapsed();
-        println!("Websocket closing after {elapsed:.2?}");
         tracing::info!("Websocket closing after {elapsed:.2?}");
     }
 
@@ -361,18 +396,30 @@ pub async fn create_frame_ws(frame_tx: broadcast::Sender<WSFrame>) -> (u16, Canc
         .route("/", get(ws_handler))
         .with_state(frame_tx);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let port = listener.local_addr().unwrap().port();
-    tracing::info!("WebSocket server listening on port {}", port);
-
     let cancel_token = CancellationToken::new();
     let cancel_token_child = cancel_token.child_token();
+    let listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
+        Ok(listener) => listener,
+        Err(err) => {
+            tracing::error!("Failed to bind frame websocket listener: {err}");
+            return (0, cancel_token_child);
+        }
+    };
+    let port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(err) => {
+            tracing::error!("Failed to read frame websocket listener address: {err}");
+            return (0, cancel_token_child);
+        }
+    };
+    tracing::info!("WebSocket server listening on port {}", port);
+
     tokio::spawn(async move {
         let server = axum::serve(listener, router.into_make_service());
         tokio::select! {
             _ = server => {},
             _ = cancel_token.cancelled() => {
-                println!("WebSocket server shutting down");
+                tracing::info!("WebSocket server shutting down");
             }
         }
     });

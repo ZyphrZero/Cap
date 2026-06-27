@@ -1,34 +1,61 @@
-// Ideally all the Notification-related types would be in @cap/web-domain
-// but @cap/web-api-contract is the closest we have right now
-
 import { db } from "@cap/database";
+import { sendEmail } from "@cap/database/emails/config";
+import { FirstView } from "@cap/database/emails/first-view";
+import { NewComment } from "@cap/database/emails/new-comment";
 import { nanoId } from "@cap/database/helpers";
 import { comments, notifications, users, videos } from "@cap/database/schema";
+import { buildEnv, serverEnv } from "@cap/env";
 import type { Notification, NotificationBase } from "@cap/web-api-contract";
-import { type Comment, Video } from "@cap/web-domain";
-import { and, eq, sql } from "drizzle-orm";
+import { Comment, User, Video } from "@cap/web-domain";
+import { and, eq, gte, isNull, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { UserPreferences } from "@/app/(org)/dashboard/dashboard-data";
+import { getSessionHash } from "@/lib/anonymous-names";
 
 export type NotificationType = Notification["type"];
 
-// Notification daata without id, readTime, etc
+const COMMENT_EMAIL_THROTTLE_MS = 15 * 60 * 1000;
+
+const notificationSettingsUrl = () =>
+	`${serverEnv().WEB_URL}/dashboard/settings/notifications`;
+
 type NotificationSpecificData = DistributiveOmit<
 	Notification,
 	keyof NotificationBase
 >;
 
-// Replaces author object with authorId since we query for that info.
-// If we add more notifications this would probably be better done manually
-// Type is weird since we need to operate on each member of the NotificationSpecificData union
-type CreateNotificationInput<D = NotificationSpecificData> =
-	D extends NotificationSpecificData
-		? D["author"] extends never
-			? D
-			: Omit<D, "author"> & { authorId: string } & {
-					parentCommentId?: Comment.CommentId;
-				}
+type AuthoredNotificationData = Exclude<
+	NotificationSpecificData,
+	{ type: "anon_view" }
+>;
+
+type CreateNotificationInput<D = AuthoredNotificationData> =
+	D extends AuthoredNotificationData
+		? Omit<D, "author"> & { authorId: string } & {
+				parentCommentId?: Comment.CommentId;
+			}
 		: never;
+
+const ANON_NOTIF_WINDOW_MS = 5 * 60 * 1000;
+const ANON_NOTIF_MAX_PER_VIDEO = 50;
+
+const isDuplicateEntryError = (error: unknown) => {
+	if (!error || typeof error !== "object") return false;
+	const duplicateEntryError = error as {
+		code?: string;
+		errno?: number;
+		message?: string;
+		sqlMessage?: string;
+	};
+	if (
+		duplicateEntryError.code !== "ER_DUP_ENTRY" &&
+		duplicateEntryError.errno !== 1062
+	)
+		return false;
+	const message =
+		`${duplicateEntryError.sqlMessage ?? ""} ${duplicateEntryError.message ?? ""}`.trim();
+	return message.includes("dedup_key_idx");
+};
 
 export async function createNotification(
 	notification: CreateNotificationInput,
@@ -75,7 +102,6 @@ export async function createNotification(
 
 		const { type, ...data } = notification;
 
-		// Handle replies: notify the parent comment's author
 		if (type === "reply" && notification.parentCommentId) {
 			const [parentComment] = await db()
 				.select({ authorId: comments.authorId })
@@ -128,19 +154,17 @@ export async function createNotification(
 				recipientId,
 				type,
 				data,
+				videoId: notification.videoId,
 			});
 
 			revalidatePath("/dashboard");
 			return { success: true, notificationId };
 		}
 
-		// Skip notification if the video owner is the current user
-		// (this only applies to non-reply types)
 		if (videoResult.ownerId === notification.authorId) {
 			return;
 		}
 
-		// Check user preferences
 		const preferences = videoResult.preferences as UserPreferences;
 		if (preferences?.notifications) {
 			const notificationPrefs = preferences.notifications;
@@ -155,7 +179,6 @@ export async function createNotification(
 			}
 		}
 
-		// Check for existing notification to prevent duplicates
 		let hasExistingNotification = false;
 		if (type === "view") {
 			const [existingNotification] = await db()
@@ -165,7 +188,7 @@ export async function createNotification(
 					and(
 						eq(notifications.type, "view"),
 						eq(notifications.recipientId, videoResult.ownerId),
-						sql`JSON_EXTRACT(${notifications.data}, '$.videoId') = ${notification.videoId}`,
+						eq(notifications.videoId, notification.videoId),
 						sql`JSON_EXTRACT(${notifications.data}, '$.authorId') = ${notification.authorId}`,
 					),
 				)
@@ -207,13 +230,263 @@ export async function createNotification(
 			recipientId: videoResult.ownerId,
 			type,
 			data,
+			videoId: notification.videoId,
 		});
 
 		revalidatePath("/dashboard");
+
+		if (type === "comment") {
+			await sendNewCommentEmail({
+				videoId: notification.videoId,
+				recipientId: videoResult.ownerId,
+				authorId: notification.authorId,
+				comment: notification.comment,
+			});
+		}
 
 		return { success: true, notificationId };
 	} catch (error) {
 		console.error("Error creating notification:", error);
 		throw error;
+	}
+}
+
+async function sendNewCommentEmail(params: {
+	videoId: string;
+	recipientId: string;
+	authorId: string;
+	comment: { id: string; content: string };
+}) {
+	try {
+		const database = db();
+
+		// Throttle to the same set of events that actually trigger an email: a
+		// top-level comment authored by someone other than the owner. Replies and
+		// the owner's own comments share comments.type === "text", so without these
+		// filters they'd poison the window and suppress legitimate comment emails.
+		// Top-level comments persist parentCommentId as "" (not NULL) — see
+		// Comment.CommentId.make("") in the share-page comment UI.
+		const throttleStart = new Date(Date.now() - COMMENT_EMAIL_THROTTLE_MS);
+		const [recentComment] = await database
+			.select({ id: comments.id })
+			.from(comments)
+			.where(
+				and(
+					eq(comments.videoId, Video.VideoId.make(params.videoId)),
+					eq(comments.type, "text"),
+					or(
+						isNull(comments.parentCommentId),
+						eq(comments.parentCommentId, Comment.CommentId.make("")),
+					),
+					ne(comments.authorId, User.UserId.make(params.recipientId)),
+					gte(comments.createdAt, throttleStart),
+					ne(comments.id, Comment.CommentId.make(params.comment.id)),
+				),
+			)
+			.limit(1);
+
+		if (recentComment) return;
+
+		const [recipient] = await database
+			.select({ email: users.email })
+			.from(users)
+			.where(eq(users.id, User.UserId.make(params.recipientId)))
+			.limit(1);
+
+		if (!recipient?.email) return;
+
+		const [video] = await database
+			.select({ name: videos.name })
+			.from(videos)
+			.where(eq(videos.id, Video.VideoId.make(params.videoId)))
+			.limit(1);
+
+		const videoName = video?.name || "Untitled Video";
+
+		const [commenter] = await database
+			.select({ name: users.name })
+			.from(users)
+			.where(eq(users.id, User.UserId.make(params.authorId)))
+			.limit(1);
+
+		const commenterName = commenter?.name || "Someone";
+
+		const videoUrl = buildEnv.NEXT_PUBLIC_IS_CAP
+			? `https://cap.link/${params.videoId}`
+			: `${serverEnv().WEB_URL}/s/${params.videoId}`;
+
+		await sendEmail({
+			email: recipient.email,
+			subject: `New comment on your Cap: ${videoName}`,
+			react: NewComment({
+				email: recipient.email,
+				url: videoUrl,
+				videoName,
+				commenterName,
+				commentContent: params.comment.content,
+				manageNotificationsUrl: notificationSettingsUrl(),
+			}),
+		});
+	} catch (error) {
+		console.error("Failed to send new comment email:", error);
+	}
+}
+
+export async function createAnonymousViewNotification({
+	videoId,
+	sessionId,
+	anonName,
+	location,
+}: {
+	videoId: string;
+	sessionId: string;
+	anonName: string;
+	location: string | null;
+}) {
+	const sessionHash = getSessionHash(sessionId);
+	const dedupKey = `anon_view:${videoId}:${sessionHash}`;
+	const rateWindowStart = new Date(Date.now() - ANON_NOTIF_WINDOW_MS);
+
+	try {
+		const database = db();
+
+		const [existingNotification] = await database
+			.select({ id: notifications.id })
+			.from(notifications)
+			.where(eq(notifications.dedupKey, dedupKey))
+			.limit(1);
+
+		if (existingNotification) return;
+
+		const [videoWithOwner] = await database
+			.select({
+				videoId: videos.id,
+				ownerId: users.id,
+				activeOrganizationId: users.activeOrganizationId,
+				preferences: users.preferences,
+			})
+			.from(videos)
+			.innerJoin(users, eq(users.id, videos.ownerId))
+			.where(eq(videos.id, Video.VideoId.make(videoId)))
+			.limit(1);
+
+		if (!videoWithOwner?.activeOrganizationId) return;
+
+		const preferences = videoWithOwner.preferences as UserPreferences;
+		if (preferences?.notifications?.pauseAnonViews) return;
+
+		const [recentNotificationCount] = await database
+			.select({ count: sql<number>`COUNT(*)` })
+			.from(notifications)
+			.where(
+				and(
+					eq(notifications.type, "anon_view"),
+					eq(notifications.recipientId, videoWithOwner.ownerId),
+					gte(notifications.createdAt, rateWindowStart),
+					eq(notifications.videoId, videoId),
+				),
+			)
+			.limit(1);
+
+		if (Number(recentNotificationCount?.count ?? 0) >= ANON_NOTIF_MAX_PER_VIDEO)
+			return;
+
+		await database.insert(notifications).values({
+			id: nanoId(),
+			orgId: videoWithOwner.activeOrganizationId,
+			recipientId: videoWithOwner.ownerId,
+			type: "anon_view",
+			data: { videoId, anonName, location },
+			videoId,
+			dedupKey,
+		});
+		revalidatePath("/dashboard");
+	} catch (error) {
+		if (isDuplicateEntryError(error)) return;
+		throw error;
+	}
+}
+
+export async function sendFirstViewEmail(
+	params:
+		| { videoId: string; viewerName: string; isAnonymous: true }
+		| { videoId: string; viewerUserId: string; isAnonymous: false },
+) {
+	try {
+		const database = db();
+
+		const videoWithOwner = await database
+			.select({
+				firstViewEmailSentAt: videos.firstViewEmailSentAt,
+				videoName: videos.name,
+				ownerId: videos.ownerId,
+				ownerEmail: users.email,
+				preferences: users.preferences,
+			})
+			.from(videos)
+			.innerJoin(users, eq(users.id, videos.ownerId))
+			.where(eq(videos.id, Video.VideoId.make(params.videoId)))
+			.limit(1)
+			.then((rows) => {
+				const row = rows[0];
+				if (!row || row.firstViewEmailSentAt) return null;
+				return row;
+			});
+
+		if (!videoWithOwner?.ownerEmail) return;
+
+		if (!params.isAnonymous && params.viewerUserId === videoWithOwner.ownerId)
+			return;
+
+		const preferences = videoWithOwner.preferences as UserPreferences;
+		if (params.isAnonymous) {
+			if (preferences?.notifications?.pauseAnonViews) return;
+		} else {
+			if (preferences?.notifications?.pauseViews) return;
+		}
+
+		const [result] = await database
+			.update(videos)
+			.set({ firstViewEmailSentAt: new Date() })
+			.where(
+				and(
+					eq(videos.id, Video.VideoId.make(params.videoId)),
+					isNull(videos.firstViewEmailSentAt),
+				),
+			);
+
+		if (result.affectedRows === 0) return;
+
+		let viewerName: string;
+		if (params.isAnonymous) {
+			viewerName = params.viewerName;
+		} else {
+			const [viewer] = await database
+				.select({ name: users.name, email: users.email })
+				.from(users)
+				.where(eq(users.id, User.UserId.make(params.viewerUserId)))
+				.limit(1);
+			viewerName = viewer?.name || viewer?.email || "Someone";
+		}
+
+		const videoUrl = buildEnv.NEXT_PUBLIC_IS_CAP
+			? `https://cap.link/${params.videoId}`
+			: `${serverEnv().WEB_URL}/s/${params.videoId}`;
+
+		const displayName = videoWithOwner.videoName || "Untitled Video";
+
+		await sendEmail({
+			email: videoWithOwner.ownerEmail,
+			subject: `Your Cap "${displayName}" just got its first view!`,
+			react: FirstView({
+				email: videoWithOwner.ownerEmail,
+				url: videoUrl,
+				videoName: displayName,
+				viewerName,
+				manageNotificationsUrl: notificationSettingsUrl(),
+			}),
+		});
+	} catch (error) {
+		console.error("Failed to send first view email:", error);
 	}
 }

@@ -1,3 +1,4 @@
+import { Button } from "@cap/ui-solid";
 import Tooltip from "@corvu/tooltip";
 import {
 	createQuery,
@@ -7,52 +8,48 @@ import {
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { remove } from "@tauri-apps/plugin-fs";
-import { cx } from "cva";
 import {
+	createEffect,
 	createMemo,
 	createSignal,
 	For,
-	type JSX,
 	type ParentProps,
 	Show,
 } from "solid-js";
-import { reconcile } from "solid-js/store";
-import { t } from "~/components/I18nProvider";
+import { Input } from "~/routes/editor/ui";
 import { trackEvent } from "~/utils/analytics";
 import { createTauriEventListener } from "~/utils/createEventListener";
+import { importImageFromPicker, showImportError } from "~/utils/importMedia";
 import { commands, events, type RecordingMeta } from "~/utils/tauri";
 
-// Icons
 import IconCapTrash from "~icons/cap/trash";
 import IconLucideCopy from "~icons/lucide/copy";
 import IconLucideEdit from "~icons/lucide/edit";
 import IconLucideFolder from "~icons/lucide/folder";
+import IconLucideImport from "~icons/lucide/import";
+import IconLucideSearch from "~icons/lucide/search";
+import { Section, SettingsPageContent } from "./Setting";
 
 type Screenshot = RecordingMeta & {
 	path: string;
 };
 
-const Tabs: { id: string; label: string; icon?: JSX.Element }[] = [
-	{
-		id: "all",
-		label: "Show all",
-	},
-];
+const PAGE_SIZE = 20;
 
-const screenshotsQuery = queryOptions({
+const screenshotsQuery = queryOptions<Screenshot[]>({
 	queryKey: ["screenshots"],
 	queryFn: async () => {
 		const result = await commands.listScreenshots().catch(() => [] as const);
 		return result.map(([path, meta]) => ({ ...meta, path }));
 	},
-	reconcile: (old, n) => reconcile(n)(old),
-	refetchInterval: 2000,
+	reconcile: "path",
 });
 
 export default function Screenshots() {
-	const [activeTab, setActiveTab] = createSignal<(typeof Tabs)[number]["id"]>(
-		Tabs[0].id,
-	);
+	const [search, setSearch] = createSignal("");
+	const trimmedSearch = createMemo(() => search().trim());
+	const normalizedSearch = createMemo(() => trimmedSearch().toLowerCase());
+	const [visibleCount, setVisibleCount] = createSignal(PAGE_SIZE);
 
 	const screenshots = createQuery(() => screenshotsQuery);
 
@@ -60,11 +57,33 @@ export default function Screenshots() {
 		screenshots.refetch(),
 	);
 
+	createEffect(() => {
+		trimmedSearch();
+		setVisibleCount(PAGE_SIZE);
+	});
+
 	const filteredScreenshots = createMemo(() => {
-		if (!screenshots.data) {
-			return [];
-		}
-		return screenshots.data;
+		const data = screenshots.data ?? [];
+		const query = normalizedSearch();
+		if (!query) return data;
+		return data.filter((screenshot) =>
+			screenshot.pretty_name.toLowerCase().includes(query),
+		);
+	});
+
+	const visibleScreenshots = createMemo(() => {
+		const items = filteredScreenshots();
+		if (normalizedSearch()) return items;
+		return items.slice(0, visibleCount());
+	});
+
+	const hasMoreScreenshots = createMemo(
+		() => !normalizedSearch() && filteredScreenshots().length > visibleCount(),
+	);
+
+	const emptyMessage = createMemo(() => {
+		const prefix = trimmedSearch() ? "No matching" : "No";
+		return `${prefix} screenshots`;
 	});
 
 	const handleScreenshotClick = (screenshot: Screenshot) => {
@@ -96,61 +115,110 @@ export default function Screenshots() {
 		commands.copyScreenshotToClipboard(path);
 	};
 
+	const handleImportImage = async () => {
+		try {
+			await importImageFromPicker();
+		} catch (e) {
+			console.error("Failed to import image:", e);
+			await showImportError("image", e);
+		}
+	};
+
 	return (
-		<div class="flex relative flex-col p-4 space-y-4 w-full h-full">
-			<div class="flex flex-col">
-				<h2 class="text-lg font-medium text-gray-12">
-					{t("screenshotsPage.title")}
-				</h2>
-				<p class="text-sm text-gray-10">{t("screenshotsPage.description")}</p>
-			</div>
-			<Show
-				when={screenshots.data && screenshots.data.length > 0}
-				fallback={
-					<p class="text-center text-[--text-tertiary] absolute flex items-center justify-center w-full h-full">
-						{t("screenshotsPage.notFound")}
-					</p>
-				}
-			>
-				<div class="flex gap-3 items-center pb-4 w-full border-b border-gray-2">
-					<For each={Tabs}>
-						{(tab) => (
-							<div
-								class={cx(
-									"flex gap-1.5 items-center transition-colors duration-200 p-2 px-3 border rounded-full",
-									activeTab() === tab.id
-										? "bg-gray-5 cursor-default border-gray-5"
-										: "bg-transparent cursor-pointer hover:bg-gray-3 border-gray-5",
-								)}
-								onClick={() => setActiveTab(tab.id)}
-							>
-								{tab.icon && tab.icon}
-								<p class="text-xs text-gray-12">
-									{t(`screenshotsPage.tabs.${tab.id}` as any)}
+		<div class="cap-settings-page flex relative flex-col w-full h-full custom-scroll">
+			<SettingsPageContent class="max-w-none space-y-4">
+				<Section
+					title="Screenshots"
+					description="Manage your screenshots and perform actions."
+					right={
+						<Button
+							variant="gray"
+							size="sm"
+							class="h-[36px] px-3 shrink-0 flex items-center gap-1.5"
+							onClick={handleImportImage}
+						>
+							<IconLucideImport class="size-3.5" />
+							<span>Import image</span>
+						</Button>
+					}
+				>
+					<Show
+						when={screenshots.data && screenshots.data.length > 0}
+						fallback={
+							<div class="flex flex-1 items-center justify-center">
+								<p class="text-center text-(--text-tertiary)">
+									No screenshots found
 								</p>
 							</div>
-						)}
-					</For>
-				</div>
-
-				<div class="flex relative flex-col flex-1 mt-4 rounded-xl border custom-scroll bg-gray-2 border-gray-3">
-					<ul class="flex flex-col w-full text-[--text-primary]">
-						<For each={filteredScreenshots()}>
-							{(screenshot) => (
-								<ScreenshotItem
-									screenshot={screenshot}
-									onClick={() => handleScreenshotClick(screenshot)}
-									onOpenEditor={() => handleOpenEditor(screenshot.path)}
-									onOpenFolder={() => handleOpenFolder(screenshot.path)}
-									onCopyImageToClipboard={() =>
-										handleCopyImageToClipboard(screenshot.path)
-									}
+						}
+					>
+						<div class="flex flex-col gap-3 pb-4 w-full border-b border-gray-2">
+							<div class="relative w-full max-w-[260px] h-[36px] flex items-center">
+								<IconLucideSearch class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
+								<Input
+									type="search"
+									class="py-2 pl-6 h-full w-full"
+									value={search()}
+									onInput={(event) => setSearch(event.currentTarget.value)}
+									onKeyDown={(event) => {
+										if (event.key === "Escape" && search()) {
+											event.preventDefault();
+											setSearch("");
+										}
+									}}
+									placeholder="Search"
+									autoCapitalize="off"
+									autocorrect="off"
+									autocomplete="off"
+									spellcheck={false}
+									aria-label="Search screenshots"
 								/>
-							)}
-						</For>
-					</ul>
-				</div>
-			</Show>
+							</div>
+						</div>
+
+						<div class="flex relative flex-col flex-1 mt-4 rounded-xl border custom-scroll bg-gray-2 border-gray-3">
+							<Show when={filteredScreenshots().length === 0}>
+								<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
+									{emptyMessage()}
+								</p>
+							</Show>
+							<ul class="flex flex-col w-full text-(--text-primary)">
+								<For each={visibleScreenshots()}>
+									{(screenshot) => (
+										<ScreenshotItem
+											screenshot={screenshot}
+											onClick={() => handleScreenshotClick(screenshot)}
+											onOpenEditor={() => handleOpenEditor(screenshot.path)}
+											onOpenFolder={() => handleOpenFolder(screenshot.path)}
+											onCopyImageToClipboard={() =>
+												handleCopyImageToClipboard(screenshot.path)
+											}
+										/>
+									)}
+								</For>
+							</ul>
+							<Show when={hasMoreScreenshots()}>
+								<div class="flex justify-center p-3 border-t border-gray-3">
+									<Button
+										variant="gray"
+										size="sm"
+										onClick={() =>
+											setVisibleCount((count) =>
+												Math.min(
+													count + PAGE_SIZE,
+													filteredScreenshots().length,
+												),
+											)
+										}
+									>
+										Load more
+									</Button>
+								</div>
+							</Show>
+						</div>
+					</Show>
+				</Section>
+			</SettingsPageContent>
 		</div>
 	);
 }
@@ -168,15 +236,15 @@ function ScreenshotItem(props: {
 	return (
 		<li
 			onClick={props.onClick}
-			class="flex flex-row justify-between p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-gray-3 items-center w-full cursor-pointer hover:bg-gray-3 transition-colors duration-200"
+			class="flex flex-row justify-between p-3 not-last:border-b not-last:border-gray-3 items-center w-full cursor-pointer hover:bg-gray-3 transition-colors duration-200"
 		>
 			<div class="flex gap-5 items-center">
 				<Show
 					when={imageExists()}
-					fallback={<div class="mr-4 rounded bg-gray-10 size-11" />}
+					fallback={<div class="mr-4 rounded-sm bg-gray-10 size-11" />}
 				>
 					<img
-						class="object-cover rounded size-12"
+						class="object-cover rounded-sm size-12"
 						alt="Screenshot thumbnail"
 						src={convertFileSrc(props.screenshot.path)}
 						onError={() => setImageExists(false)}
@@ -213,7 +281,6 @@ function ScreenshotItem(props: {
 					onClick={async () => {
 						if (!(await ask(t("screenshotsPage.confirm.deleteMessage"))))
 							return;
-						// screenshot.path is the png file. Parent is the .cap folder.
 						const parent = props.screenshot.path.replace(/[/\\][^/\\]+$/, "");
 						await remove(parent, { recursive: true });
 

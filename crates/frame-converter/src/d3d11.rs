@@ -5,39 +5,39 @@ use std::{
     mem::ManuallyDrop,
     ptr,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Instant,
 };
 use windows::{
-    core::Interface,
     Win32::{
         Foundation::{CloseHandle, HANDLE, HMODULE},
         Graphics::{
             Direct3D11::{
-                D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D,
-                ID3D11VideoContext, ID3D11VideoDevice, ID3D11VideoProcessor,
-                ID3D11VideoProcessorEnumerator, ID3D11VideoProcessorInputView,
-                ID3D11VideoProcessorOutputView, D3D11_BIND_RENDER_TARGET, D3D11_CPU_ACCESS_READ,
-                D3D11_CPU_ACCESS_WRITE, D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-                D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_MAP_WRITE,
-                D3D11_RESOURCE_MISC_SHARED, D3D11_RESOURCE_MISC_SHARED_NTHANDLE, D3D11_SDK_VERSION,
-                D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_USAGE_STAGING,
-                D3D11_VIDEO_PROCESSOR_CONTENT_DESC, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC,
-                D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_STREAM,
-                D3D11_VPIV_DIMENSION_TEXTURE2D, D3D11_VPOV_DIMENSION_TEXTURE2D,
+                D3D11_BIND_RENDER_TARGET, D3D11_CPU_ACCESS_READ, D3D11_CPU_ACCESS_WRITE,
+                D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_MAP_READ, D3D11_MAP_WRITE,
+                D3D11_MAPPED_SUBRESOURCE, D3D11_RESOURCE_MISC_SHARED,
+                D3D11_RESOURCE_MISC_SHARED_NTHANDLE, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
+                D3D11_USAGE_DEFAULT, D3D11_USAGE_STAGING, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
+                D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC,
+                D3D11_VIDEO_PROCESSOR_STREAM, D3D11_VPIV_DIMENSION_TEXTURE2D,
+                D3D11_VPOV_DIMENSION_TEXTURE2D, D3D11CreateDevice, ID3D11Device,
+                ID3D11DeviceContext, ID3D11Texture2D, ID3D11VideoContext, ID3D11VideoDevice,
+                ID3D11VideoProcessor, ID3D11VideoProcessorEnumerator,
+                ID3D11VideoProcessorInputView, ID3D11VideoProcessorOutputView,
             },
             Dxgi::{
                 Common::{
                     DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12, DXGI_FORMAT_P010,
                     DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_YUY2,
                 },
-                CreateDXGIFactory1, IDXGIAdapter, IDXGIDevice, IDXGIFactory1, IDXGIResource1,
-                DXGI_SHARED_RESOURCE_READ, DXGI_SHARED_RESOURCE_WRITE,
+                CreateDXGIFactory1, DXGI_SHARED_RESOURCE_READ, DXGI_SHARED_RESOURCE_WRITE,
+                IDXGIAdapter, IDXGIDevice, IDXGIFactory1, IDXGIResource1,
             },
         },
     },
+    core::Interface,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +49,29 @@ pub enum GpuVendor {
     Arm,
     Microsoft,
     Unknown(u32),
+}
+
+const NON_HARDWARE_ADAPTER_MARKERS: &[&str] = &[
+    "parsec",
+    "displaylink",
+    "splashtop",
+    "synergy",
+    "virtual display",
+    "microsoft basic render",
+    "microsoft basic",
+    "warp",
+];
+
+fn matches_non_hardware_adapter_marker(description: &str) -> bool {
+    let description = description.to_ascii_lowercase();
+    NON_HARDWARE_ADAPTER_MARKERS
+        .iter()
+        .any(|marker| description.contains(marker))
+}
+
+fn is_non_hardware_adapter(vendor_id: u32, description: &str) -> bool {
+    (vendor_id == 0x1414 && description.contains("Basic Render"))
+        || matches_non_hardware_adapter_marker(description)
 }
 
 impl GpuVendor {
@@ -90,7 +113,9 @@ impl GpuInfo {
     }
 
     pub fn supports_hardware_encoding(&self) -> bool {
-        !self.is_software_adapter && !self.is_basic_render_driver()
+        !self.is_software_adapter
+            && !self.is_basic_render_driver()
+            && !matches_non_hardware_adapter_marker(&self.description)
     }
 }
 
@@ -174,10 +199,7 @@ fn enumerate_all_gpus() -> Vec<GpuInfo> {
                         .collect::<Vec<_>>(),
                 );
 
-                let is_software = desc.VendorId == 0x1414
-                    && (description.contains("Basic Render")
-                        || description.contains("WARP")
-                        || description.contains("Microsoft Basic"));
+                let is_software = is_non_hardware_adapter(desc.VendorId, &description);
 
                 let gpu_info = GpuInfo {
                     vendor: GpuVendor::from_id(desc.VendorId),
@@ -219,7 +241,10 @@ fn select_best_gpu(gpus: &[GpuInfo]) -> Option<GpuInfo> {
         return None;
     }
 
-    let hardware_gpus: Vec<&GpuInfo> = gpus.iter().filter(|g| !g.is_software_adapter).collect();
+    let hardware_gpus: Vec<&GpuInfo> = gpus
+        .iter()
+        .filter(|g| g.supports_hardware_encoding())
+        .collect();
 
     if hardware_gpus.is_empty() {
         tracing::warn!("No hardware GPUs found, falling back to software adapter");
@@ -316,10 +341,7 @@ fn get_gpu_info(device: &ID3D11Device) -> Result<GpuInfo, ConvertError> {
                 .collect::<Vec<_>>(),
         );
 
-        let is_software = desc.VendorId == 0x1414
-            && (description.contains("Basic Render")
-                || description.contains("WARP")
-                || description.contains("Microsoft Basic"));
+        let is_software = is_non_hardware_adapter(desc.VendorId, &description);
 
         Ok(GpuInfo {
             vendor: GpuVendor::from_id(desc.VendorId),
@@ -360,10 +382,7 @@ impl D3D11Converter {
                             .collect::<Vec<_>>(),
                     );
 
-                    let is_software = desc.VendorId == 0x1414
-                        && (description.contains("Basic Render")
-                            || description.contains("WARP")
-                            || description.contains("Microsoft Basic"));
+                    let is_software = is_non_hardware_adapter(desc.VendorId, &description);
 
                     if !is_software {
                         let vendor = GpuVendor::from_id(desc.VendorId);

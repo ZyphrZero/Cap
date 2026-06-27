@@ -1,6 +1,5 @@
-use crate::{general_settings::GeneralSettingsStore, AppSounds};
+use crate::{AppSounds, general_settings::GeneralSettingsStore};
 use tauri_plugin_notification::NotificationExt;
-use tauri_specta::Event;
 
 #[allow(unused)]
 pub enum NotificationType {
@@ -102,7 +101,6 @@ impl NotificationType {
 }
 
 pub fn send_notification(app: &tauri::AppHandle, notification_type: NotificationType) {
-    // Check if notifications are enabled in settings
     let enable_notifications = GeneralSettingsStore::get(app)
         .map(|settings| settings.is_some_and(|s| s.enable_notifications))
         .unwrap_or(false);
@@ -111,7 +109,7 @@ pub fn send_notification(app: &tauri::AppHandle, notification_type: Notification
         return;
     }
 
-    let (title, body, is_error) = notification_type.details();
+    let (title, body, _is_error) = notification_type.details();
 
     app.notification()
         .builder()
@@ -120,12 +118,15 @@ pub fn send_notification(app: &tauri::AppHandle, notification_type: Notification
         .show()
         .ok();
 
-    let _ = crate::NewNotification {
-        title: title.to_string(),
-        body: body.to_string(),
-        is_error,
-    }
-    .emit(app);
+    let skip_sound = matches!(
+        notification_type,
+        NotificationType::ScreenshotSaved
+            | NotificationType::ScreenshotCopiedToClipboard
+            | NotificationType::ScreenshotSaveFailed
+            | NotificationType::ScreenshotCopyFailed
+    );
 
-    AppSounds::Notification.play();
+    if !skip_sound {
+        AppSounds::Notification.play();
+    }
 }

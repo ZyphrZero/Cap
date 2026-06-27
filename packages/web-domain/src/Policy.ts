@@ -19,7 +19,7 @@ export type PublicPolicy<E = never, R = never> = Effect.Effect<
 
 export class PolicyDeniedError extends Schema.TaggedError<PolicyDeniedError>()(
 	"PolicyDenied",
-	{},
+	{ reason: Schema.optional(Schema.String) },
 	HttpApiSchema.annotations({ status: 403 }),
 ) {}
 
@@ -58,7 +58,9 @@ export const publicPolicy = <E, R>(
 		);
 	}) as PublicPolicy<E, R>;
 
-export class DenyAccess extends Data.TaggedError("DenyAccess")<{}> {}
+export class DenyAccess extends Data.TaggedError("DenyAccess")<
+	Record<never, never>
+> {}
 
 /**
  * Applies a policy as a pre-check to an effect.

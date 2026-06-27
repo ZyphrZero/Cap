@@ -1,19 +1,89 @@
 import { db } from "@cap/database";
 import { nanoId } from "@cap/database/helpers";
-import { users } from "@cap/database/schema";
+import { developerCreditTransactions, users } from "@cap/database/schema";
 import { buildEnv, serverEnv } from "@cap/env";
 import { stripe } from "@cap/utils";
 import { Organisation, User } from "@cap/web-domain";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { PostHog } from "posthog-node";
 import type Stripe from "stripe";
+import { addCreditsToAccount } from "@/lib/developer-credits";
 
 const relevantEvents = new Set([
 	"checkout.session.completed",
+	"checkout.session.async_payment_succeeded",
 	"customer.subscription.updated",
 	"customer.subscription.deleted",
 ]);
+
+async function grantDeveloperCredits(
+	session: Stripe.Checkout.Session,
+): Promise<Response> {
+	const { accountId, amountCents } = session.metadata ?? {};
+	const paymentIntentId =
+		typeof session.payment_intent === "string" ? session.payment_intent : null;
+
+	if (!accountId || !amountCents || !paymentIntentId) {
+		console.error("Missing required metadata for developer credits:", {
+			accountId,
+			amountCents,
+			paymentIntentId,
+		});
+		return new Response("Missing metadata", { status: 400 });
+	}
+
+	// Only grant credits once the payment has actually settled. Without this
+	// guard a checkout session (e.g. an unpaid/async payment) could grant
+	// credits before money is captured.
+	if (session.payment_status !== "paid") {
+		console.log(
+			`Developer credits checkout not paid yet (payment_status=${session.payment_status}); skipping credit grant`,
+			{ accountId, paymentIntentId },
+		);
+		return NextResponse.json({ received: true });
+	}
+
+	console.log("Processing developer credits purchase:", {
+		accountId,
+		amountCents,
+		paymentIntentId,
+	});
+
+	const [existingTxn] = await db()
+		.select({ id: developerCreditTransactions.id })
+		.from(developerCreditTransactions)
+		.where(
+			and(
+				eq(developerCreditTransactions.accountId, accountId),
+				eq(developerCreditTransactions.referenceId, paymentIntentId),
+				eq(developerCreditTransactions.referenceType, "stripe_payment_intent"),
+			),
+		)
+		.limit(1);
+
+	if (existingTxn) {
+		console.log(
+			"Duplicate webhook delivery — transaction already exists:",
+			existingTxn.id,
+		);
+		return NextResponse.json({ received: true });
+	}
+
+	await addCreditsToAccount({
+		accountId,
+		amountCents: Number(amountCents),
+		referenceId: paymentIntentId,
+		referenceType: "stripe_payment_intent",
+		metadata: {
+			amountCents: Number(amountCents),
+			stripeSessionId: session.id,
+		},
+	});
+
+	console.log("Developer credits added successfully");
+	return NextResponse.json({ received: true });
+}
 
 async function createGuestUser(
 	email: string,
@@ -48,7 +118,7 @@ async function createGuestUser(
 async function findUserWithRetry(
 	email: string,
 	userId?: User.UserId,
-	maxRetries = 5,
+	maxRetries = 3,
 ): Promise<typeof users.$inferSelect | null> {
 	for (let i = 0; i < maxRetries; i++) {
 		console.log(`[Attempt ${i + 1}/${maxRetries}] Looking for user:`, {
@@ -90,7 +160,7 @@ async function findUserWithRetry(
 			}
 
 			if (i < maxRetries - 1) {
-				const delay = 2 ** i * 3000;
+				const delay = 2 ** i * 1000;
 				console.log(
 					`No user found on attempt ${
 						i + 1
@@ -101,7 +171,7 @@ async function findUserWithRetry(
 		} catch (error) {
 			console.error(`Error during attempt ${i + 1}:`, error);
 			if (i < maxRetries - 1) {
-				const delay = 2 ** i * 3000;
+				const delay = 2 ** i * 1000;
 				await new Promise((resolve) => setTimeout(resolve, delay));
 			}
 		}
@@ -143,6 +213,10 @@ export const POST = async (req: Request) => {
 					customerId: session.customer,
 					subscriptionId: session.subscription,
 				});
+
+				if (session.metadata?.type === "developer_credits") {
+					return await grantDeveloperCredits(session);
+				}
 
 				const customer = await stripe().customers.retrieve(
 					session.customer as string,
@@ -273,7 +347,12 @@ export const POST = async (req: Request) => {
 							price_id: subscription.items.data[0]?.price.id,
 							quantity: inviteQuota,
 							is_onboarding: session.metadata?.isOnBoarding === "true",
-							platform: session.metadata?.platform === "web",
+							platform:
+								session.metadata?.platform === "desktop"
+									? "desktop"
+									: session.metadata?.platform === "web"
+										? "web"
+										: "unknown",
 							is_first_purchase: isFirstPurchase,
 							is_guest_checkout: isGuestCheckout,
 						},
@@ -283,6 +362,17 @@ export const POST = async (req: Request) => {
 					console.log("Successfully tracked purchase event in PostHog");
 				} catch (error) {
 					console.error("Error tracking purchase in PostHog:", error);
+				}
+			}
+
+			if (event.type === "checkout.session.async_payment_succeeded") {
+				console.log(
+					"Processing checkout.session.async_payment_succeeded event",
+				);
+				const session = event.data.object as Stripe.Checkout.Session;
+
+				if (session.metadata?.type === "developer_credits") {
+					return await grantDeveloperCredits(session);
 				}
 			}
 

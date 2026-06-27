@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque};
 
 use cap_camera::CapturedFrame;
 use cap_camera_windows::PixelFormat;
-use ffmpeg::{format::Pixel, frame::Video as FFVideo, Packet};
+use ffmpeg::{Packet, format::Pixel, frame::Video as FFVideo};
 
 use crate::CapturedFrameExt;
 
@@ -20,28 +20,55 @@ pub enum AsFFmpegError {
     H264NeedMoreData,
 }
 
+struct MjpegDecoder {
+    decoder: ffmpeg::codec::decoder::Video,
+}
+
+impl MjpegDecoder {
+    fn new() -> Result<Self, AsFFmpegError> {
+        let codec = ffmpeg::codec::decoder::find(ffmpeg::codec::Id::MJPEG)
+            .ok_or_else(|| AsFFmpegError::MjpegDecodeError("MJPEG codec not found".to_string()))?;
+
+        let decoder_context = ffmpeg::codec::context::Context::new_with_codec(codec);
+
+        let decoder = decoder_context.decoder().video().map_err(|e| {
+            AsFFmpegError::MjpegDecodeError(format!("Failed to create decoder: {e}"))
+        })?;
+
+        Ok(Self { decoder })
+    }
+
+    fn decode(&mut self, bytes: &[u8]) -> Result<FFVideo, AsFFmpegError> {
+        let packet = Packet::copy(bytes);
+        self.decoder
+            .send_packet(&packet)
+            .map_err(|e| AsFFmpegError::MjpegDecodeError(format!("Failed to send packet: {e}")))?;
+
+        let mut decoded_frame = FFVideo::empty();
+        self.decoder
+            .receive_frame(&mut decoded_frame)
+            .map_err(|e| {
+                AsFFmpegError::MjpegDecodeError(format!("Failed to receive frame: {e}"))
+            })?;
+
+        Ok(decoded_frame)
+    }
+}
+
+thread_local! {
+    static MJPEG_DECODER: RefCell<Option<MjpegDecoder>> = const { RefCell::new(None) };
+}
+
 fn decode_mjpeg(bytes: &[u8]) -> Result<FFVideo, AsFFmpegError> {
-    let codec = ffmpeg::codec::decoder::find(ffmpeg::codec::Id::MJPEG)
-        .ok_or_else(|| AsFFmpegError::MjpegDecodeError("MJPEG codec not found".to_string()))?;
+    MJPEG_DECODER.with(|decoder_cell| {
+        let mut decoder_opt = decoder_cell.borrow_mut();
 
-    let decoder_context = ffmpeg::codec::context::Context::new_with_codec(codec);
+        if decoder_opt.is_none() {
+            *decoder_opt = Some(MjpegDecoder::new()?);
+        }
 
-    let mut decoder = decoder_context
-        .decoder()
-        .video()
-        .map_err(|e| AsFFmpegError::MjpegDecodeError(format!("Failed to create decoder: {e}")))?;
-
-    let packet = Packet::copy(bytes);
-    decoder
-        .send_packet(&packet)
-        .map_err(|e| AsFFmpegError::MjpegDecodeError(format!("Failed to send packet: {e}")))?;
-
-    let mut decoded_frame = FFVideo::empty();
-    decoder
-        .receive_frame(&mut decoded_frame)
-        .map_err(|e| AsFFmpegError::MjpegDecodeError(format!("Failed to receive frame: {e}")))?;
-
-    Ok(decoded_frame)
+        decoder_opt.as_mut().unwrap().decode(bytes)
+    })
 }
 
 pub struct H264Decoder {
@@ -199,11 +226,7 @@ pub fn reset_h264_decoder() {
 }
 
 fn src_y(y: usize, height: usize, is_bottom_up: bool) -> usize {
-    if is_bottom_up {
-        height - y - 1
-    } else {
-        y
-    }
+    if is_bottom_up { height - y - 1 } else { y }
 }
 
 impl CapturedFrameExt for CapturedFrame {

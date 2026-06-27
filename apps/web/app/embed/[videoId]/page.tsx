@@ -4,15 +4,22 @@ import {
 	comments,
 	organizations,
 	sharedVideos,
+	spaces,
+	spaceVideos,
 	users,
 	videos,
 	videoUploads,
 } from "@cap/database/schema";
 import type { VideoMetadata } from "@cap/database/types";
 import { buildEnv } from "@cap/env";
-import { provideOptionalAuth, Videos, VideosPolicy } from "@cap/web-backend";
+import {
+	provideOptionalAuth,
+	resolveEffectiveVideoRules,
+	Videos,
+	VideosPolicy,
+} from "@cap/web-backend";
 import { type Organisation, Policy, type Video } from "@cap/web-domain";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Option } from "effect";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -106,6 +113,19 @@ export async function generateMetadata(
 	);
 }
 
+const renderEmbedPolicyDenied = () =>
+	Effect.succeed(
+		<div className="flex flex-col justify-center items-center min-h-screen text-center text-white bg-black">
+			<h1 className="mb-4 text-2xl font-bold">This video is private</h1>
+			<p className="text-gray-400">
+				If you own this video, please <Link href="/login">sign in</Link> to
+				manage sharing.
+			</p>
+		</div>,
+	);
+
+const renderNoSuchElement = () => Effect.sync(() => notFound());
+
 export default async function EmbedVideoPage(
 	props: PageProps<"/embed/[videoId]">,
 ) {
@@ -129,6 +149,7 @@ export default async function EmbedVideoPage(
 					effectiveCreatedAt: videos.effectiveCreatedAt,
 					updatedAt: videos.updatedAt,
 					bucket: videos.bucket,
+					storageIntegrationId: videos.storageIntegrationId,
 					metadata: videos.metadata,
 					public: videos.public,
 					videoStartTime: videos.videoStartTime,
@@ -147,10 +168,12 @@ export default async function EmbedVideoPage(
 					height: videos.height,
 					duration: videos.duration,
 					fps: videos.fps,
+					firstViewEmailSentAt: videos.firstViewEmailSentAt,
 					hasPassword: sql`${videos.password} IS NOT NULL`.mapWith(Boolean),
 					sharedOrganization: {
 						organizationId: sharedVideos.organizationId,
 					},
+					orgSettings: organizations.settings,
 					hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
 						Boolean,
 					),
@@ -158,7 +181,8 @@ export default async function EmbedVideoPage(
 				.from(videos)
 				.leftJoin(sharedVideos, eq(videos.id, sharedVideos.videoId))
 				.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
-				.where(eq(videos.id, videoId)),
+				.leftJoin(organizations, eq(videos.orgId, organizations.id))
+				.where(and(eq(videos.id, videoId), isNull(organizations.tombstoneAt))),
 		).pipe(Policy.withPublicPolicy(videosPolicy.canView(videoId)));
 
 		return Option.fromNullable(video);
@@ -169,7 +193,7 @@ export default async function EmbedVideoPage(
 			Effect.succeed({ needsPassword: true } as const),
 		),
 		Effect.map((data) => (
-			<div className="min-h-screen bg-black">
+			<div key={videoId} className="min-h-screen bg-black">
 				<PasswordOverlay isOpen={data.needsPassword} videoId={videoId} />
 				{!data.needsPassword && (
 					<EmbedContent video={data.video} autoplay={autoplay} />
@@ -177,17 +201,8 @@ export default async function EmbedVideoPage(
 			</div>
 		)),
 		Effect.catchTags({
-			PolicyDenied: () =>
-				Effect.succeed(
-					<div className="flex flex-col justify-center items-center min-h-screen text-center text-white bg-black">
-						<h1 className="mb-4 text-2xl font-bold">This video is private</h1>
-						<p className="text-gray-400">
-							If you own this video, please <Link href="/login">sign in</Link>{" "}
-							to manage sharing.
-						</p>
-					</div>,
-				),
-			NoSuchElementException: () => Effect.sync(() => notFound()),
+			PolicyDenied: renderEmbedPolicyDenied,
+			NoSuchElementException: renderNoSuchElement,
 		}),
 		provideOptionalAuth,
 		EffectRuntime.runPromise,
@@ -201,16 +216,34 @@ async function EmbedContent({
 	video: Omit<typeof videos.$inferSelect, "password"> & {
 		sharedOrganization: { organizationId: Organisation.OrganisationId } | null;
 		hasActiveUpload: boolean | undefined;
+		orgSettings?: (typeof organizations.$inferSelect)["settings"] | null;
 	};
 	autoplay: boolean;
 }) {
 	const user = await getCurrentUser();
+	const sharedSpaces = await db()
+		.select({
+			id: spaces.id,
+			name: spaces.name,
+			settings: spaces.settings,
+			hasPassword: sql`${spaces.password} IS NOT NULL`.mapWith(Boolean),
+		})
+		.from(spaceVideos)
+		.innerJoin(spaces, eq(spaceVideos.spaceId, spaces.id))
+		.where(eq(spaceVideos.videoId, video.id));
+
+	const rules = resolveEffectiveVideoRules({
+		videoSettings: video.settings,
+		organizationSettings: video.orgSettings,
+		spaces: sharedSpaces,
+	});
 
 	let aiGenerationEnabled = false;
 	const videoOwnerQuery = await db()
 		.select({
 			email: users.email,
 			stripeSubscriptionStatus: users.stripeSubscriptionStatus,
+			thirdPartyStripeSubscriptionId: users.thirdPartyStripeSubscriptionId,
 		})
 		.from(users)
 		.where(eq(users.id, video.ownerId))
@@ -221,39 +254,13 @@ async function EmbedContent({
 		aiGenerationEnabled = await isAiGenerationEnabled(videoOwner);
 	}
 
-	if (video.sharedOrganization?.organizationId) {
-		const organization = await db()
-			.select()
-			.from(organizations)
-			.where(eq(organizations.id, video.sharedOrganization.organizationId))
-			.limit(1);
-
-		if (organization[0]?.allowedEmailDomain) {
-			if (
-				!user?.email ||
-				!user.email.endsWith(`@${organization[0].allowedEmailDomain}`)
-			) {
-				return (
-					<div className="flex flex-col justify-center items-center min-h-screen text-center text-white bg-black">
-						<h1 className="mb-4 text-2xl font-bold">Access Restricted</h1>
-						<p className="mb-2 text-gray-300">
-							This video is only accessible to members of this organization.
-						</p>
-						<p className="text-gray-400">
-							Please sign in with your organization email address to access this
-							content.
-						</p>
-					</div>
-				);
-			}
-		}
-	}
-
 	if (
+		!rules.settings.disableTranscript &&
 		video.transcriptionStatus !== "COMPLETE" &&
 		video.transcriptionStatus !== "PROCESSING" &&
 		video.transcriptionStatus !== "SKIPPED" &&
-		video.transcriptionStatus !== "NO_AUDIO"
+		video.transcriptionStatus !== "NO_AUDIO" &&
+		video.transcriptionStatus !== "ERROR"
 	) {
 		transcribeVideo(video.id, video.ownerId, aiGenerationEnabled);
 	}
@@ -270,14 +277,6 @@ async function EmbedContent({
 			title: currentMetadata.aiTitle || null,
 			summary: currentMetadata.summary || null,
 			chapters: currentMetadata.chapters || null,
-			processing: currentMetadata.aiProcessing || false,
-		};
-	} else if (currentMetadata.aiProcessing) {
-		initialAiData = {
-			title: null,
-			summary: null,
-			chapters: null,
-			processing: true,
 		};
 	}
 
@@ -319,10 +318,13 @@ async function EmbedContent({
 			data={video}
 			user={user}
 			comments={commentsQuery}
-			chapters={initialAiData?.chapters || []}
-			aiProcessing={initialAiData?.processing || false}
+			chapters={
+				rules.settings.disableChapters ? [] : initialAiData?.chapters || []
+			}
 			ownerName={videoOwner[0]?.name || null}
 			autoplay={autoplay}
+			viewerSettings={rules.settings}
+			showPlaybackStatusBadge={user?.id === video.ownerId}
 		/>
 	);
 }

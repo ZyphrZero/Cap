@@ -1,39 +1,31 @@
-"use client";
-
-import type React from "react";
-import { ReadyToGetStarted } from "@/components/ReadyToGetStarted";
-import { TextReveal } from "@/components/ui/TextReveal";
-import { homepageCopy } from "../../../data/homepage-copy";
+import { STRIPE_PLAN_IDS } from "@cap/utils";
+import {
+	DeferredHomepageClosingSections,
+	DeferredHomepageSections,
+} from "./DeferredHomepageSections";
 import Faq from "./Faq";
-import Features from "./Features";
 import Header from "./Header";
 import { HomePageSchema } from "./HomePageSchema";
-import Pricing from "./Pricing";
-import RecordingModes from "./RecordingModes";
-import Testimonials from "./Testimonials";
 
 interface HomePageProps {
 	serverHomepageCopyVariant?: string;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({
-	serverHomepageCopyVariant = "",
-}) => {
+export function HomePage({ serverHomepageCopyVariant = "" }: HomePageProps) {
+	const plans =
+		process.env.VERCEL_ENV === "production"
+			? STRIPE_PLAN_IDS.production
+			: STRIPE_PLAN_IDS.development;
+
 	return (
 		<>
 			<HomePageSchema />
 			<Header serverHomepageCopyVariant={serverHomepageCopyVariant} />
-			<div className="space-y-[150px] lg:space-y-[200px]">
-				<RecordingModes />
-				<Features />
-				<Testimonials />
-				<Pricing />
+			<DeferredHomepageSections plans={plans} />
+			<div className="mt-20 sm:mt-[120px] lg:mt-[180px]">
 				<Faq />
 			</div>
-			<TextReveal className="max-w-[600px] mx-auto leading-[1.2] text-center">
-				{homepageCopy.textReveal}
-			</TextReveal>
-			<ReadyToGetStarted />
+			<DeferredHomepageClosingSections />
 		</>
 	);
-};
+}

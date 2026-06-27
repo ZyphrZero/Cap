@@ -1,6 +1,6 @@
 use wgpu::{self, util::DeviceExt};
 
-use crate::{util::read_buffer_to_vec, yuyv, ConvertError, GpuConverterError};
+use crate::{ConvertError, GpuConverterError, util::read_buffer_to_vec, yuyv};
 
 pub struct YUYVToNV12 {
     device: wgpu::Device,
@@ -11,6 +11,12 @@ pub struct YUYVToNV12 {
 
 impl YUYVToNV12 {
     pub async fn new() -> Result<Self, GpuConverterError> {
+        #[cfg(target_os = "windows")]
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN,
+            ..Default::default()
+        });
+        #[cfg(not(target_os = "windows"))]
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
 
         let adapter = instance

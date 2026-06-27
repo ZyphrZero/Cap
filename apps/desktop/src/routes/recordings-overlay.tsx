@@ -26,7 +26,7 @@ import { TransitionGroup } from "solid-transition-group";
 import { t } from "~/components/I18nProvider";
 import { authStore } from "~/store";
 import { createTauriEventListener } from "~/utils/createEventListener";
-import { exportVideo } from "~/utils/export";
+import { createExportToFileTask, exportVideo } from "~/utils/export";
 import {
 	commands,
 	events,
@@ -100,7 +100,7 @@ export default function () {
 
 	return (
 		<div
-			class="w-screen h-[100vh] bg-transparent relative overflow-y-hidden"
+			class="w-screen h-screen bg-transparent relative overflow-y-hidden"
 			style={{
 				"scrollbar-color": "auto transparent",
 			}}
@@ -166,13 +166,13 @@ export default function () {
 											ref={setRef}
 											style={{ "border-color": "rgba(255, 255, 255, 0.1)" }}
 											class={cx(
-												"overflow-hidden relative rounded-xl shadow transition-all duration-200 w-[260px] h-[150px] bg-gray-12 border-[1px] group",
+												"overflow-hidden relative rounded-xl shadow-sm transition-all duration-200 w-[260px] h-[150px] bg-gray-12 border group",
 											)}
 										>
 											<div
 												class={cx(
 													"w-full h-full flex relative bg-transparent z-10 overflow-hidden transition-all",
-													isLoading() && "backdrop-blur bg-gray-12",
+													isLoading() && "backdrop-blur-sm bg-gray-12",
 												)}
 												style={{
 													"pointer-events": "auto",
@@ -308,7 +308,7 @@ export default function () {
 														showUpgradeTooltip()
 															? "opacity-100"
 															: "opacity-0 group-hover:opacity-100",
-														"backdrop-blur p-2",
+														"backdrop-blur-sm p-2",
 													)}
 												>
 													<TooltipIconButton
@@ -331,7 +331,7 @@ export default function () {
 															);
 														}}
 													>
-														<IconCapCircleX class="size-[1rem]" />
+														<IconCapCircleX class="size-4" />
 													</TooltipIconButton>
 													{isRecording ? (
 														<TooltipIconButton
@@ -357,7 +357,7 @@ export default function () {
 																});
 															}}
 														>
-															<IconCapEditor class="size-[1rem]" />
+															<IconCapEditor class="size-4" />
 														</TooltipIconButton>
 													) : (
 														<TooltipIconButton
@@ -368,7 +368,7 @@ export default function () {
 																commands.openFilePath(media.path);
 															}}
 														>
-															<IconLucideEye class="size-[1rem]" />
+															<IconLucideEye class="size-4" />
 														</TooltipIconButton>
 													)}
 													<TooltipIconButton
@@ -381,10 +381,10 @@ export default function () {
 														tooltipPlacement="left"
 														onClick={() => copy.mutate()}
 													>
-														<IconCapCopy class="size-[1rem]" />
+														<IconCapCopy class="size-4" />
 													</TooltipIconButton>
 													<TooltipIconButton
-														class="absolute right-3 bottom-3 z-[998]"
+														class="absolute right-3 bottom-3 z-998"
 														tooltipText={
 															recordingMeta.data?.sharing
 																? t("recordingsPage.actions.copyLink")
@@ -393,7 +393,7 @@ export default function () {
 														tooltipPlacement="left"
 														onClick={() => upload.mutate()}
 													>
-														<IconCapUpload class="size-[1rem]" />
+														<IconCapUpload class="size-4" />
 													</TooltipIconButton>
 													<div class="flex absolute inset-0 justify-center items-center">
 														<Button
@@ -469,7 +469,7 @@ function ActionProgressOverlay(props: {
 			style={{
 				"background-color": "rgba(0, 0, 0, 0.85)",
 			}}
-			class="absolute inset-0 flex items-center justify-center z-[999999] pointer-events-auto"
+			class="absolute inset-0 flex items-center justify-center z-999999 pointer-events-auto"
 		>
 			<div class="w-[80%] text-center">
 				<h3 class="mb-3 text-sm font-medium text-gray-1 dark:text-gray-12">
@@ -666,7 +666,7 @@ function createRecordingMutations(
 				: media.path.split(".cap/")[1];
 			const suggestedName = meta.pretty_name || defaultName;
 
-			const fileType = isRecording ? "recording" : "screenshot";
+			const fileType = isRecording ? "mp4" : "screenshot";
 			const extension = isRecording ? ".mp4" : ".png";
 
 			const fullFileName = suggestedName.endsWith(extension)
@@ -681,29 +681,39 @@ function createRecordingMutations(
 				},
 			});
 
-			const savePath = await commands.saveFileDialog(fullFileName, fileType);
-
-			if (!savePath) {
-				setActionState({ type: "idle" });
-				return false;
-			}
-
-			setActionState({
-				type: "save",
-				state: {
-					type: "rendering",
-					state: { type: "starting" },
-				},
-			});
-
 			if (isRecording) {
-				const outputPath = await exportWithDefaultSettings(
+				const { promise } = createExportToFileTask(
+					media.path,
+					{
+						format: "Mp4",
+						fps: FPS,
+						resolution_base: OUTPUT_SIZE,
+						compression: "Web",
+						custom_bpp: null,
+					},
+					fullFileName,
+					fileType,
 					createRenderProgressCallback("save", setActionState),
+					() => {
+						setActionState({
+							type: "save",
+							state: { type: "rendering", state: { type: "starting" } },
+						});
+					},
+					() => {
+						setActionState({ type: "save", state: { type: "saving" } });
+					},
 				);
 
-				await commands.copyFileToPath(outputPath, savePath);
+				await promise;
 			} else {
-				// For screenshots, show quick progress animation
+				const savePath = await commands.saveFileDialog(fullFileName, fileType);
+
+				if (!savePath) {
+					setActionState({ type: "idle" });
+					return false;
+				}
+
 				setActionState({ type: "save", state: { type: "saving" } });
 
 				await commands.copyFileToPath(media.path, savePath);

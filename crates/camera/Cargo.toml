@@ -1,7 +1,7 @@
 [package]
 name = "cap-camera"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 
 [dependencies]
@@ -19,6 +19,9 @@ cap-camera-avfoundation = { path = "../camera-avfoundation" }
 windows = { workspace = true }
 windows-core = { workspace = true }
 cap-camera-windows = { path = "../camera-windows" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+v4l = "0.14.0"
 
 [dev-dependencies]
 inquire = "0.9.4"

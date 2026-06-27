@@ -3,15 +3,15 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicU32, Ordering},
     },
     time::{Duration, Instant, SystemTime},
 };
 
 use cap_export::{
-    mp4::{ExportCompression, Mp4ExportSettings},
     ExporterBase,
+    mp4::{ExportCompression, Mp4ExportSettings},
 };
 use cap_project::XY;
 
@@ -27,6 +27,7 @@ async fn run_export(project_path: PathBuf) -> Result<(PathBuf, Duration, u32), S
         compression: ExportCompression::Maximum,
         custom_bpp: None,
         force_ffmpeg_decoder: false,
+        optimize_filesize: false,
     };
 
     let start = Instant::now();
@@ -136,7 +137,7 @@ pub fn list_recordings() -> Vec<PathBuf> {
         })
         .collect();
 
-    recordings.sort_by(|a, b| b.0.cmp(&a.0));
+    recordings.sort_by_key(|entry| std::cmp::Reverse(entry.0));
 
     recordings.into_iter().map(|(_, path)| path).collect()
 }

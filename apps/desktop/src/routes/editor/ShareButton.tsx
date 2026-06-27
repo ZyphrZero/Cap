@@ -195,7 +195,7 @@ function ShareButton() {
 										upload.mutate();
 									}}
 									variant="dark"
-									class="flex justify-center items-center size-[41px] !px-0 !py-0 space-x-1"
+									class="flex justify-center items-center size-[41px] px-0! py-0! space-x-1"
 								>
 									{upload.isPending ? (
 										<IconLucideLoaderCircle class="animate-spin size-4" />
@@ -204,8 +204,8 @@ function ShareButton() {
 									)}
 								</Button>
 							</Tooltip>
-							<Tooltip content={t("editor.share.openLink")}>
-								<div class="rounded-xl px-3 py-2 flex flex-row items-center gap-[0.375rem] bg-gray-3 hover:bg-gray-4 transition-colors duration-100">
+							<Tooltip content="Open link">
+								<div class="rounded-xl px-3 py-2 flex flex-row items-center gap-1.5 bg-gray-3 hover:bg-gray-4 transition-colors duration-100">
 									<a
 										href={
 											linkToDisplay() === customLink
@@ -246,9 +246,9 @@ function ShareButton() {
 												placement="bottom-end"
 												gutter={4}
 											>
-												<KSelect.Trigger class="flex justify-center items-center transition-colors duration-200 rounded-lg size-[22px] text-gray-12 bg-gray-6 hover:bg-gray-7 group focus:outline-none focus-visible:outline-none">
+												<KSelect.Trigger class="flex justify-center items-center transition-colors duration-200 rounded-lg size-[22px] text-gray-12 bg-gray-6 hover:bg-gray-7 group focus:outline-hidden focus-visible:outline-hidden">
 													<KSelect.Icon>
-														<IconCapChevronDown class="size-4 transition-transform duration-200 group-data-[expanded]:rotate-180" />
+														<IconCapChevronDown class="size-4 transition-transform duration-200 group-data-expanded:rotate-180" />
 													</KSelect.Icon>
 												</KSelect.Trigger>
 												<KSelect.Portal>
@@ -286,9 +286,9 @@ function ShareButton() {
 			</Show>
 			<Dialog.Root open={!upload.isIdle}>
 				<DialogContent
-					title={t("editor.share.reuploadTitle")}
-					confirm={<></>}
-					close={<></>}
+					title={"Reupload Recording"}
+					confirm={null}
+					close={null}
 					class="text-gray-12 dark:text-gray-12"
 				>
 					<div class="w-[80%] text-center mx-auto relative z-10 space-y-6 py-4">

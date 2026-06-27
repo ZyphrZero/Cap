@@ -12,7 +12,11 @@ import {
 	videoUploads,
 } from "@cap/database/schema";
 import { serverEnv } from "@cap/env";
-import { Database, ImageUploads } from "@cap/web-backend";
+import {
+	Database,
+	ImageUploads,
+	resolveEffectiveVideoRules,
+} from "@cap/web-backend";
 import { type ImageUpload, Video } from "@cap/web-domain";
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { type Array, Effect } from "effect";
@@ -42,6 +46,9 @@ const getSharedSpacesForVideos = Effect.fn(function* (
 				id: spaces.id,
 				name: spaces.name,
 				organizationId: spaces.organizationId,
+				iconUrl: spaces.iconUrl,
+				settings: spaces.settings,
+				hasPassword: sql`${spaces.password} IS NOT NULL`.mapWith(Boolean),
 			})
 			.from(spaceVideos)
 			.innerJoin(spaces, eq(spaceVideos.spaceId, spaces.id))
@@ -75,6 +82,9 @@ const getSharedSpacesForVideos = Effect.fn(function* (
 			name: string;
 			organizationId: string;
 			isOrg: boolean;
+			iconUrl?: ImageUpload.ImageUrlOrKey | null;
+			settings?: (typeof spaces.$inferSelect)["settings"];
+			hasPassword: boolean;
 		}>
 	> = {};
 
@@ -88,6 +98,9 @@ const getSharedSpacesForVideos = Effect.fn(function* (
 			name: space.name,
 			organizationId: space.organizationId,
 			isOrg: false,
+			iconUrl: space.iconUrl,
+			settings: space.settings,
+			hasPassword: space.hasPassword,
 		});
 	});
 
@@ -101,6 +114,9 @@ const getSharedSpacesForVideos = Effect.fn(function* (
 			name: org.name,
 			organizationId: org.organizationId,
 			isOrg: true,
+			iconUrl: org.iconUrl,
+			settings: null,
+			hasPassword: false,
 		});
 	});
 
@@ -144,6 +160,8 @@ export default async function CapsPage(
 			name: videos.name,
 			createdAt: videos.createdAt,
 			metadata: videos.metadata,
+			source: videos.source,
+			isScreenshot: videos.isScreenshot,
 			duration: videos.duration,
 			public: videos.public,
 			totalComments: sql<number>`COUNT(DISTINCT CASE WHEN ${comments.type} = 'text' THEN ${comments.id} END)`,
@@ -193,6 +211,12 @@ export default async function CapsPage(
 			videos.name,
 			videos.createdAt,
 			videos.metadata,
+			videos.source,
+			videos.isScreenshot,
+			videos.duration,
+			videos.public,
+			videos.password,
+			videos.settings,
 			videos.orgId,
 			users.name,
 		)
@@ -205,6 +229,7 @@ export default async function CapsPage(
 			id: folders.id,
 			name: folders.name,
 			color: folders.color,
+			public: folders.public,
 			parentId: folders.parentId,
 			videoCount: sql<number>`(
         SELECT COUNT(*) FROM videos WHERE videos.folderId = folders.id
@@ -224,19 +249,37 @@ export default async function CapsPage(
 	const videoIds = videoData.map((video) => video.id);
 	const sharedSpacesMap =
 		await getSharedSpacesForVideos(videoIds).pipe(runPromise);
+	const [organizationSettingsRow] = user.activeOrganizationId
+		? await db()
+				.select({ settings: organizations.settings })
+				.from(organizations)
+				.where(eq(organizations.id, user.activeOrganizationId))
+				.limit(1)
+		: [];
+	const organizationSettings = organizationSettingsRow?.settings ?? null;
 
 	const processedVideoData = await Effect.all(
 		videoData.map(
 			Effect.fn(function* (video) {
 				const imageUploads = yield* ImageUploads;
 
-				const { effectiveDate, ...videoWithoutEffectiveDate } = video;
+				const { effectiveDate: _effectiveDate, ...videoWithoutEffectiveDate } =
+					video;
+				const sharedSpaces = sharedSpacesMap[video.id] ?? [];
+				const rules = resolveEffectiveVideoRules({
+					videoSettings: video.settings,
+					organizationSettings,
+					spaces: sharedSpaces.filter((space) => !space.isOrg),
+				});
 
 				return {
 					...videoWithoutEffectiveDate,
 					id: Video.VideoId.make(video.id),
 					foldersData,
 					settings: video.settings,
+					hasInheritedPassword: rules.hasInheritedPassword,
+					inheritedPasswordSources: rules.inheritedPasswordSources,
+					inheritedSpaceSettings: rules.inheritedSettings,
 					sharedOrganizations: yield* Effect.all(
 						(video.sharedOrganizations ?? [])
 							.filter((organization) => organization.id !== null)
@@ -251,12 +294,23 @@ export default async function CapsPage(
 								}),
 							),
 					),
-					sharedSpaces: sharedSpacesMap[video.id] ?? [],
+					sharedSpaces: yield* Effect.all(
+						sharedSpaces.map(
+							Effect.fn(function* (space) {
+								return {
+									...space,
+									iconUrl: space.iconUrl
+										? yield* imageUploads.resolveImageUrl(space.iconUrl)
+										: null,
+								};
+							}),
+						),
+					),
 					ownerName: video.ownerName ?? "",
 					metadata: video.metadata as
 						| {
 								customCreatedAt?: string;
-								[key: string]: any;
+								[key: string]: unknown;
 						  }
 						| undefined,
 				};

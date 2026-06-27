@@ -12,13 +12,19 @@ export const sendEmail = async ({
 	marketing,
 	test,
 	scheduledAt,
+	cc,
+	replyTo,
+	fromOverride,
 }: {
 	email: string;
 	subject: string;
-	react: ReactElement<any, string | JSXElementConstructor<any>>;
+	react: ReactElement<unknown, string | JSXElementConstructor<unknown>>;
 	marketing?: boolean;
 	test?: boolean;
 	scheduledAt?: string;
+	cc?: string | string[];
+	replyTo?: string;
+	fromOverride?: string;
 }) => {
 	const r = resend();
 	if (!r) {
@@ -26,9 +32,10 @@ export const sendEmail = async ({
 	}
 
 	if (marketing && !buildEnv.NEXT_PUBLIC_IS_CAP) return;
-	let from;
+	let from: string;
 
-	if (marketing) from = "Richie from Cap <richie@send.cap.so>";
+	if (fromOverride) from = fromOverride;
+	else if (marketing) from = "Richie from Cap <richie@send.cap.so>";
 	else if (buildEnv.NEXT_PUBLIC_IS_CAP)
 		from = "Cap Auth <no-reply@auth.cap.so>";
 	else from = `auth@${serverEnv().RESEND_FROM_DOMAIN}`;
@@ -39,5 +46,7 @@ export const sendEmail = async ({
 		subject,
 		react,
 		scheduledAt,
-	}) as any;
+		cc: test ? undefined : cc,
+		replyTo: replyTo,
+	});
 };

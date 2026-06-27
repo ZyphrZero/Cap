@@ -15,10 +15,15 @@ export function ShadowPopover() {
 		<Popover
 			placement="bottom-start"
 			open={activePopover() === "shadow"}
-			onOpenChange={(open) => setActivePopover(open ? "shadow" : null)}
+			onOpenChange={(open) => {
+				if (!open && activePopover() === "shadow") setActivePopover(null);
+			}}
 		>
-			<Popover.Trigger
+			<Popover.Anchor
 				as={EditorButton}
+				onClick={() =>
+					setActivePopover(activePopover() === "shadow" ? null : "shadow")
+				}
 				leftIcon={<IconCapShadow class="size-4" />}
 				tooltipText={t("screenshotEditor.appearance.shadow.title")}
 				kbd={["S"]}

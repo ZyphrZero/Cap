@@ -3,7 +3,7 @@ use std::time::Duration;
 fn main() {
     #[cfg(windows)]
     {
-        use windows::Win32::UI::HiDpi::{SetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE};
+        use windows::Win32::UI::HiDpi::{PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness};
 
         unsafe { SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE).unwrap() };
     }
@@ -128,7 +128,7 @@ fn main() {
             })
             .collect::<Vec<_>>();
 
-        relevant_windows.sort_by(|a, b| b.1.cmp(&a.1));
+        relevant_windows.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Print current topmost window info
         if let Some((topmost_window, level)) = relevant_windows.first() {

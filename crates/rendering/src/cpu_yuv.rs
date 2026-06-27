@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 pub struct ConversionProgress {
     pub rows_completed: AtomicUsize,

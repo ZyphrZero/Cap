@@ -64,6 +64,8 @@ cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8", fe
     "dispatch",
     "io_surface",
     "mtl",
+    "vt",
+    "vn",
 ], default-features = false }
 
 windows = "0.62.2"
@@ -93,9 +95,15 @@ unnecessary_lazy_evaluations = "deny"
 needless_range_loop = "deny"
 manual_clamp = "deny"
 
+[profile.dev]
+debug = 1
+
+[profile.dev.package."*"]
+debug = 0
+
 # Optimize for smaller binary size
 [profile.release]
-panic = "abort"   # Strip expensive panic clean-up logic
+panic = "unwind"
 codegen-units = 1 # Compile crates one after another so the compiler can optimize better
 lto = true        # Enables link to optimizations
 opt-level = "s"   # Optimize for binary size
@@ -106,6 +114,8 @@ debug = true
 cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8" }
 # https://github.com/gfx-rs/wgpu/pull/7550
 # wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "cd41a6e32a6239b65d1cecbeccde6a43a100914a" }
+wgpu-hal = { path = "vendor/wgpu-hal" }
+tao = { path = "vendor/tao" }
 
 # https://github.com/CapSoftware/reqwest/commit/9b5ecbd5210a9510fde766015cabb724c1e70d2e
 reqwest = { git = "https://github.com/CapSoftware/reqwest", rev = "9b5ecbd5210a9510fde766015cabb724c1e70d2e" }

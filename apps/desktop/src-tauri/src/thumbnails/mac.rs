@@ -7,21 +7,21 @@ use super::*;
 pub async fn capture_display_thumbnail(display: &scap_targets::Display) -> Option<String> {
     let content = get_shareable_content().await.ok()??;
 
-    let filter = display.raw_handle().as_content_filter(content).await?;
+    let filter = display.raw_handle().as_content_filter(content)?;
     capture_thumbnail_from_filter(filter).await
 }
 
 pub async fn capture_window_thumbnail(window: &scap_targets::Window) -> Option<String> {
     let content = get_shareable_content().await.ok()??;
 
-    let sc_window = window.raw_handle().as_sc(content).await?;
+    let sc_window = window.raw_handle().as_sc(content)?;
     let filter = cidre::sc::ContentFilter::with_desktop_independent_window(&sc_window);
     capture_thumbnail_from_filter(filter).await
 }
 
 async fn capture_thumbnail_from_filter(filter: arc::R<sc::ContentFilter>) -> Option<String> {
     use cidre::{cv, sc};
-    use image::{codecs::png::PngEncoder, ImageEncoder, RgbaImage};
+    use image::{ImageEncoder, RgbaImage, codecs::png::PngEncoder};
     use std::io::Cursor;
 
     let mut config = sc::StreamCfg::new();
@@ -320,7 +320,7 @@ impl Drop for PixelBufferLock<'_> {
 unsafe fn cv_pixel_buffer_get_base_address(buffer: &cidre::cv::PixelBuf) -> *mut std::ffi::c_void {
     unsafe extern "C" {
         fn CVPixelBufferGetBaseAddress(pixel_buffer: &cidre::cv::PixelBuf)
-            -> *mut std::ffi::c_void;
+        -> *mut std::ffi::c_void;
     }
 
     unsafe { CVPixelBufferGetBaseAddress(buffer) }

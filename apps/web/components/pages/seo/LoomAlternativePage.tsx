@@ -9,7 +9,7 @@ export const loomAlternativeContent: SeoPageContent = {
 	title:
 		"The Ultimate Loom Alternative: Why Cap is the Best Open-Source Screen Recorder for Mac & Windows",
 	description:
-		"Looking for the best Loom alternative? Discover Cap, the open-source, privacy-focused screen recorder for Mac & Windows. See why users are switching today!",
+		"Looking for the best Loom alternative? Discover Cap, the open-source, privacy-focused screen recorder for Mac & Windows with a built-in Loom video importer. See why users are switching today!",
 
 	featuresTitle: "Why Cap is the Best Loom Alternative",
 	featuresDescription:
@@ -24,12 +24,12 @@ export const loomAlternativeContent: SeoPageContent = {
 		{
 			title: "Enhanced Privacy & Security",
 			description:
-				"Cap prioritizes your privacy with GDPR compliance and the option to use your own S3 storage, ensuring your data remains under your control. Connect your own custom domain for a branded experience while maintaining 100% ownership of your data.",
+				"Cap prioritizes your privacy with GDPR compliance and the option to use your own Google Drive or S3 storage, ensuring your data remains under your control. Connect your own custom domain for a branded experience while maintaining 100% ownership of your data.",
 		},
 		{
 			title: "Half the Price of Loom",
 			description:
-				"Cap stars from just $8.16/month per user, compared to Loom's $18/month per user. Plus, Cap offers a generous free plan that includes Studio mode for personal use.",
+				"Cap starts from just $8.16/month per user, compared to Loom's $18/month per user. Plus, Cap offers a generous free plan that includes Studio mode for personal use.",
 		},
 		{
 			title: "High-Quality Recordings",
@@ -45,6 +45,11 @@ export const loomAlternativeContent: SeoPageContent = {
 			title: "Cross-Platform Support",
 			description:
 				"Available for both Mac and Windows, Cap delivers consistent performance across platforms. A perfect <a href='/screen-recording-software'>screen recording software</a> for all users.",
+		},
+		{
+			title: "Built-In Loom Video Importer",
+			description:
+				"Already using Loom? Cap's built-in video importer lets you seamlessly transfer your existing Loom recordings into Cap. No need to start from scratch — bring all your content with you when you switch. Just need the raw files? Our <a href='/tools/loom-downloader'>free Loom video downloader</a> saves any public Loom as an MP4 in one click.",
 		},
 	],
 
@@ -87,7 +92,7 @@ export const loomAlternativeContent: SeoPageContent = {
 		{
 			title: "Complete Data Ownership",
 			description:
-				"Cap lets you connect your own S3 storage and custom domain, giving you 100% ownership and control over your content. No more being locked into proprietary platforms.",
+				"Cap lets you connect your own Google Drive or S3 storage and custom domain, giving you 100% ownership and control over your content. No more being locked into proprietary platforms.",
 		},
 		{
 			title: "Community-Driven Development",
@@ -98,6 +103,11 @@ export const loomAlternativeContent: SeoPageContent = {
 			title: "Collaborative Feedback",
 			description:
 				"Cap's built-in thread commenting on shareable links makes it easy to collect feedback and collaborate without switching between different tools.",
+		},
+		{
+			title: "Effortless Migration from Loom",
+			description:
+				"Cap's built-in Loom video importer makes switching painless. Import your existing Loom recordings directly into Cap and keep all your content organized in one place — no downloads or re-uploads required.",
 		},
 	],
 
@@ -121,12 +131,17 @@ export const loomAlternativeContent: SeoPageContent = {
 		{
 			question: "Can I keep full ownership of my recordings with Cap?",
 			answer:
-				"Absolutely! Cap allows you to connect your own S3 storage and custom domain, giving you 100% ownership and control of your content. Your data remains yours, and you're never locked into our platform.",
+				"Absolutely! Cap allows you to connect your own Google Drive or S3 storage and custom domain, giving you 100% ownership and control of your content. Your data remains yours, and you're never locked into our platform.",
 		},
 		{
 			question: "Does Cap support collaboration features?",
 			answer:
 				"Yes, Cap includes built-in thread commenting on shareable links, making it easy to collaborate with teammates and collect feedback directly on your recordings. This keeps all your communication in one place.",
+		},
+		{
+			question: "Can I import my existing Loom videos into Cap?",
+			answer:
+				"Yes! Cap Pro includes a built-in Loom video importer. Simply paste your Loom video links and Cap will import them directly into your library. It's the easiest way to migrate from Loom without losing any of your existing content. If you'd rather keep local copies, our <a href='/tools/loom-downloader'>Loom video downloader</a> exports any public Loom to MP4, and our <a href='/migrate-from-loom'>migrate from Loom</a> guide covers the full switch.",
 		},
 	],
 
@@ -166,13 +181,18 @@ export const loomAlternativeContent: SeoPageContent = {
 			],
 			[
 				"Own Storage Integration",
-				{ text: "Connect your own S3", status: "positive" },
+				{ text: "Connect your own S3 or Google Drive", status: "positive" },
 				{ text: "Not available", status: "negative" },
 			],
 			[
 				"Community Input",
 				{ text: "Direct via open source", status: "positive" },
 				{ text: "Limited", status: "neutral" },
+			],
+			[
+				"Loom Video Import",
+				{ text: "Built-in importer", status: "positive" },
+				{ text: "Not available", status: "negative" },
 			],
 			[
 				"Data Ownership",
@@ -185,10 +205,11 @@ export const loomAlternativeContent: SeoPageContent = {
 		title: "How to Get Started with Cap (Easy Guide)",
 		steps: [
 			"Download Cap for your operating system (Mac or Windows)",
-			"Launch the application",
+			"Launch the application and sign in to your Cap account",
+			"Import your existing Loom videos using Cap's built-in Loom video importer",
 			"Start recording using either Instant Mode or Studio Mode",
 			"Share your recordings easily with Cap's built-in sharing features",
-			"Optional: Connect your own S3 storage and custom domain for complete data ownership",
+			"Optional: Connect your own Google Drive or S3 storage and custom domain for complete data ownership",
 		],
 	},
 

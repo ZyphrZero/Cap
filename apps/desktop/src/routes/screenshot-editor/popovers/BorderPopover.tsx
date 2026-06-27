@@ -18,10 +18,15 @@ export function BorderPopover() {
 		<Popover
 			placement="bottom-start"
 			open={activePopover() === "border"}
-			onOpenChange={(open) => setActivePopover(open ? "border" : null)}
+			onOpenChange={(open) => {
+				if (!open && activePopover() === "border") setActivePopover(null);
+			}}
 		>
-			<Popover.Trigger
+			<Popover.Anchor
 				as={EditorButton}
+				onClick={() =>
+					setActivePopover(activePopover() === "border" ? null : "border")
+				}
 				leftIcon={<IconCapSquare class="size-4" />}
 				tooltipText={t("screenshotEditor.appearance.border.title")}
 				kbd={["O"]}
@@ -51,7 +56,7 @@ export function BorderPopover() {
 						</div>
 
 						<Collapsible open={project.background.border?.enabled ?? false}>
-							<Collapsible.Content class="overflow-hidden opacity-0 transition-opacity animate-collapsible-up ui-expanded:animate-collapsible-down ui-expanded:opacity-100">
+							<Collapsible.Content class="overflow-hidden opacity-0 transition-opacity animate-collapsible-up data-expanded:animate-collapsible-down data-expanded:opacity-100">
 								<div class="flex flex-col gap-4">
 									<Field
 										name={t("screenshotEditor.config.width")}

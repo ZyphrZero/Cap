@@ -1,8 +1,8 @@
 use cap_recording::{
+    CameraFeed,
     benchmark::{BenchmarkConfig, EncoderInfo},
     feeds::camera::{self, DeviceOrModelID},
     screen_capture::ScreenCaptureTarget,
-    CameraFeed,
 };
 use kameo::Actor;
 use scap_targets::Display;
@@ -36,6 +36,7 @@ async fn run_recording_benchmark(
             let feed = CameraFeed::spawn(CameraFeed::default());
 
             feed.ask(camera::SetInput {
+                settings: None,
                 id: DeviceOrModelID::from_info(&camera_info),
             })
             .await?
@@ -56,7 +57,9 @@ async fn run_recording_benchmark(
     let handle = builder
         .build(
             #[cfg(target_os = "macos")]
-            cidre::sc::ShareableContent::current().await?,
+            Some(cap_recording::SendableShareableContent::from(
+                cidre::sc::ShareableContent::current().await?,
+            )),
         )
         .await?;
 
@@ -89,14 +92,12 @@ async fn run_recording_benchmark(
         println!("  Bitrate: {bitrate_mbps:.2} Mbps");
     }
 
-    if include_camera {
-        if let Ok(metadata) = std::fs::metadata(content_dir.join("camera.mp4")) {
-            let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
-            let bitrate_mbps = size_mb * 8.0 / config.duration_secs as f64;
-            println!("\nCamera recording:");
-            println!("  Size: {size_mb:.2} MB");
-            println!("  Bitrate: {bitrate_mbps:.2} Mbps");
-        }
+    if include_camera && let Ok(metadata) = std::fs::metadata(content_dir.join("camera.mp4")) {
+        let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
+        let bitrate_mbps = size_mb * 8.0 / config.duration_secs as f64;
+        println!("\nCamera recording:");
+        println!("  Size: {size_mb:.2} MB");
+        println!("  Bitrate: {bitrate_mbps:.2} Mbps");
     }
 
     std::mem::forget(dir);
@@ -117,7 +118,9 @@ async fn run_pause_resume_benchmark(duration_secs: u64) -> Result<(), Box<dyn st
     )
     .build(
         #[cfg(target_os = "macos")]
-        cidre::sc::ShareableContent::current().await?,
+        Some(cap_recording::SendableShareableContent::from(
+            cidre::sc::ShareableContent::current().await?,
+        )),
     )
     .await?;
 
@@ -175,7 +178,9 @@ async fn stress_test_recording(
         )
         .build(
             #[cfg(target_os = "macos")]
-            cidre::sc::ShareableContent::current().await?,
+            Some(cap_recording::SendableShareableContent::from(
+                cidre::sc::ShareableContent::current().await?,
+            )),
         )
         .await?;
         start_times.push(start.elapsed());

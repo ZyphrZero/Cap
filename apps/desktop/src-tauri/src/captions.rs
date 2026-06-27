@@ -1,18 +1,20 @@
 use anyhow::Result;
 use cap_audio::AudioData;
 use ffmpeg::{
-    codec as avcodec,
+    ChannelLayout, codec as avcodec,
     format::{self as avformat},
     software::resampling,
-    ChannelLayout,
 };
 use futures::StreamExt;
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+use parakeet_rs::{ParakeetTDT, TimestampMode, Transcriber};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tempfile::tempdir;
@@ -23,7 +25,16 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 
 pub use cap_project::{CaptionSegment, CaptionSettings, CaptionWord};
 
-use crate::http_client;
+use crate::{general_settings::GeneralSettingsStore, http_client};
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const PARAKEET_UNSUPPORTED_MESSAGE: &str = "Parakeet transcription is not available on Intel macOS";
+
+#[derive(Debug, Serialize, Deserialize, Type, Clone)]
+pub enum TranscriptionEngine {
+    Whisper,
+    Parakeet,
+}
 
 #[derive(Debug, Serialize, Deserialize, Type, Clone)]
 pub struct CaptionData {
@@ -44,7 +55,143 @@ lazy_static::lazy_static! {
     static ref WHISPER_CONTEXT: Arc<Mutex<Option<Arc<WhisperContext>>>> = Arc::new(Mutex::new(None));
 }
 
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+lazy_static::lazy_static! {
+    static ref PARAKEET_CONTEXT: Mutex<Option<CachedParakeetContext>> = Mutex::new(None);
+}
+
 const WHISPER_SAMPLE_RATE: u32 = 16000;
+const TARGET_CAPTION_WORDS_PER_SEGMENT: usize = 6;
+const MAX_CAPTION_WORDS_PER_SEGMENT: usize = 8;
+const MIN_FINAL_CAPTION_WORDS: usize = 3;
+// Whisper/Parakeet sometimes stretch a trailing word's end across a following
+// silence (e.g. a 16s "seconds."), which leaves the rendered caption stuck on
+// screen and duplicates the word across timeline cuts once projected. Real
+// spoken words never approach this, so cap each word's duration to keep timing
+// tied to speech rather than silence.
+const MAX_CAPTION_WORD_DURATION: f32 = 2.5;
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+struct CachedParakeetContext {
+    model_dir: String,
+    model: Arc<std::sync::Mutex<ParakeetTDT>>,
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+fn parakeet_model_dir_matches(cached_model_dir: &str, model_dir: &Path) -> bool {
+    cached_model_dir == model_dir.to_string_lossy()
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+async fn invalidate_parakeet_cache_for_dir(model_dir: &Path) {
+    let mut ctx = PARAKEET_CONTEXT.lock().await;
+    if ctx
+        .as_ref()
+        .is_some_and(|cached| parakeet_model_dir_matches(&cached.model_dir, model_dir))
+    {
+        tracing::info!(
+            "Invalidating cached Parakeet context for {}",
+            model_dir.display()
+        );
+        *ctx = None;
+    }
+}
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+async fn invalidate_parakeet_cache_for_dir(_model_dir: &Path) {}
+
+pub async fn release_ml_models() {
+    {
+        let mut ctx = WHISPER_CONTEXT.lock().await;
+        if ctx.is_some() {
+            tracing::info!("Releasing Whisper context to free memory");
+            *ctx = None;
+        }
+    }
+    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+    {
+        let mut ctx = PARAKEET_CONTEXT.lock().await;
+        if ctx.is_some() {
+            tracing::info!("Releasing Parakeet context to free memory");
+            *ctx = None;
+        }
+    }
+}
+
+fn normalize_relative_components(path: &Path) -> Result<PathBuf, String> {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                return Err("Path is outside the app data directory".to_string());
+            }
+            Component::RootDir => {
+                return Err("Path is outside the app data directory".to_string());
+            }
+            Component::Prefix(_) => {
+                return Err("Path is outside the app data directory".to_string());
+            }
+        }
+    }
+
+    Ok(normalized)
+}
+
+fn resolve_path_with_base(base_dir: &Path, path: &str) -> Result<PathBuf, String> {
+    if !base_dir.exists() {
+        std::fs::create_dir_all(base_dir)
+            .map_err(|e| format!("Failed to create app data directory: {e}"))?;
+    }
+
+    let canonical_base = base_dir
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
+    let requested = PathBuf::from(path);
+    let candidate = if requested.is_absolute() {
+        requested
+    } else {
+        canonical_base.join(normalize_relative_components(&requested)?)
+    };
+
+    let mut suffix = Vec::new();
+    let mut current = candidate.as_path();
+
+    while !current.exists() {
+        let file_name = current
+            .file_name()
+            .ok_or_else(|| "Path is outside the app data directory".to_string())?;
+        suffix.push(file_name.to_os_string());
+        current = current
+            .parent()
+            .ok_or_else(|| "Path is outside the app data directory".to_string())?;
+    }
+
+    let mut resolved = current
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve path: {e}"))?;
+
+    if !resolved.starts_with(&canonical_base) {
+        return Err("Path is outside the app data directory".to_string());
+    }
+
+    for component in suffix.into_iter().rev() {
+        resolved.push(component);
+    }
+
+    Ok(resolved)
+}
+
+fn validate_model_path(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
+    let app_data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "Failed to get app local data directory".to_string())?;
+
+    resolve_path_with_base(&app_data_dir, path)
+}
 
 #[tauri::command]
 #[specta::specta]
@@ -161,12 +308,17 @@ async fn extract_audio_from_video(video_path: &str, output_path: &PathBuf) -> Re
             }
         }
 
-        let mixed_samples = final_samples;
+        let mut mixed_samples = final_samples;
         let channel_count = 1_usize;
 
         if mixed_samples.is_empty() {
             log::error!("No audio samples after processing all sources");
             return Err("Failed to process any audio sources".to_string());
+        }
+
+        let gain = normalize_audio_for_transcription(&mut mixed_samples);
+        if (gain - 1.0).abs() > 0.01 {
+            log::info!("Applied transcription audio gain: {gain:.2}x");
         }
 
         log::info!("Final mixed audio: {} samples", mixed_samples.len());
@@ -526,16 +678,200 @@ fn is_special_token(token_text: &str) -> bool {
     is_special
 }
 
+fn caption_token_attaches_to_previous(text: &str) -> bool {
+    let Some(first_char) = text.trim().chars().next() else {
+        return false;
+    };
+
+    caption_char_attaches_to_previous(first_char)
+}
+
+fn caption_char_attaches_to_previous(value: char) -> bool {
+    matches!(
+        value,
+        ',' | '.'
+            | '!'
+            | '?'
+            | ';'
+            | ':'
+            | '%'
+            | ')'
+            | ']'
+            | '}'
+            | '\''
+            | '’'
+            | '、'
+            | '。'
+            | '！'
+            | '？'
+            | '；'
+            | '：'
+            | '，'
+    )
+}
+
+fn caption_boundary_word_is_weak(word: &CaptionWord) -> bool {
+    let normalized = word
+        .text
+        .trim()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+
+    normalized.len() <= 1
+        || matches!(
+            normalized.as_str(),
+            "an" | "as"
+                | "at"
+                | "be"
+                | "by"
+                | "do"
+                | "he"
+                | "if"
+                | "in"
+                | "is"
+                | "it"
+                | "me"
+                | "my"
+                | "of"
+                | "on"
+                | "or"
+                | "so"
+                | "to"
+                | "up"
+                | "we"
+        )
+}
+
+fn normalize_caption_words(words: Vec<CaptionWord>) -> Vec<CaptionWord> {
+    let mut normalized: Vec<CaptionWord> = Vec::with_capacity(words.len());
+
+    for word in words {
+        let text = word.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+
+        if caption_token_attaches_to_previous(text)
+            && let Some(previous) = normalized.last_mut()
+        {
+            previous.text.push_str(text);
+            previous.end = word.end;
+        } else {
+            normalized.push(CaptionWord {
+                text: text.to_string(),
+                start: word.start,
+                end: word.end,
+            });
+        }
+    }
+
+    for word in &mut normalized {
+        word.end = word.end.min(word.start + MAX_CAPTION_WORD_DURATION);
+    }
+
+    normalized
+}
+
+fn caption_text_from_words<'a>(words: impl IntoIterator<Item = &'a CaptionWord>) -> String {
+    let mut text = String::new();
+
+    for word in words {
+        let word_text = word.text.trim();
+        if word_text.is_empty() {
+            continue;
+        }
+
+        if !text.is_empty() && !caption_token_attaches_to_previous(word_text) {
+            text.push(' ');
+        }
+        text.push_str(word_text);
+    }
+
+    text
+}
+
+fn caption_word_chunks(words: &[CaptionWord]) -> Vec<&[CaptionWord]> {
+    let mut chunks = Vec::new();
+    let mut start = 0;
+
+    while start < words.len() {
+        let remaining = words.len() - start;
+        if remaining <= TARGET_CAPTION_WORDS_PER_SEGMENT {
+            chunks.push(&words[start..]);
+            break;
+        }
+
+        let mut end = (start + TARGET_CAPTION_WORDS_PER_SEGMENT).min(words.len());
+        while end < words.len()
+            && caption_boundary_word_is_weak(&words[end - 1])
+            && end - start < MAX_CAPTION_WORDS_PER_SEGMENT
+        {
+            end += 1;
+        }
+
+        let remaining_after = words.len() - end;
+        if remaining_after > 0
+            && remaining_after < MIN_FINAL_CAPTION_WORDS
+            && caption_boundary_word_is_weak(&words[end])
+        {
+            end = words.len();
+        }
+
+        chunks.push(&words[start..end]);
+        start = end;
+    }
+
+    chunks
+}
+
+fn normalize_audio_for_transcription(samples: &mut [f32]) -> f32 {
+    if samples.is_empty() {
+        return 1.0;
+    }
+
+    let peak = samples
+        .iter()
+        .fold(0.0_f32, |max, sample| max.max(sample.abs()));
+    if peak <= f32::EPSILON {
+        return 1.0;
+    }
+
+    let rms =
+        (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt();
+    if rms <= f32::EPSILON {
+        return 1.0;
+    }
+
+    let target_rms = 0.08_f32;
+    let desired_gain = (target_rms / rms).clamp(1.0, 8.0);
+    let peak_limited_gain = 0.98 / peak;
+    let gain = desired_gain.min(peak_limited_gain);
+
+    if (gain - 1.0).abs() > 0.01 {
+        for sample in samples {
+            *sample = (*sample * gain).clamp(-0.98, 0.98);
+        }
+    }
+
+    gain
+}
+
 fn process_with_whisper(
     audio_path: &PathBuf,
     context: Arc<WhisperContext>,
     language: &str,
+    transcription_hints: &[String],
 ) -> Result<CaptionData, String> {
     log::info!("=== WHISPER TRANSCRIPTION START ===");
     log::info!("Processing audio file: {audio_path:?}");
     log::info!("Language setting: {language}");
 
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+        beam_size: 5,
+        patience: 1.0,
+    });
 
     params.set_translate(false);
     params.set_print_special(false);
@@ -545,7 +881,13 @@ fn process_with_whisper(
     params.set_language(Some(if language == "auto" { "auto" } else { language }));
     params.set_max_len(i32::MAX);
 
-    log::info!("Whisper params - translate: false, token_timestamps: true, max_len: MAX");
+    if let Some(initial_prompt) = build_initial_prompt(transcription_hints) {
+        params.set_initial_prompt(&initial_prompt);
+    }
+
+    log::info!(
+        "Whisper params - translate: false, token_timestamps: true, beam_size: 5, max_len: MAX"
+    );
 
     let mut audio_file = File::open(audio_path)
         .map_err(|e| format!("Failed to open audio file: {e} at path: {audio_path:?}"))?;
@@ -562,6 +904,11 @@ fn process_with_whisper(
             let sample = i16::from_le_bytes([audio_data[i], audio_data[i + 1]]) as f32 / 32768.0;
             audio_data_f32.push(sample);
         }
+    }
+
+    let gain = normalize_audio_for_transcription(&mut audio_data_f32);
+    if (gain - 1.0).abs() > 0.01 {
+        log::info!("Applied Whisper input gain: {gain:.2}x");
     }
 
     let duration_seconds = audio_data_f32.len() as f32 / WHISPER_SAMPLE_RATE as f32;
@@ -714,6 +1061,8 @@ fn process_with_whisper(
             }
         }
 
+        let words = normalize_caption_words(words);
+
         log::info!("  Segment {} produced {} words", i, words.len());
         for (w_idx, word) in words.iter().enumerate() {
             log::info!(
@@ -730,19 +1079,8 @@ fn process_with_whisper(
             continue;
         }
 
-        const MAX_WORDS_PER_SEGMENT: usize = 6;
-
-        let word_chunks: Vec<Vec<CaptionWord>> = words
-            .chunks(MAX_WORDS_PER_SEGMENT)
-            .map(|chunk| chunk.to_vec())
-            .collect();
-
-        for (chunk_idx, chunk_words) in word_chunks.into_iter().enumerate() {
-            let segment_text = chunk_words
-                .iter()
-                .map(|word| word.text.clone())
-                .collect::<Vec<_>>()
-                .join(" ");
+        for (chunk_idx, chunk_words) in caption_word_chunks(&words).into_iter().enumerate() {
+            let segment_text = caption_text_from_words(chunk_words);
 
             let segment_start = chunk_words
                 .first()
@@ -755,7 +1093,7 @@ fn process_with_whisper(
                 start: segment_start,
                 end: segment_end,
                 text: segment_text,
-                words: chunk_words,
+                words: chunk_words.to_vec(),
             });
         }
     }
@@ -784,28 +1122,165 @@ fn process_with_whisper(
     })
 }
 
+fn build_initial_prompt(transcription_hints: &[String]) -> Option<String> {
+    let mut normalized = Vec::new();
+
+    for hint in transcription_hints {
+        let value = hint.replace('\0', "").trim().to_string();
+        if value.is_empty() || normalized.contains(&value) {
+            continue;
+        }
+        normalized.push(value);
+    }
+
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Preferred spellings, names, and capitalization for this transcript: {}",
+            normalized.join("; ")
+        ))
+    }
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+fn process_with_parakeet(
+    audio_path: &std::path::Path,
+    model_dir: &str,
+) -> Result<CaptionData, String> {
+    tracing::info!("Processing audio file: {audio_path:?}");
+    tracing::info!("Model directory: {model_dir}");
+
+    let cached_model = {
+        let guard = PARAKEET_CONTEXT.blocking_lock();
+        guard.as_ref().and_then(|cached| {
+            if cached.model_dir == model_dir {
+                Some(Arc::clone(&cached.model))
+            } else {
+                None
+            }
+        })
+    };
+
+    let model_arc = if let Some(model) = cached_model {
+        tracing::info!("Reusing cached Parakeet TDT model");
+        model
+    } else {
+        tracing::info!("Loading Parakeet TDT model from: {model_dir}");
+        let model = ParakeetTDT::from_pretrained(model_dir, None).map_err(|e| format!("{e}"))?;
+        let loaded_model = Arc::new(std::sync::Mutex::new(model));
+
+        let mut guard = PARAKEET_CONTEXT.blocking_lock();
+        if let Some(cached) = guard
+            .as_ref()
+            .filter(|cached| cached.model_dir == model_dir)
+        {
+            tracing::info!("Reusing cached Parakeet TDT model");
+            Arc::clone(&cached.model)
+        } else {
+            *guard = Some(CachedParakeetContext {
+                model_dir: model_dir.to_string(),
+                model: Arc::clone(&loaded_model),
+            });
+            tracing::info!("Parakeet TDT model loaded successfully");
+            loaded_model
+        }
+    };
+
+    let result = {
+        let mut parakeet = model_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock Parakeet model: {e}"))?;
+        parakeet
+            .transcribe_file(audio_path, Some(TimestampMode::Words))
+            .map_err(|e| format!("Parakeet transcription failed: {e}"))?
+    };
+
+    tracing::info!("Transcription text: {}", result.text);
+    tracing::info!("Got {} timed tokens", result.tokens.len());
+
+    let words = normalize_caption_words(
+        result
+            .tokens
+            .iter()
+            .filter(|t| !t.text.trim().is_empty())
+            .map(|t| CaptionWord {
+                text: t.text.trim().to_string(),
+                start: t.start,
+                end: t.end,
+            })
+            .collect(),
+    );
+
+    if words.is_empty() {
+        tracing::warn!("Parakeet produced no words");
+        return Err("No speech detected in the audio".to_string());
+    }
+
+    let mut segments = Vec::new();
+
+    for (chunk_idx, chunk) in caption_word_chunks(&words).into_iter().enumerate() {
+        let segment_text = caption_text_from_words(chunk);
+        let segment_start = chunk.first().map(|w| w.start).unwrap_or(0.0);
+        let segment_end = chunk.last().map(|w| w.end).unwrap_or(0.0);
+
+        segments.push(CaptionSegment {
+            id: format!("segment-{chunk_idx}"),
+            start: segment_start,
+            end: segment_end,
+            text: segment_text,
+            words: chunk.to_vec(),
+        });
+    }
+
+    tracing::info!("Total segments: {}", segments.len());
+    tracing::info!(
+        "Total words: {}",
+        segments.iter().map(|s| s.words.len()).sum::<usize>()
+    );
+
+    Ok(CaptionData {
+        segments,
+        settings: Some(cap_project::CaptionSettings::default()),
+    })
+}
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+fn process_with_parakeet(
+    _audio_path: &std::path::Path,
+    _model_dir: &str,
+) -> Result<CaptionData, String> {
+    Err(PARAKEET_UNSUPPORTED_MESSAGE.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 #[instrument]
 pub async fn transcribe_audio(
+    app: AppHandle,
     video_path: String,
     model_path: String,
     language: String,
+    engine: TranscriptionEngine,
 ) -> Result<CaptionData, String> {
     log::info!("=== TRANSCRIBE AUDIO COMMAND START ===");
     log::info!("Video path: {}", video_path);
     log::info!("Model path: {}", model_path);
     log::info!("Language: {}", language);
 
+    let validated_model_path = validate_model_path(&app, &model_path)?;
+
     if !std::path::Path::new(&video_path).exists() {
         log::error!("Video file not found at path: {video_path}");
         return Err(format!("Video file not found at path: {video_path}"));
     }
 
-    if !std::path::Path::new(&model_path).exists() {
+    if !validated_model_path.exists() {
         log::error!("Model file not found at path: {model_path}");
         return Err(format!("Model file not found at path: {model_path}"));
     }
+
+    let model_path = validated_model_path.to_string_lossy().to_string();
 
     let temp_dir = tempdir().map_err(|e| format!("Failed to create temporary directory: {e}"))?;
     let audio_path = temp_dir.path().join("audio.wav");
@@ -833,24 +1308,42 @@ pub async fn transcribe_audio(
         );
     }
 
-    let context = match get_whisper_context(&model_path).await {
-        Ok(ctx) => {
-            log::info!("Whisper context ready");
-            ctx
+    let transcription_result = match engine {
+        TranscriptionEngine::Parakeet => {
+            log::info!("Using Parakeet TDT engine");
+            let model_dir = model_path.clone();
+            tokio::task::spawn_blocking(move || process_with_parakeet(&audio_path, &model_dir))
+                .await
+                .map_err(|e| format!("Parakeet task panicked: {e}"))?
         }
-        Err(e) => {
-            log::error!("Failed to initialize Whisper context: {e}");
-            return Err(format!("Failed to initialize transcription model: {e}"));
+        TranscriptionEngine::Whisper => {
+            let context = match get_whisper_context(&model_path).await {
+                Ok(ctx) => {
+                    log::info!("Whisper context ready");
+                    ctx
+                }
+                Err(e) => {
+                    log::error!("Failed to initialize Whisper context: {e}");
+                    return Err(format!("Failed to initialize transcription model: {e}"));
+                }
+            };
+
+            let transcription_hints = GeneralSettingsStore::get(&app)
+                .ok()
+                .flatten()
+                .map(|settings| settings.transcription_hints)
+                .unwrap_or_default();
+
+            log::info!("Starting Whisper transcription in blocking task...");
+            tokio::task::spawn_blocking(move || {
+                process_with_whisper(&audio_path, context, &language, &transcription_hints)
+            })
+            .await
+            .map_err(|e| format!("Whisper task panicked: {e}"))?
         }
     };
 
-    log::info!("Starting Whisper transcription in blocking task...");
-    let whisper_result =
-        tokio::task::spawn_blocking(move || process_with_whisper(&audio_path, context, &language))
-            .await
-            .map_err(|e| format!("Whisper task panicked: {e}"))?;
-
-    match whisper_result {
+    match transcription_result {
         Ok(captions) => {
             log::info!("=== TRANSCRIBE AUDIO RESULT ===");
             log::info!(
@@ -1211,6 +1704,40 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
 
+                    let preset = settings_obj
+                        .get("preset")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("classic")
+                        .to_string();
+
+                    let animation = settings_obj
+                        .get("animation")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("bounce")
+                        .to_string();
+
+                    let highlight_style = settings_obj
+                        .get("highlightStyle")
+                        .or_else(|| settings_obj.get("highlight_style"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("color")
+                        .to_string();
+
+                    let uppercase = settings_obj
+                        .get("uppercase")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    let manual_position = settings_obj
+                        .get("manualPosition")
+                        .or_else(|| settings_obj.get("manual_position"))
+                        .and_then(|value| {
+                            Some(cap_project::XY {
+                                x: value.get("x")?.as_f64()? as f32,
+                                y: value.get("y")?.as_f64()? as f32,
+                            })
+                        });
+
                     cap_project::CaptionSettings {
                         enabled,
                         font,
@@ -1229,12 +1756,21 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         linger_duration,
                         word_transition_duration,
                         active_word_highlight,
+                        manual_position,
+                        preset,
+                        animation,
+                        highlight_style,
+                        uppercase,
                     }
                 } else {
                     cap_project::CaptionSettings::default()
                 };
 
-                Ok(cap_project::CaptionsData { segments, settings })
+                Ok(cap_project::CaptionsData {
+                    segments,
+                    settings,
+                    ..Default::default()
+                })
             } else {
                 Err("Missing or invalid segments array in captions file".to_string())
             }
@@ -1338,64 +1874,79 @@ pub async fn download_whisper_model(
     model_name: String,
     output_path: String,
 ) -> Result<(), String> {
-    let model_url = match model_name.as_str() {
-        "tiny" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-        "base" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-        "small" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-        "medium" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
-        "large" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
-        "large-v3" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
-        _ => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+    let validated_path = validate_model_path(&app, &output_path)?;
+
+    let model_parts: &[&str] = match model_name.as_str() {
+        "tiny" => &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-tiny.bin",
+        ],
+        "base" => &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-base.bin",
+        ],
+        "small" => &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-small.bin",
+        ],
+        "medium" => &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-medium.bin.part0",
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-medium.bin.part1",
+        ],
+        _ => &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/whisper-v1/ggml-tiny.bin",
+        ],
     };
 
-    let response = app
-        .state::<http_client::HttpClient>()
-        .get(model_url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to download model: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Failed to download model: HTTP {}",
-            response.status()
-        ));
-    }
-
-    let total_size = response.content_length().unwrap_or(0);
-
-    if let Some(parent) = std::path::Path::new(&output_path).parent() {
+    if let Some(parent) = validated_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create parent directories: {e}"))?;
     }
-    let mut file = tokio::fs::File::create(&output_path)
+
+    let http_client = app.state::<http_client::HttpClient>();
+    let total_size = total_content_length(&http_client, model_parts).await;
+
+    let mut file = tokio::fs::File::create(&validated_path)
         .await
         .map_err(|e| format!("Failed to create file: {e}"))?;
 
     let mut downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
 
-    while let Some(chunk_result) = stream.next().await {
-        let chunk = chunk_result.map_err(|e| format!("Error while downloading: {e}"))?;
-
-        file.write_all(&chunk)
+    for url in model_parts {
+        let response = http_client
+            .get(*url)
+            .timeout(MODEL_DOWNLOAD_REQUEST_TIMEOUT)
+            .send()
             .await
-            .map_err(|e| format!("Error while writing to file: {e}"))?;
+            .map_err(|e| format!("Failed to download model: {e}"))?;
 
-        downloaded += chunk.len() as u64;
-
-        let progress = if total_size > 0 {
-            (downloaded as f64 / total_size as f64) * 100.0
-        } else {
-            0.0
-        };
-
-        DownloadProgress {
-            progress,
-            message: format!("Downloading model: {progress:.1}%"),
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to download model: HTTP {}",
+                response.status()
+            ));
         }
-        .emit(&app)
-        .ok();
+
+        let mut stream = response.bytes_stream();
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.map_err(|e| format!("Error while downloading: {e}"))?;
+
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| format!("Error while writing to file: {e}"))?;
+
+            downloaded = downloaded.saturating_add(chunk.len() as u64);
+
+            let progress = if total_size > 0 {
+                (downloaded as f64 / total_size as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            DownloadProgress {
+                progress,
+                message: format!("Downloading model: {progress:.1}%"),
+            }
+            .emit(&app)
+            .ok();
+        }
     }
 
     file.flush()
@@ -1405,24 +1956,371 @@ pub async fn download_whisper_model(
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-#[instrument]
-pub async fn check_model_exists(model_path: String) -> Result<bool, String> {
-    Ok(std::path::Path::new(&model_path).exists())
+async fn total_content_length(client: &reqwest::Client, urls: &[&str]) -> u64 {
+    let mut total: u64 = 0;
+    for url in urls {
+        let Ok(resp) = client
+            .head(*url)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+        else {
+            return 0;
+        };
+        if !resp.status().is_success() {
+            return 0;
+        }
+        match resp.content_length() {
+            Some(size) => total = total.saturating_add(size),
+            None => return 0,
+        }
+    }
+    total
 }
 
 #[tauri::command]
 #[specta::specta]
-#[instrument]
-pub async fn delete_whisper_model(model_path: String) -> Result<(), String> {
-    if !std::path::Path::new(&model_path).exists() {
+#[instrument(skip(app))]
+pub async fn check_model_exists(app: AppHandle, model_path: String) -> Result<bool, String> {
+    let validated_path = validate_model_path(&app, &model_path)?;
+    Ok(validated_path.exists())
+}
+
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(app))]
+pub async fn delete_whisper_model(app: AppHandle, model_path: String) -> Result<(), String> {
+    let validated_path = validate_model_path(&app, &model_path)?;
+
+    if !validated_path.exists() {
         return Err(format!("Model file not found: {model_path}"));
     }
 
-    tokio::fs::remove_file(&model_path)
+    tokio::fs::remove_file(&validated_path)
         .await
         .map_err(|e| format!("Failed to delete model file: {e}"))?;
+
+    Ok(())
+}
+
+const MODEL_DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+
+const PARAKEET_TDT_INT8_MODEL_FILES: &[(&str, &[&str])] = &[
+    (
+        "encoder-model.int8.onnx",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/encoder-model.int8.onnx",
+        ],
+    ),
+    (
+        "decoder_joint-model.int8.onnx",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/decoder_joint-model.int8.onnx",
+        ],
+    ),
+    (
+        "vocab.txt",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/vocab.txt",
+        ],
+    ),
+];
+
+const PARAKEET_TDT_FULL_MODEL_FILES: &[(&str, &[&str])] = &[
+    (
+        "encoder-model.onnx",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/encoder-model.onnx",
+        ],
+    ),
+    (
+        "encoder-model.onnx.data",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/encoder-model.onnx.data.part0",
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/encoder-model.onnx.data.part1",
+        ],
+    ),
+    (
+        "decoder_joint-model.onnx",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/decoder_joint-model.onnx",
+        ],
+    ),
+    (
+        "vocab.txt",
+        &[
+            "https://github.com/CapSoftware/transcription-models/releases/download/parakeet-tdt-v1/vocab.txt",
+        ],
+    ),
+];
+
+const PARAKEET_MODEL_CLEANUP_FILES: &[&str] = &[
+    "encoder-model.onnx",
+    "encoder-model.onnx.data",
+    "decoder_joint-model.onnx",
+    "encoder-model.int8.onnx",
+    "decoder_joint-model.int8.onnx",
+    "nemo128.onnx",
+    "vocab.txt",
+];
+
+fn parakeet_model_files_for_dir(
+    output_dir: &std::path::Path,
+) -> &'static [(&'static str, &'static [&'static str])] {
+    let dir_name = output_dir.file_name().and_then(|name| name.to_str());
+
+    match dir_name {
+        Some("parakeet-best-max") => PARAKEET_TDT_FULL_MODEL_FILES,
+        _ => PARAKEET_TDT_INT8_MODEL_FILES,
+    }
+}
+
+fn parakeet_staging_dir(validated_dir: &std::path::Path) -> PathBuf {
+    validated_dir.with_file_name(format!(
+        "{}.downloading",
+        validated_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("model")
+    ))
+}
+
+async fn parakeet_model_file_sizes(
+    http_client: &reqwest::Client,
+    model_files: &'static [(&'static str, &'static [&'static str])],
+) -> Result<Vec<(&'static str, u64)>, String> {
+    let mut sizes = Vec::with_capacity(model_files.len());
+    for (filename, urls) in model_files {
+        let mut file_size = 0_u64;
+        for url in *urls {
+            let resp = http_client
+                .head(*url)
+                .timeout(Duration::from_secs(30))
+                .send()
+                .await
+                .map_err(|e| format!("Failed to get size for {filename}: {e}"))?;
+
+            if !resp.status().is_success() {
+                return Err(format!(
+                    "Failed to get size for {filename}: HTTP {}",
+                    resp.status()
+                ));
+            }
+
+            file_size = file_size.saturating_add(resp.content_length().unwrap_or(0));
+        }
+        sizes.push((*filename, file_size));
+    }
+    Ok(sizes)
+}
+
+fn parakeet_model_files_match(dir: &std::path::Path, expected_files: &[(&str, u64)]) -> bool {
+    expected_files.iter().all(|(filename, expected_size)| {
+        let Ok(metadata) = std::fs::metadata(dir.join(filename)) else {
+            return false;
+        };
+
+        metadata.is_file() && (*expected_size == 0 || metadata.len() == *expected_size)
+    })
+}
+
+fn finalize_parakeet_model_download(
+    validated_dir: &std::path::Path,
+    staging_dir: &std::path::Path,
+    model_files: &'static [(&'static str, &'static [&'static str])],
+) -> Result<(), String> {
+    std::fs::create_dir_all(validated_dir)
+        .map_err(|e| format!("Failed to create model directory: {e}"))?;
+
+    for filename in PARAKEET_MODEL_CLEANUP_FILES {
+        let file_path = validated_dir.join(filename);
+        if file_path.exists() {
+            let _ = std::fs::remove_file(&file_path);
+        }
+    }
+
+    for (filename, _) in model_files {
+        let src = staging_dir.join(filename);
+        let dst = validated_dir.join(filename);
+        std::fs::rename(&src, &dst)
+            .map_err(|e| format!("Failed to move {filename} to final location: {e}"))?;
+    }
+
+    let _ = std::fs::remove_dir_all(staging_dir);
+
+    Ok(())
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(app))]
+pub async fn download_parakeet_model(app: AppHandle, output_dir: String) -> Result<(), String> {
+    let validated_dir = validate_model_path(&app, &output_dir)?;
+
+    std::fs::create_dir_all(&validated_dir)
+        .map_err(|e| format!("Failed to create model directory: {e}"))?;
+
+    let http_client = app.state::<http_client::HttpClient>();
+    let model_files = parakeet_model_files_for_dir(&validated_dir);
+    let expected_file_sizes = parakeet_model_file_sizes(&http_client, model_files).await?;
+
+    let staging_dir = parakeet_staging_dir(&validated_dir);
+    if parakeet_model_files_match(&staging_dir, &expected_file_sizes) {
+        tracing::info!("Finalizing previously completed Parakeet model download");
+        finalize_parakeet_model_download(&validated_dir, &staging_dir, model_files)?;
+        invalidate_parakeet_cache_for_dir(&validated_dir).await;
+        return Ok(());
+    }
+
+    if staging_dir.exists() {
+        std::fs::remove_dir_all(&staging_dir)
+            .map_err(|e| format!("Failed to clean staging directory: {e}"))?;
+    }
+    std::fs::create_dir_all(&staging_dir)
+        .map_err(|e| format!("Failed to create staging directory: {e}"))?;
+
+    let total_size = expected_file_sizes
+        .iter()
+        .fold(0_u64, |acc, (_, size)| acc.saturating_add(*size));
+
+    let mut downloaded_total: u64 = 0;
+
+    let download_result: Result<(), String> = async {
+        for (idx, (filename, urls)) in model_files.iter().enumerate() {
+            let file_path = staging_dir.join(filename);
+            let mut file = tokio::fs::File::create(&file_path)
+                .await
+                .map_err(|e| format!("Failed to create {filename}: {e}"))?;
+
+            for url in *urls {
+                tracing::info!("Downloading {filename} part from {url}");
+
+                let response = http_client
+                    .get(*url)
+                    .timeout(MODEL_DOWNLOAD_REQUEST_TIMEOUT)
+                    .send()
+                    .await
+                    .map_err(|e| format!("Failed to download {filename}: {e}"))?;
+
+                if !response.status().is_success() {
+                    return Err(format!(
+                        "Failed to download {filename}: HTTP {}",
+                        response.status()
+                    ));
+                }
+
+                let mut stream = response.bytes_stream();
+                while let Some(chunk_result) = stream.next().await {
+                    let chunk =
+                        chunk_result.map_err(|e| format!("Download error for {filename}: {e}"))?;
+                    file.write_all(&chunk)
+                        .await
+                        .map_err(|e| format!("Write error for {filename}: {e}"))?;
+
+                    downloaded_total = downloaded_total.saturating_add(chunk.len() as u64);
+
+                    let progress = if total_size > 0 {
+                        (downloaded_total as f64 / total_size as f64) * 100.0
+                    } else {
+                        ((idx as f64 + 0.5) / model_files.len() as f64) * 100.0
+                    };
+
+                    DownloadProgress {
+                        progress,
+                        message: format!("Downloading {filename}: {progress:.1}%"),
+                    }
+                    .emit(&app)
+                    .ok();
+                }
+            }
+
+            file.flush()
+                .await
+                .map_err(|e| format!("Failed to flush {filename}: {e}"))?;
+
+            tracing::info!("Finished downloading {filename}");
+        }
+        Ok(())
+    }
+    .await;
+
+    if let Err(e) = &download_result {
+        tracing::warn!("Download failed, cleaning up staging directory: {e}");
+        let _ = std::fs::remove_dir_all(&staging_dir);
+        return Err(e.clone());
+    }
+
+    if !parakeet_model_files_match(&staging_dir, &expected_file_sizes) {
+        let _ = std::fs::remove_dir_all(&staging_dir);
+        return Err("Downloaded model files did not match expected sizes".to_string());
+    }
+
+    finalize_parakeet_model_download(&validated_dir, &staging_dir, model_files)?;
+
+    invalidate_parakeet_cache_for_dir(&validated_dir).await;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(_app))]
+pub async fn download_parakeet_model(_app: AppHandle, _output_dir: String) -> Result<(), String> {
+    Err(PARAKEET_UNSUPPORTED_MESSAGE.to_string())
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(app))]
+pub async fn check_parakeet_model_exists(
+    app: AppHandle,
+    model_dir: String,
+) -> Result<bool, String> {
+    let validated_dir = validate_model_path(&app, &model_dir)?;
+
+    if !validated_dir.is_dir() {
+        return Ok(false);
+    }
+
+    let has_vocab = validated_dir.join("vocab.txt").exists();
+    let has_full_model = validated_dir.join("encoder-model.onnx").exists()
+        && validated_dir.join("encoder-model.onnx.data").exists()
+        && validated_dir.join("decoder_joint-model.onnx").exists();
+    let has_int8_model = validated_dir.join("encoder-model.int8.onnx").exists()
+        && validated_dir.join("decoder_joint-model.int8.onnx").exists();
+
+    Ok(has_vocab && (has_full_model || has_int8_model))
+}
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(_app))]
+pub async fn check_parakeet_model_exists(
+    _app: AppHandle,
+    _model_dir: String,
+) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(app))]
+pub async fn delete_parakeet_model(app: AppHandle, model_dir: String) -> Result<(), String> {
+    let validated_dir = validate_model_path(&app, &model_dir)?;
+
+    if !validated_dir.exists() {
+        return Err(format!("Model directory not found: {model_dir}"));
+    }
+
+    invalidate_parakeet_cache_for_dir(&validated_dir).await;
+
+    tokio::fs::remove_dir_all(&validated_dir)
+        .await
+        .map_err(|e| format!("Failed to delete model directory: {e}"))?;
 
     Ok(())
 }
@@ -1523,4 +2421,134 @@ fn mix_samples(dest: &mut [f32], source: &[f32]) -> usize {
         dest[i] = (dest[i] + source[i]) * 0.5;
     }
     length
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CaptionWord, caption_text_from_words, caption_word_chunks, normalize_caption_words,
+        resolve_path_with_base,
+    };
+    use tempfile::tempdir;
+
+    fn word(text: &str, index: usize) -> CaptionWord {
+        CaptionWord {
+            text: text.to_string(),
+            start: index as f32,
+            end: index as f32 + 0.5,
+        }
+    }
+
+    #[test]
+    fn resolve_path_with_base_rejects_parent_dir_escape() {
+        let dir = tempdir().unwrap();
+        let base = dir.path().join("app-data");
+        std::fs::create_dir_all(base.join("models")).unwrap();
+
+        let escaped = base.join("..").join("outside.bin");
+
+        let result = resolve_path_with_base(&base, escaped.to_string_lossy().as_ref());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolve_path_with_base_allows_nested_model_path() {
+        let dir = tempdir().unwrap();
+        let base = dir.path().join("app-data");
+        std::fs::create_dir_all(base.join("models")).unwrap();
+
+        let target = base.join("models").join("nested").join("model.bin");
+        let expected = base
+            .canonicalize()
+            .unwrap()
+            .join("models")
+            .join("nested")
+            .join("model.bin");
+
+        let resolved = resolve_path_with_base(&base, target.to_string_lossy().as_ref()).unwrap();
+
+        assert_eq!(resolved, expected);
+    }
+
+    #[test]
+    fn normalize_caption_words_attaches_punctuation() {
+        let words = normalize_caption_words(vec![
+            word("test", 0),
+            word(",", 1),
+            word("test", 2),
+            word(".", 3),
+        ]);
+
+        assert_eq!(caption_text_from_words(&words), "test, test.");
+        assert_eq!(words.len(), 2);
+    }
+
+    #[test]
+    fn normalize_caption_words_clamps_inflated_trailing_word() {
+        let words = normalize_caption_words(vec![CaptionWord {
+            text: "seconds.".to_string(),
+            start: 53.92,
+            end: 70.16,
+        }]);
+
+        assert_eq!(words.len(), 1);
+        assert!((words[0].end - (53.92 + super::MAX_CAPTION_WORD_DURATION)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn normalize_caption_words_keeps_normal_word_durations() {
+        let words = normalize_caption_words(vec![CaptionWord {
+            text: "hello".to_string(),
+            start: 1.0,
+            end: 1.4,
+        }]);
+
+        assert_eq!(words.len(), 1);
+        assert!((words[0].end - 1.4).abs() < 1e-4);
+    }
+
+    #[test]
+    fn caption_word_chunks_do_not_end_on_short_connector_when_more_words_follow() {
+        let words = [
+            "This", "is", "where", "we", "record", "I", "want", "clean", "captions",
+        ]
+        .iter()
+        .enumerate()
+        .map(|(index, text)| word(text, index))
+        .collect::<Vec<_>>();
+
+        let chunks = caption_word_chunks(&words);
+
+        assert_eq!(
+            caption_text_from_words(chunks[0]),
+            "This is where we record I want"
+        );
+        assert_eq!(caption_text_from_words(chunks[1]), "clean captions");
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+    mod parakeet {
+        use super::super::parakeet_model_dir_matches;
+        use tempfile::tempdir;
+
+        #[test]
+        fn parakeet_model_dir_match_uses_full_directory_path() {
+            let dir = tempdir().unwrap();
+            let model_dir = dir.path().join("models").join("parakeet-best");
+
+            assert!(parakeet_model_dir_matches(
+                model_dir.to_string_lossy().as_ref(),
+                &model_dir
+            ));
+            assert!(!parakeet_model_dir_matches(
+                dir.path()
+                    .join("models")
+                    .join("parakeet-best-max")
+                    .to_string_lossy()
+                    .as_ref(),
+                &model_dir
+            ));
+        }
+    }
 }

@@ -2,7 +2,7 @@ import { createContextProvider } from "@solid-primitives/context";
 import { trackStore } from "@solid-primitives/deep";
 import { debounce, throttle } from "@solid-primitives/scheduled";
 import { makePersisted } from "@solid-primitives/storage";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
 	createEffect,
 	createResource,
@@ -23,8 +23,27 @@ import {
 	type ProjectConfiguration,
 	type XY,
 } from "~/utils/tauri";
+import { calculateImageTransform } from "./layout";
 
 const NV12_FORMAT_MAGIC = 0x4e563132;
+
+export function hasNoVisibleBackground(source: {
+	type: string;
+	path?: string | null;
+	alpha?: number;
+}): boolean {
+	if (source.type === "color") {
+		return (source.alpha ?? 255) === 0;
+	}
+	if (source.type === "wallpaper" || source.type === "image") {
+		return !source.path;
+	}
+	return false;
+}
+
+type ScreenshotFrameData = FrameData & {
+	revision: number;
+};
 
 function convertNv12ToRgba(
 	nv12Data: Uint8ClampedArray,
@@ -38,7 +57,7 @@ function convertNv12ToRgba(
 	const ySize = yStride * height;
 	const yPlane = nv12Data;
 	const uvPlane = nv12Data.subarray(ySize);
-	const uvStride = width;
+	const uvStride = yStride;
 
 	for (let row = 0; row < height; row++) {
 		const yRowOffset = row * yStride;
@@ -77,6 +96,7 @@ function convertNv12ToRgba(
 
 export type ScreenshotProject = ProjectConfiguration;
 export type { Annotation, AnnotationType };
+export type ScreenshotEditorTool = AnnotationType | "select";
 
 export type CurrentDialog =
 	| { type: "createPreset" }
@@ -135,7 +155,7 @@ const DEFAULT_PROJECT: ScreenshotProject = {
 		source: {
 			type: "color",
 			value: [255, 255, 255],
-			alpha: 255,
+			alpha: 0,
 		},
 		blur: 0,
 		padding: 20,
@@ -164,9 +184,8 @@ function createScreenshotEditorContext() {
 	const [selectedAnnotationId, setSelectedAnnotationId] = createSignal<
 		string | null
 	>(null);
-	const [activeTool, setActiveTool] = createSignal<AnnotationType | "select">(
-		"select",
-	);
+	const [activeTool, setActiveTool] =
+		createSignal<ScreenshotEditorTool>("select");
 
 	const [layersPanelOpen, setLayersPanelOpen] = makePersisted(
 		createSignal(false),
@@ -184,16 +203,27 @@ function createScreenshotEditorContext() {
 		open: false,
 	});
 
-	const [latestFrame, setLatestFrame] = createLazySignal<FrameData>();
+	const [latestFrame, setLatestFrame] = createLazySignal<ScreenshotFrameData>();
+	const [previewCanvas, setPreviewCanvas] =
+		createSignal<HTMLCanvasElement | null>(null);
+	const [previewMaskCanvas, setPreviewMaskCanvas] =
+		createSignal<HTMLCanvasElement | null>(null);
+	const [configRevision, setConfigRevision] = createSignal(0);
 	const [originalImageSize, setOriginalImageSize] = createSignal<{
 		width: number;
 		height: number;
 	} | null>(null);
 	const [isRenderReady, setIsRenderReady] = createSignal(false);
+	const [isImageFileReady, setIsImageFileReady] = createSignal(false);
 	let wsRef: WebSocket | null = null;
 
 	const [editorInstance] = createResource(async () => {
+		const perfStart = performance.now();
+		const sincePerfStart = () => Math.round(performance.now() - perfStart);
 		const instance = await commands.createScreenshotEditorInstance();
+		console.info(
+			`[screenshot-editor] createScreenshotEditorInstance resolved in ${sincePerfStart()}ms`,
+		);
 
 		if (instance.config) {
 			setProject(reconcile(instance.config));
@@ -202,18 +232,20 @@ function createScreenshotEditorContext() {
 			}
 		}
 
+		setOriginalImageSize({
+			width: instance.imageWidth,
+			height: instance.imageHeight,
+		});
+
 		const hasReceivedWebSocketFrame = { value: false };
 
 		if (instance.path) {
-			const loadImage = (imagePath: string) => {
+			const loadImage = (imagePath: string, retryCount = 0) => {
 				const img = new Image();
 				img.crossOrigin = "anonymous";
 				img.src = convertFileSrc(imagePath);
 				img.onload = async () => {
-					setOriginalImageSize({
-						width: img.naturalWidth,
-						height: img.naturalHeight,
-					});
+					setIsImageFileReady(true);
 					if (hasReceivedWebSocketFrame.value) {
 						return;
 					}
@@ -231,7 +263,11 @@ function createScreenshotEditorContext() {
 							width: img.naturalWidth,
 							height: img.naturalHeight,
 							bitmap,
+							revision: 0,
 						});
+						console.info(
+							`[screenshot-editor] fallback image shown at ${sincePerfStart()}ms`,
+						);
 						setIsRenderReady(true);
 					} catch (e: unknown) {
 						console.error(
@@ -240,28 +276,27 @@ function createScreenshotEditorContext() {
 						);
 					}
 				};
+				img.onerror = () => {
+					if (retryCount < 10) {
+						setTimeout(() => loadImage(imagePath, retryCount + 1), 200);
+					}
+				};
 				return img;
 			};
 
 			const pathStr = instance.path;
 			const isCapDir = pathStr.endsWith(".cap");
-
-			if (isCapDir) {
-				const originalPath = `${pathStr}/original.png`;
-				const img = loadImage(originalPath);
-				img.onerror = () => {
-					loadImage(pathStr);
-				};
-			} else {
-				loadImage(pathStr);
-			}
+			const imagePath = isCapDir ? `${pathStr}/original.png` : pathStr;
+			loadImage(imagePath);
 		}
 
 		const ws = new WebSocket(instance.framesSocketUrl);
 		wsRef = ws;
 		ws.binaryType = "arraybuffer";
+		const wsFirstFrame = { value: true };
 		ws.onmessage = async (event) => {
 			const buffer = event.data as ArrayBuffer;
+			const frameStart = performance.now();
 
 			let isNv12Format = false;
 			if (buffer.byteLength >= 28) {
@@ -271,6 +306,7 @@ function createScreenshotEditorContext() {
 
 			let width: number;
 			let height: number;
+			let revision: number;
 			let processedData: Uint8ClampedArray;
 
 			if (isNv12Format) {
@@ -281,11 +317,12 @@ function createScreenshotEditorContext() {
 				const yStride = meta.getUint32(0, true);
 				height = meta.getUint32(4, true);
 				width = meta.getUint32(8, true);
+				revision = meta.getUint32(12, true);
 
 				if (!width || !height) return;
 
 				const ySize = yStride * height;
-				const uvSize = width * (height / 2);
+				const uvSize = yStride * (height / 2);
 				const totalSize = ySize + uvSize;
 
 				const nv12Data = new Uint8ClampedArray(buffer, 0, totalSize);
@@ -298,6 +335,7 @@ function createScreenshotEditorContext() {
 				const strideBytes = meta.getUint32(0, true);
 				height = meta.getUint32(4, true);
 				width = meta.getUint32(8, true);
+				revision = meta.getUint32(12, true);
 
 				if (!width || !height) return;
 
@@ -337,7 +375,15 @@ function createScreenshotEditorContext() {
 				if (existing?.bitmap && existing.bitmap !== bitmap) {
 					existing.bitmap.close();
 				}
-				setLatestFrame({ width, height, bitmap });
+				setLatestFrame({ width, height, bitmap, revision });
+				if (wsFirstFrame.value) {
+					wsFirstFrame.value = false;
+					console.info(
+						`[screenshot-editor] first ws frame ${width}x${height} (${buffer.byteLength} bytes) shown at ${sincePerfStart()}ms, processed in ${Math.round(
+							performance.now() - frameStart,
+						)}ms`,
+					);
+				}
 			} catch {}
 		};
 
@@ -366,16 +412,31 @@ function createScreenshotEditorContext() {
 	const FPS = 60;
 	const FRAME_TIME = 1000 / FPS;
 
-	const doRenderUpdate = (config: ProjectConfiguration) => {
-		commands.updateScreenshotConfig(config, false);
+	const doRenderUpdate = ({
+		config,
+		revision,
+	}: {
+		config: ProjectConfiguration;
+		revision: number;
+	}) => {
+		void invoke("update_screenshot_config", { config, save: false, revision });
 	};
 
 	const throttledRenderUpdate = throttle(doRenderUpdate, FRAME_TIME);
 	const trailingRenderUpdate = debounce(doRenderUpdate, FRAME_TIME + 16);
 
-	const saveConfig = debounce((config: ProjectConfiguration) => {
-		commands.updateScreenshotConfig(config, true);
-	}, 1000);
+	const saveConfig = debounce(
+		({
+			config,
+			revision,
+		}: {
+			config: ProjectConfiguration;
+			revision: number;
+		}) => {
+			void invoke("update_screenshot_config", { config, save: true, revision });
+		},
+		1000,
+	);
 
 	createEffect(
 		on(
@@ -391,57 +452,16 @@ function createScreenshotEditorContext() {
 					...unwrap(project),
 					annotations: unwrap(annotations),
 				};
+				const revision = configRevision() + 1;
 
-				throttledRenderUpdate(config);
-				trailingRenderUpdate(config);
-				saveConfig(config);
+				setConfigRevision(revision);
+
+				throttledRenderUpdate({ config, revision });
+				trailingRenderUpdate({ config, revision });
+				saveConfig({ config, revision });
 			},
 		),
 	);
-
-	const SCREEN_MAX_PADDING = 0.4;
-
-	const calculateImageTransform = (
-		frameSize: { width: number; height: number },
-		imageSize: { width: number; height: number },
-		padding: number,
-		crop: { position: XY<number>; size: XY<number> } | null,
-	) => {
-		const cropWidth = crop?.size.x ?? imageSize.width;
-		const cropHeight = crop?.size.y ?? imageSize.height;
-		const croppedAspect = cropWidth / cropHeight;
-		const outputAspect = frameSize.width / frameSize.height;
-
-		const paddingFactor = (padding / 100.0) * SCREEN_MAX_PADDING;
-		const paddingPixels =
-			Math.max(frameSize.width, frameSize.height) * paddingFactor;
-
-		const availableWidth = frameSize.width - 2 * paddingPixels;
-		const availableHeight = frameSize.height - 2 * paddingPixels;
-
-		const isHeightConstrained = croppedAspect <= outputAspect;
-
-		let targetWidth: number;
-		let targetHeight: number;
-		if (isHeightConstrained) {
-			targetHeight = availableHeight;
-			targetWidth = availableHeight * croppedAspect;
-		} else {
-			targetWidth = availableWidth;
-			targetHeight = availableWidth / croppedAspect;
-		}
-
-		const targetOffsetX = (frameSize.width - targetWidth) / 2;
-		const targetOffsetY = (frameSize.height - targetHeight) / 2;
-
-		const offsetX = isHeightConstrained ? targetOffsetX : paddingPixels;
-		const offsetY = isHeightConstrained ? paddingPixels : targetOffsetY;
-
-		return {
-			offset: { x: offsetX, y: offsetY },
-			size: { width: targetWidth, height: targetHeight },
-		};
-	};
 
 	let prevState: {
 		frameSize: { width: number; height: number };
@@ -459,8 +479,9 @@ function createScreenshotEditorContext() {
 				imageSize: originalImageSize(),
 				padding: project.background.padding,
 				crop: project.background.crop,
+				aspectRatio: project.aspectRatio,
 			}),
-			({ frame, imageSize, padding, crop }) => {
+			({ frame, imageSize, padding, crop, aspectRatio }) => {
 				if (!frame || !imageSize) return;
 
 				const frameSize = { width: frame.width, height: frame.height };
@@ -479,6 +500,7 @@ function createScreenshotEditorContext() {
 					imageSize,
 					padding,
 					crop,
+					aspectRatio,
 				);
 
 				const rawAnnotations = unwrap(annotations);
@@ -662,8 +684,14 @@ function createScreenshotEditorContext() {
 		dialog,
 		setDialog,
 		latestFrame,
+		previewCanvas,
+		setPreviewCanvas,
+		previewMaskCanvas,
+		setPreviewMaskCanvas,
+		configRevision,
 		originalImageSize,
 		isRenderReady,
+		isImageFileReady,
 		editorInstance,
 	};
 }

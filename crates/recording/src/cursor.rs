@@ -1,8 +1,10 @@
 use cap_cursor_capture::CursorCropBounds;
 use cap_cursor_info::CursorShape;
-use cap_project::{CursorClickEvent, CursorEvents, CursorMoveEvent, XY};
+use cap_project::{
+    CursorClickEvent, CursorEvents, CursorMoveEvent, KeyPressEvent, KeyboardEvents, XY,
+};
 use cap_timestamp::Timestamps;
-use futures::{future::Shared, FutureExt};
+use futures::{FutureExt, future::Shared};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -23,25 +25,49 @@ pub type Cursors = HashMap<u64, Cursor>;
 
 #[derive(Clone)]
 pub struct CursorActorResponse {
-    // pub cursor_images: HashMap<String, Vec<u8>>,
     pub cursors: Cursors,
     pub next_cursor_id: u32,
     pub moves: Vec<CursorMoveEvent>,
     pub clicks: Vec<CursorClickEvent>,
+    pub keyboard_presses: Vec<KeyPressEvent>,
 }
 
 pub struct CursorActor {
     stop: Option<DropGuard>,
+    stop_wakeup: Option<std::sync::mpsc::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
     pub rx: Shared<oneshot::Receiver<CursorActorResponse>>,
+}
+
+pub struct IncrementalCaptureOutputs {
+    pub cursor: Option<PathBuf>,
+    pub keyboard: Option<PathBuf>,
 }
 
 impl CursorActor {
     pub fn stop(&mut self) {
         drop(self.stop.take());
+        if let Some(stop_wakeup) = self.stop_wakeup.take() {
+            let _ = stop_wakeup.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
     }
 }
 
 const CURSOR_FLUSH_INTERVAL_SECS: u64 = 5;
+
+#[cfg(target_os = "linux")]
+fn prefers_wayland_portal_cursor() -> bool {
+    if std::env::var_os("WAYLAND_DISPLAY").is_none() {
+        return false;
+    }
+
+    std::env::var_os("DISPLAY").is_none()
+        || std::env::var("XDG_SESSION_TYPE")
+            .is_ok_and(|session| session.eq_ignore_ascii_case("wayland"))
+}
 
 fn flush_cursor_data(output_path: &Path, moves: &[CursorMoveEvent], clicks: &[CursorClickEvent]) {
     let events = CursorEvents {
@@ -59,6 +85,126 @@ fn flush_cursor_data(output_path: &Path, moves: &[CursorMoveEvent], clicks: &[Cu
     }
 }
 
+fn flush_keyboard_data(output_path: &Path, presses: &[KeyPressEvent]) {
+    let events = KeyboardEvents {
+        presses: presses.to_vec(),
+    };
+    if let Err(e) = events.write_to_file(output_path) {
+        tracing::error!(
+            "Failed to write keyboard data to {}: {}",
+            output_path.display(),
+            e
+        );
+    }
+}
+
+fn keycode_to_string(key: &device_query::Keycode) -> (String, String) {
+    use device_query::Keycode;
+    let (display, code) = match key {
+        Keycode::Key0 => ("0", "Key0"),
+        Keycode::Key1 => ("1", "Key1"),
+        Keycode::Key2 => ("2", "Key2"),
+        Keycode::Key3 => ("3", "Key3"),
+        Keycode::Key4 => ("4", "Key4"),
+        Keycode::Key5 => ("5", "Key5"),
+        Keycode::Key6 => ("6", "Key6"),
+        Keycode::Key7 => ("7", "Key7"),
+        Keycode::Key8 => ("8", "Key8"),
+        Keycode::Key9 => ("9", "Key9"),
+        Keycode::A => ("a", "A"),
+        Keycode::B => ("b", "B"),
+        Keycode::C => ("c", "C"),
+        Keycode::D => ("d", "D"),
+        Keycode::E => ("e", "E"),
+        Keycode::F => ("f", "F"),
+        Keycode::G => ("g", "G"),
+        Keycode::H => ("h", "H"),
+        Keycode::I => ("i", "I"),
+        Keycode::J => ("j", "J"),
+        Keycode::K => ("k", "K"),
+        Keycode::L => ("l", "L"),
+        Keycode::M => ("m", "M"),
+        Keycode::N => ("n", "N"),
+        Keycode::O => ("o", "O"),
+        Keycode::P => ("p", "P"),
+        Keycode::Q => ("q", "Q"),
+        Keycode::R => ("r", "R"),
+        Keycode::S => ("s", "S"),
+        Keycode::T => ("t", "T"),
+        Keycode::U => ("u", "U"),
+        Keycode::V => ("v", "V"),
+        Keycode::W => ("w", "W"),
+        Keycode::X => ("x", "X"),
+        Keycode::Y => ("y", "Y"),
+        Keycode::Z => ("z", "Z"),
+        Keycode::F1 => ("F1", "F1"),
+        Keycode::F2 => ("F2", "F2"),
+        Keycode::F3 => ("F3", "F3"),
+        Keycode::F4 => ("F4", "F4"),
+        Keycode::F5 => ("F5", "F5"),
+        Keycode::F6 => ("F6", "F6"),
+        Keycode::F7 => ("F7", "F7"),
+        Keycode::F8 => ("F8", "F8"),
+        Keycode::F9 => ("F9", "F9"),
+        Keycode::F10 => ("F10", "F10"),
+        Keycode::F11 => ("F11", "F11"),
+        Keycode::F12 => ("F12", "F12"),
+        Keycode::Escape => ("Escape", "Escape"),
+        Keycode::Space => ("Space", "Space"),
+        Keycode::LControl => ("LControl", "LControl"),
+        Keycode::RControl => ("RControl", "RControl"),
+        Keycode::LShift => ("LShift", "LShift"),
+        Keycode::RShift => ("RShift", "RShift"),
+        Keycode::LAlt => ("LAlt", "LAlt"),
+        Keycode::RAlt => ("RAlt", "RAlt"),
+        Keycode::LMeta => ("Meta", "Meta"),
+        Keycode::Enter => ("Enter", "Enter"),
+        Keycode::Up => ("Up", "Up"),
+        Keycode::Down => ("Down", "Down"),
+        Keycode::Left => ("Left", "Left"),
+        Keycode::Right => ("Right", "Right"),
+        Keycode::Backspace => ("Backspace", "Backspace"),
+        Keycode::CapsLock => ("CapsLock", "CapsLock"),
+        Keycode::Tab => ("Tab", "Tab"),
+        Keycode::Home => ("Home", "Home"),
+        Keycode::End => ("End", "End"),
+        Keycode::PageUp => ("PageUp", "PageUp"),
+        Keycode::PageDown => ("PageDown", "PageDown"),
+        Keycode::Insert => ("Insert", "Insert"),
+        Keycode::Delete => ("Delete", "Delete"),
+        Keycode::Numpad0 => ("0", "Numpad0"),
+        Keycode::Numpad1 => ("1", "Numpad1"),
+        Keycode::Numpad2 => ("2", "Numpad2"),
+        Keycode::Numpad3 => ("3", "Numpad3"),
+        Keycode::Numpad4 => ("4", "Numpad4"),
+        Keycode::Numpad5 => ("5", "Numpad5"),
+        Keycode::Numpad6 => ("6", "Numpad6"),
+        Keycode::Numpad7 => ("7", "Numpad7"),
+        Keycode::Numpad8 => ("8", "Numpad8"),
+        Keycode::Numpad9 => ("9", "Numpad9"),
+        Keycode::NumpadSubtract => ("-", "NumpadSubtract"),
+        Keycode::NumpadAdd => ("+", "NumpadAdd"),
+        Keycode::NumpadDivide => ("/", "NumpadDivide"),
+        Keycode::NumpadMultiply => ("*", "NumpadMultiply"),
+        Keycode::Grave => ("`", "Grave"),
+        Keycode::Minus => ("-", "Minus"),
+        Keycode::Equal => ("=", "Equal"),
+        Keycode::LeftBracket => ("[", "LeftBracket"),
+        Keycode::RightBracket => ("]", "RightBracket"),
+        Keycode::BackSlash => ("\\", "BackSlash"),
+        Keycode::Semicolon => (";", "Semicolon"),
+        Keycode::Apostrophe => ("'", "Apostrophe"),
+        Keycode::Comma => (",", "Comma"),
+        Keycode::Dot => (".", "Dot"),
+        Keycode::Slash => ("/", "Slash"),
+        _ => {
+            let s = format!("{key:?}");
+            return (s.clone(), s);
+        }
+    };
+    (display.to_string(), code.to_string())
+}
+
 #[tracing::instrument(name = "cursor", skip_all)]
 pub fn spawn_cursor_recorder(
     crop_bounds: CursorCropBounds,
@@ -67,22 +213,40 @@ pub fn spawn_cursor_recorder(
     prev_cursors: Cursors,
     next_cursor_id: u32,
     start_time: Timestamps,
-    output_path: Option<PathBuf>,
+    incremental_outputs: IncrementalCaptureOutputs,
 ) -> CursorActor {
-    use cap_utils::spawn_actor;
+    #[cfg(target_os = "linux")]
+    if prefers_wayland_portal_cursor() {
+        let (tx, rx) = oneshot::channel();
+        let _ = tx.send(CursorActorResponse {
+            cursors: prev_cursors,
+            next_cursor_id,
+            moves: vec![],
+            clicks: vec![],
+            keyboard_presses: vec![],
+        });
+        return CursorActor {
+            stop: None,
+            stop_wakeup: None,
+            thread: None,
+            rx: rx.shared(),
+        };
+    }
+
     use device_query::{DeviceQuery, DeviceState};
-    use futures::future::Either;
     use sha2::{Digest, Sha256};
-    use std::{pin::pin, time::Duration};
+    use std::time::Duration;
     use tracing::{error, info};
 
     let stop_token = CancellationToken::new();
     let (tx, rx) = oneshot::channel();
+    let (stop_wakeup_tx, stop_wakeup_rx) = std::sync::mpsc::channel();
 
     let stop_token_child = stop_token.child_token();
-    spawn_actor(async move {
+    let thread = std::thread::spawn(move || {
         let device_state = DeviceState::new();
         let mut last_mouse_state = device_state.get_mouse();
+        let mut last_keys: Vec<device_query::Keycode> = device_state.get_keys();
 
         let mut last_position = cap_cursor_capture::RawCursorPosition::get();
 
@@ -93,6 +257,7 @@ pub fn spawn_cursor_recorder(
             next_cursor_id,
             moves: vec![],
             clicks: vec![],
+            keyboard_presses: vec![],
         };
 
         let mut last_flush = Instant::now();
@@ -100,12 +265,16 @@ pub fn spawn_cursor_recorder(
         let mut last_cursor_id: Option<String> = None;
 
         loop {
-            let sleep = tokio::time::sleep(Duration::from_millis(16));
-            let Either::Right(_) =
-                futures::future::select(pin!(stop_token_child.cancelled()), pin!(sleep)).await
-            else {
+            if stop_token_child.is_cancelled() {
                 break;
-            };
+            }
+
+            if stop_wakeup_rx
+                .recv_timeout(Duration::from_millis(16))
+                .is_ok()
+            {
+                break;
+            }
 
             let elapsed = start_time.instant().elapsed().as_secs_f64() * 1000.0;
             let mouse_state = device_state.get_mouse();
@@ -203,18 +372,53 @@ pub fn spawn_cursor_recorder(
 
             last_mouse_state = mouse_state;
 
-            if let Some(ref path) = output_path {
-                if last_flush.elapsed() >= flush_interval {
-                    flush_cursor_data(path, &response.moves, &response.clicks);
-                    last_flush = Instant::now();
+            let current_keys = device_state.get_keys();
+
+            for key in &current_keys {
+                if !last_keys.contains(key) {
+                    let (display, code) = keycode_to_string(key);
+                    response.keyboard_presses.push(KeyPressEvent {
+                        key: display,
+                        key_code: code,
+                        time_ms: elapsed,
+                        down: true,
+                    });
                 }
+            }
+
+            for key in &last_keys {
+                if !current_keys.contains(key) {
+                    let (display, code) = keycode_to_string(key);
+                    response.keyboard_presses.push(KeyPressEvent {
+                        key: display,
+                        key_code: code,
+                        time_ms: elapsed,
+                        down: false,
+                    });
+                }
+            }
+
+            last_keys = current_keys;
+
+            if last_flush.elapsed() >= flush_interval {
+                if let Some(ref path) = incremental_outputs.cursor {
+                    flush_cursor_data(path, &response.moves, &response.clicks);
+                }
+                if let Some(ref kb_path) = incremental_outputs.keyboard {
+                    flush_keyboard_data(kb_path, &response.keyboard_presses);
+                }
+                last_flush = Instant::now();
             }
         }
 
         info!("cursor recorder done");
 
-        if let Some(ref path) = output_path {
+        if let Some(ref path) = incremental_outputs.cursor {
             flush_cursor_data(path, &response.moves, &response.clicks);
+        }
+
+        if let Some(ref kb_path) = incremental_outputs.keyboard {
+            flush_keyboard_data(kb_path, &response.keyboard_presses);
         }
 
         let _ = tx.send(response);
@@ -222,6 +426,8 @@ pub fn spawn_cursor_recorder(
 
     CursorActor {
         stop: Some(stop_token.drop_guard()),
+        stop_wakeup: Some(stop_wakeup_tx),
+        thread: Some(thread),
         rx: rx.shared(),
     }
 }
@@ -261,15 +467,105 @@ fn get_cursor_data() -> Option<CursorData> {
     })
 }
 
+#[cfg(target_os = "linux")]
+fn get_cursor_data() -> Option<CursorData> {
+    get_x11_cursor_data().or_else(fallback_cursor_data)
+}
+
+#[cfg(target_os = "linux")]
+fn get_x11_cursor_data() -> Option<CursorData> {
+    use x11rb::protocol::xfixes::ConnectionExt as _;
+
+    let (conn, _) = x11rb::connect(None).ok()?;
+    conn.xfixes_query_version(5, 0).ok()?.reply().ok()?;
+    let cursor = conn.xfixes_get_cursor_image().ok()?.reply().ok()?;
+
+    let width = u32::from(cursor.width);
+    let height = u32::from(cursor.height);
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let pixel_count = usize::from(cursor.width).checked_mul(usize::from(cursor.height))?;
+    if cursor.cursor_image.len() != pixel_count {
+        return None;
+    }
+
+    let mut rgba = Vec::with_capacity(pixel_count.checked_mul(4)?);
+    for pixel in cursor.cursor_image {
+        rgba.push(((pixel >> 16) & 0xff) as u8);
+        rgba.push(((pixel >> 8) & 0xff) as u8);
+        rgba.push((pixel & 0xff) as u8);
+        rgba.push(((pixel >> 24) & 0xff) as u8);
+    }
+
+    let image = image::RgbaImage::from_raw(width, height, rgba)?;
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .ok()?;
+
+    Some(CursorData {
+        image: bytes.into_inner(),
+        hotspot: XY::new(
+            f64::from(cursor.xhot) / f64::from(width),
+            f64::from(cursor.yhot) / f64::from(height),
+        ),
+        shape: None,
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn fallback_cursor_data() -> Option<CursorData> {
+    use std::sync::OnceLock;
+
+    static CURSOR_PNG: OnceLock<Vec<u8>> = OnceLock::new();
+
+    let image = CURSOR_PNG.get_or_init(linux_cursor_png).clone();
+    if image.is_empty() {
+        return None;
+    }
+
+    Some(CursorData {
+        image,
+        hotspot: XY::new(0.0, 0.0),
+        shape: None,
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cursor_png() -> Vec<u8> {
+    let mut image = image::RgbaImage::new(24, 24);
+    for y in 0..18 {
+        for x in 0..=y.min(10) {
+            image.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+        }
+    }
+    for y in 2..15 {
+        for x in 1..=y.min(8) {
+            image.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+        }
+    }
+
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    if image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .is_err()
+    {
+        return Vec::new();
+    }
+    bytes.into_inner()
+}
+
 #[cfg(windows)]
 fn get_cursor_data() -> Option<CursorData> {
     use windows::Win32::Foundation::{HWND, POINT};
     use windows::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, GetObjectA, ReleaseDC,
-        SelectObject, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS,
+        BITMAP, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS,
+        DeleteDC, DeleteObject, GetDC, GetObjectA, ReleaseDC, SelectObject,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{DrawIconEx, GetIconInfo, DI_NORMAL, ICONINFO};
-    use windows::Win32::UI::WindowsAndMessaging::{GetCursorInfo, CURSORINFO, CURSORINFO_FLAGS};
+    use windows::Win32::UI::WindowsAndMessaging::{CURSORINFO, CURSORINFO_FLAGS, GetCursorInfo};
+    use windows::Win32::UI::WindowsAndMessaging::{DI_NORMAL, DrawIconEx, GetIconInfo, ICONINFO};
 
     unsafe {
         // Get cursor info

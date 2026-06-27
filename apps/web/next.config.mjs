@@ -1,5 +1,3 @@
-/** @type {import('next').NextConfig} */
-
 import("dotenv").then(({ config }) => config({ path: "../../.env" }));
 
 import fs from "node:fs";
@@ -13,14 +11,17 @@ const packageJson = JSON.parse(
 );
 const { version } = packageJson;
 
+const ffmpegTracingIncludes = [
+	"./node_modules/ffmpeg-static/ffmpeg",
+	"./node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static/ffmpeg",
+];
+
 const nextConfig = {
 	reactStrictMode: true,
 	serverExternalPackages: ["ffmpeg-static", "prettier"],
 	outputFileTracingIncludes: {
-		"/app/.well-known/workflow/v1/step": [
-			"./node_modules/ffmpeg-static/ffmpeg",
-			"./node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static/ffmpeg",
-		],
+		"/.well-known/workflow/v1/step": ffmpegTracingIncludes,
+		"/api/tools/loom-download": ffmpegTracingIncludes,
 	},
 	transpilePackages: [
 		"@cap/ui",
@@ -29,11 +30,9 @@ const nextConfig = {
 		"@cap/web-domain",
 		"@cap/env",
 		"@cap/database",
+		"@cap/recorder-core",
 		"next-mdx-remote",
 	],
-	eslint: {
-		ignoreDuringBuilds: true,
-	},
 	typescript: {
 		ignoreBuildErrors: true,
 	},
@@ -56,6 +55,7 @@ const nextConfig = {
 			"@radix-ui/react-tooltip",
 			"date-fns",
 		],
+		turbopackFileSystemCacheForDev: true,
 	},
 	images: {
 		remotePatterns: [
@@ -99,6 +99,16 @@ const nextConfig = {
 					},
 				],
 			},
+			{
+				source: "/c/:collectionId",
+				destination: "/c/:collectionId",
+				has: [
+					{
+						type: "host",
+						value: "(?!cap.so|cap.link).*",
+					},
+				],
+			},
 		];
 	},
 	async redirects() {
@@ -129,28 +139,8 @@ const nextConfig = {
 	env: {
 		appVersion: version,
 	},
-	// If the NEXT_PUBLIC_DOCKER_BUILD environment variable is set to true, we are output nextjs to standalone ready for docker deployment
 	output:
 		process.env.NEXT_PUBLIC_DOCKER_BUILD === "true" ? "standalone" : undefined,
-	// webpack: (config) => {
-	// 	config.module.rules.push({
-	// 		test: /\.(?:js|ts)$/,
-	// 		use: [
-	// 			{
-	// 				loader: "babel-loader",
-	// 				options: {
-	// 					presets: ["next/babel"],
-	// 					plugins: [
-	// 						"@babel/plugin-transform-private-property-in-object",
-	// 						"@babel/plugin-transform-private-methods",
-	// 					],
-	// 				},
-	// 			},
-	// 		],
-	// 	});
-
-	// 	return config;
-	// },
 };
 
 export default withWorkflow(nextConfig);

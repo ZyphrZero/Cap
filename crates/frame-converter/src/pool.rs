@@ -1,9 +1,9 @@
-use crate::{create_converter, ConversionConfig, ConvertError, FrameConverter, VideoFramePool};
+use crate::{ConversionConfig, ConvertError, FrameConverter, VideoFramePool, create_converter};
 use ffmpeg::frame;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},

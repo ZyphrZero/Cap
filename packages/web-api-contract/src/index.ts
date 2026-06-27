@@ -2,6 +2,15 @@ import { z } from "zod";
 import desktop from "./desktop";
 import { c } from "./util";
 
+export {
+	DesktopOrganization,
+	DesktopStorageIntegrations,
+	OrganizationBrandColors,
+	OrganizationBrandingPatchBody,
+	OrganizationHexColor,
+	OrganizationLogoUpdate,
+} from "./desktop";
+
 export const NotificationAuthor = z.object({
 	id: z.string(),
 	name: z.string(),
@@ -44,6 +53,12 @@ export const Notification = z
 			videoId: z.string(),
 			author: NotificationAuthor,
 			comment: CommentData,
+		}),
+		z.object({
+			type: z.literal("anon_view"),
+			videoId: z.string(),
+			anonName: z.string(),
+			location: z.string().nullable(),
 		}),
 		// z.object({
 		//   type: z.literal("mention"),

@@ -10,7 +10,7 @@ pub async fn main() {
 
     #[cfg(windows)]
     {
-        use windows::Win32::UI::HiDpi::{SetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE};
+        use windows::Win32::UI::HiDpi::{PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness};
 
         unsafe { SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE).unwrap() };
     }
@@ -64,7 +64,9 @@ pub async fn main() {
     // .with_mic_feed(Arc::new(mic_feed.ask(microphone::Lock).await.unwrap()))
     .build(
         #[cfg(target_os = "macos")]
-        cidre::sc::ShareableContent::current().await.unwrap(),
+        Some(cap_recording::SendableShareableContent::from(
+            cidre::sc::ShareableContent::current().await.unwrap(),
+        )),
     )
     .await
     .unwrap();

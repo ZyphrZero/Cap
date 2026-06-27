@@ -62,6 +62,10 @@ impl ModelID {
         let vid = unique_id[unique_id.len() - 2 * 4..unique_id.len() - 4].to_string();
         let pid = unique_id[unique_id.len() - 4..].to_string();
 
+        if vid == "0000" && pid == "0001" {
+            return None;
+        }
+
         Some(Self { vid, pid })
     }
 }
@@ -69,6 +73,14 @@ impl ModelID {
 pub type NativeFormat = arc::R<av::capture::device::Format>;
 
 pub type NativeCaptureHandle = AVFoundationRecordingHandle;
+
+static AVFOUNDATION_SESSION_LIFECYCLE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn avfoundation_session_lifecycle_guard() -> std::sync::MutexGuard<'static, ()> {
+    AVFOUNDATION_SESSION_LIFECYCLE_LOCK
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+}
 
 fn find_device(info: &CameraInfo) -> Option<arc::R<av::CaptureDevice>> {
     let devices = list_video_devices();
@@ -111,16 +123,36 @@ pub(super) fn start_capturing_impl(
 
     let mut output = av::capture::VideoDataOutput::new();
     let mut session = av::capture::Session::new();
+    let mut added_input = false;
+    let pixel_format = format.native().format_desc().media_sub_type();
 
     session.configure(|s| {
         if s.can_add_input(&input) {
             s.add_input(&input);
+            added_input = true;
         } else {
-            panic!("can't add input");
+            return;
         }
 
         s.add_output(&output);
     });
+
+    if !added_input {
+        return Err(AVFoundationError::Message(
+            "Failed to add camera input to AVFoundation session".to_string(),
+        )
+        .into());
+    }
+
+    let video_settings = ns::Dictionary::with_keys_values(
+        &[cv::pixel_buffer_keys::pixel_format().as_ns()],
+        &[ns::Number::with_u32(pixel_format).as_id_ref()],
+    );
+    output
+        .set_video_settings(Some(video_settings.as_ref()))
+        .map_err(|err| {
+            AVFoundationError::Message(format!("Failed to set camera video settings: {err}"))
+        })?;
 
     output.set_sample_buf_delegate(Some(delegate.as_ref()), Some(&queue));
 
@@ -128,6 +160,7 @@ pub(super) fn start_capturing_impl(
     // otherwise start_running can overwrite the active format on macOS
     // https://stackoverflow.com/questions/36689578/avfoundation-capturing-video-with-custom-resolution
     {
+        let _session_lifecycle_guard = avfoundation_session_lifecycle_guard();
         let mut _lock = device.config_lock().map_err(AVFoundationError::Retained)?;
 
         _lock.set_active_format(format.native());
@@ -138,24 +171,51 @@ pub(super) fn start_capturing_impl(
     Ok(AVFoundationRecordingHandle {
         _delegate: delegate,
         session,
-        _output: output,
-        _input: input,
+        output,
+        input,
         _device: device,
+        is_torn_down: false,
     })
 }
 
 pub struct AVFoundationRecordingHandle {
     _delegate: arc::R<cap_camera_avfoundation::CallbackOutputDelegate>,
     session: arc::R<cidre::av::capture::Session>,
-    _output: arc::R<av::CaptureVideoDataOutput>,
-    _input: arc::R<av::CaptureDeviceInput>,
+    output: arc::R<av::CaptureVideoDataOutput>,
+    input: arc::R<av::CaptureDeviceInput>,
     _device: arc::R<av::CaptureDevice>,
+    is_torn_down: bool,
 }
 
 impl AVFoundationRecordingHandle {
     pub fn stop_capturing(mut self) -> Result<(), String> {
-        self.session.stop_running();
+        self.teardown();
         Ok(())
+    }
+
+    fn teardown(&mut self) {
+        if self.is_torn_down {
+            return;
+        }
+
+        self.is_torn_down = true;
+        let _session_lifecycle_guard = avfoundation_session_lifecycle_guard();
+
+        self.session.stop_running();
+        self.output
+            .set_sample_buf_delegate::<CallbackOutputDelegate>(None, None);
+        let output = self.output.clone();
+        let input = self.input.clone();
+        self.session.configure(move |s| {
+            s.remove_output(&output);
+            s.remove_input(&input);
+        });
+    }
+}
+
+impl Drop for AVFoundationRecordingHandle {
+    fn drop(&mut self) {
+        self.teardown();
     }
 }
 
@@ -165,6 +225,8 @@ pub enum AVFoundationError {
     Static(&'static cidre::ns::Error),
     #[error("{0}")]
     Retained(cidre::arc::R<cidre::ns::Error>),
+    #[error("{0}")]
+    Message(String),
 }
 
 impl From<&'static cidre::ns::Error> for AVFoundationError {
@@ -186,6 +248,7 @@ impl Deref for AVFoundationError {
         match self {
             AVFoundationError::Static(err) => err,
             AVFoundationError::Retained(err) => err,
+            AVFoundationError::Message(_) => unreachable!(),
         }
     }
 }
@@ -195,6 +258,7 @@ impl Debug for AVFoundationError {
         match self {
             AVFoundationError::Static(err) => write!(f, "{err}"),
             AVFoundationError::Retained(err) => write!(f, "{err}"),
+            AVFoundationError::Message(err) => write!(f, "{err}"),
         }
     }
 }
