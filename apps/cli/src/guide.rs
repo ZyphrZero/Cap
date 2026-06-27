@@ -127,7 +127,7 @@ fn build() -> Guide {
             EnvVar {
                 name: "CAP_DESKTOP_FORCE_INSTALL",
                 required: false,
-                used_by: "install-cli.sh, install-cli.ps1, update",
+                used_by: "install-cli.sh, install-cli.ps1",
                 description: "Force the installer scripts to replace Cap Desktop before linking the CLI.",
             },
         ],
@@ -204,12 +204,6 @@ fn build() -> Guide {
             cmd(
                 "upload",
                 "Upload a .cap project or video file; returns a shareable link. Authenticates via Cap Desktop's login or CAP_API_KEY.",
-                OutputMode::SingleJson,
-                &[],
-            ),
-            cmd(
-                "update",
-                "Download and install the latest Cap Desktop bundle, then repair the `cap` shim.",
                 OutputMode::SingleJson,
                 &[],
             ),

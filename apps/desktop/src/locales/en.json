@@ -47,13 +47,7 @@
 	},
 	"app": {
 		"title": "Cap",
-		"subtitle": "Beautiful screen recording, truly yours.",
-		"update": {
-			"title": "Update Cap",
-			"message": "Version {{version}} of Cap is available, would you like to install it?",
-			"ok": "Update",
-			"ignore": "Ignore"
-		}
+		"subtitle": "Beautiful screen recording, truly yours."
 	},
 	"recording": {
 		"start": "Start Recording",
@@ -1122,12 +1116,6 @@
 			"placeholder": "Enter license key...",
 			"button": "Activate"
 		}
-	},
-	"update": {
-		"noUpdate": "No update available",
-		"installing": "Installing Update",
-		"done": "Update has been installed. Restart Cap to finish updating.",
-		"restartNow": "Restart Now"
 	},
 	"errorPage": {
 		"title": "An Error Occured",

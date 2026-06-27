@@ -1,5 +1,4 @@
 import { Button } from "@cap/ui-solid";
-import { useNavigate } from "@solidjs/router";
 import {
 	createMutation,
 	queryOptions,
@@ -15,7 +14,6 @@ import {
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import * as shell from "@tauri-apps/plugin-shell";
-import * as updater from "@tauri-apps/plugin-updater";
 import { cx } from "cva";
 import {
 	createEffect,
@@ -78,7 +76,6 @@ import {
 	type ScreenCaptureTarget,
 	type UploadProgress,
 } from "~/utils/tauri";
-import { getUpdaterCheckOptions } from "~/utils/updater";
 import IconCapLogoFull from "~icons/cap/logo-full";
 import IconCapLogoFullDark from "~icons/cap/logo-full-dark";
 import IconLucideAppWindowMac from "~icons/lucide/app-window-mac";
@@ -228,25 +225,25 @@ type IdleWindow = typeof window & {
 
 type TargetMenuPanelProps =
 	| {
-		variant: "display";
-		targets?: CaptureDisplayWithThumbnail[];
-		onSelect: (target: CaptureDisplayWithThumbnail) => void;
-	}
+			variant: "display";
+			targets?: CaptureDisplayWithThumbnail[];
+			onSelect: (target: CaptureDisplayWithThumbnail) => void;
+	  }
 	| {
-		variant: "window";
-		targets?: CaptureWindowWithThumbnail[];
-		onSelect: (target: CaptureWindowWithThumbnail) => void;
-	}
+			variant: "window";
+			targets?: CaptureWindowWithThumbnail[];
+			onSelect: (target: CaptureWindowWithThumbnail) => void;
+	  }
 	| {
-		variant: "recording";
-		targets?: RecordingWithPath[];
-		onSelect: (target: RecordingWithPath) => void;
-		onViewAll: () => void;
-		uploadProgress?: Record<string, number>;
-		reuploadingPaths?: Set<string>;
-		onReupload?: (path: string) => void;
-		onRefetch?: () => void;
-	}
+			variant: "recording";
+			targets?: RecordingWithPath[];
+			onSelect: (target: RecordingWithPath) => void;
+			onViewAll: () => void;
+			uploadProgress?: Record<string, number>;
+			reuploadingPaths?: Set<string>;
+			onReupload?: (path: string) => void;
+			onRefetch?: () => void;
+	  }
 	| {
 			variant: "screenshot";
 			targets?: ScreenshotWithPath[];
@@ -1551,49 +1548,6 @@ export default function () {
 	);
 }
 
-let hasChecked = false;
-function createUpdateCheck() {
-	if (import.meta.env.DEV) return;
-
-	const navigate = useNavigate();
-
-	onMount(async () => {
-		if (hasChecked) return;
-		hasChecked = true;
-
-		await new Promise((res) => setTimeout(res, 10_000));
-
-		let update: updater.Update | undefined;
-		try {
-			const result = await updater.check(getUpdaterCheckOptions());
-			if (result) update = result;
-		} catch (e) {
-			console.error("Failed to check for updates:", e);
-			return;
-		}
-
-		if (!update) return;
-
-		let shouldUpdate: boolean | undefined;
-		try {
-			shouldUpdate = await dialog.confirm(
-				t("app.update.message", { version: update.version }),
-				{
-					title: t("app.update.title"),
-					okLabel: t("app.update.ok"),
-					cancelLabel: t("app.update.ignore"),
-				},
-			);
-		} catch (e) {
-			console.error("Failed to show update dialog:", e);
-			return;
-		}
-
-		if (!shouldUpdate) return;
-		navigate("/update");
-	});
-}
-
 function MainWindowHelpButton() {
 	return (
 		<Tooltip content={<span>Help & Tour</span>}>
@@ -1925,7 +1879,7 @@ function Page() {
 			await commands.uploadExportedVideo(
 				path,
 				"Reupload",
-				new Channel<UploadProgress>(() => { }),
+				new Channel<UploadProgress>(() => {}),
 				null,
 			);
 		} finally {
@@ -2115,8 +2069,6 @@ function Page() {
 	}));
 
 	const setCamera = createCameraMutation();
-
-	createUpdateCheck();
 
 	onMount(async () => {
 		if (document.activeElement instanceof HTMLElement) {
@@ -2616,7 +2568,7 @@ function Page() {
 			}
 		}
 
-		await signIn.mutateAsync(abort).catch(() => { });
+		await signIn.mutateAsync(abort).catch(() => {});
 
 		for (const win of await getAllWebviewWindows()) {
 			if (win.label.startsWith("target-select-overlay")) {
@@ -2795,7 +2747,9 @@ function Page() {
 									targets={recordingsData()}
 									isLoading={recordings.isPending}
 									errorMessage={
-										recordings.error ? t("recordingsPage.status.loadFailed") : undefined
+										recordings.error
+											? t("recordingsPage.status.loadFailed")
+											: undefined
 									}
 									onSelect={async (recording) => {
 										if (recording.mode === "studio") {
@@ -2845,7 +2799,9 @@ function Page() {
 									targets={screenshotsData()}
 									isLoading={screenshots.isPending}
 									errorMessage={
-										screenshots.error ? t("screenshot.messages.loadFailed") : undefined
+										screenshots.error
+											? t("screenshot.messages.loadFailed")
+											: undefined
 									}
 									onSelect={async (screenshot) => {
 										await commands.showWindow({

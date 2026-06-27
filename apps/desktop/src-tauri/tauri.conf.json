@@ -33,7 +33,6 @@
 		}
 	},
 	"plugins": {
-		"updater": { "active": false, "pubkey": "" },
 		"deep-link": {
 			"desktop": {
 				"schemes": ["cap-desktop"]
@@ -42,7 +41,6 @@
 	},
 	"bundle": {
 		"active": true,
-		"createUpdaterArtifacts": true,
 		"targets": "all",
 		"externalBin": [
 			"binaries/cap-muxer",

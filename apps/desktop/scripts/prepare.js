@@ -6,6 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, "../../..");
+const targetDir = path.join(repoRoot, "target");
+const windowsFfmpegRequiredDlls = [
+	"avcodec-61.dll",
+	"avdevice-61.dll",
+	"avfilter-10.dll",
+	"avformat-61.dll",
+	"avutil-59.dll",
+	"swresample-5.dll",
+	"swscale-8.dll",
+];
 
 /**
  * Creates a Microsoft Windows Installer (TM) compatible version from the provided crate's semver version.
@@ -60,6 +71,46 @@ function deepMerge(target, source) {
 	return { ...target, ...source };
 }
 
+async function fileExists(filePath) {
+	return fs
+		.access(filePath)
+		.then(() => true)
+		.catch(() => false);
+}
+
+async function copyFileIfChanged(sourcePath, destPath) {
+	if (await filesHaveSameContents(sourcePath, destPath)) return false;
+
+	try {
+		await fs.copyFile(sourcePath, destPath);
+		return true;
+	} catch (error) {
+		if (error?.code === "EBUSY") {
+			throw new Error(
+				`Cannot update ${destPath} because it is currently in use. Close Cap, cap-desktop.exe, and any process loading FFmpeg DLLs, then rerun the command.`,
+			);
+		}
+
+		throw error;
+	}
+}
+
+async function filesHaveSameContents(sourcePath, destPath) {
+	const [sourceStat, destStat] = await Promise.all([
+		fs.stat(sourcePath),
+		fs.stat(destPath).catch(() => null),
+	]);
+
+	if (!destStat || sourceStat.size !== destStat.size) return false;
+
+	const [source, dest] = await Promise.all([
+		fs.readFile(sourcePath),
+		fs.readFile(destPath).catch(() => null),
+	]);
+
+	return dest !== null && source.equals(dest);
+}
+
 /**
  * Writes platform-specific tauri configs
  *
@@ -77,6 +128,7 @@ export async function createTauriPlatformConfigs(
 	console.log(`Updating Platform (${platform}) Tauri config...`);
 	if (platform === "win32") {
 		configFileName = "tauri.windows.conf.json";
+		await syncWindowsFfmpegDlls();
 		baseConfig = {
 			...baseConfig,
 			bundle: {
@@ -126,6 +178,72 @@ export async function createTauriPlatformConfigs(
 		`${srcTauri}/${configFileName}`,
 		JSON.stringify(mergedConfig, null, 2),
 	);
+}
+
+async function syncWindowsFfmpegDlls() {
+	const ffmpegBin = path.join(targetDir, "ffmpeg", "bin");
+	const sourceNames = await fs.readdir(ffmpegBin).catch(() => {
+		throw new Error(
+			`FFmpeg DLL directory not found at ${ffmpegBin}. Run "pnpm -w cap-setup" before building the desktop app.`,
+		);
+	});
+	const dllNames = sourceNames.filter((name) =>
+		name.toLowerCase().endsWith(".dll"),
+	);
+	const available = new Set(dllNames.map((name) => name.toLowerCase()));
+	const missing = windowsFfmpegRequiredDlls.filter(
+		(name) => !available.has(name),
+	);
+
+	if (missing.length > 0) {
+		throw new Error(
+			`FFmpeg setup is incomplete; missing ${missing.join(", ")} in ${ffmpegBin}. Run "pnpm -w cap-setup" before building the desktop app.`,
+		);
+	}
+
+	const runtimeDirs = await windowsFfmpegRuntimeDirs();
+	for (const runtimeDir of runtimeDirs) {
+		await fs.mkdir(runtimeDir, { recursive: true });
+		for (const dllName of dllNames) {
+			await copyFileIfChanged(
+				path.join(ffmpegBin, dllName),
+				path.join(runtimeDir, dllName),
+			);
+		}
+	}
+
+	console.log(
+		`Synced ${dllNames.length} FFmpeg DLLs to ${runtimeDirs.length} Windows runtime directories`,
+	);
+}
+
+async function windowsFfmpegRuntimeDirs() {
+	const runtimeDirs = [
+		path.join(targetDir, "debug"),
+		path.join(targetDir, "release"),
+	];
+	const entries = await fs
+		.readdir(targetDir, { withFileTypes: true })
+		.catch(() => []);
+
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		if (
+			entry.name === "debug" ||
+			entry.name === "release" ||
+			entry.name === "ffmpeg" ||
+			entry.name === "native-deps"
+		) {
+			continue;
+		}
+
+		for (const profile of ["debug", "release"]) {
+			const dir = path.join(targetDir, entry.name, profile);
+			if (await fileExists(dir)) runtimeDirs.push(dir);
+		}
+	}
+
+	return [...new Set(runtimeDirs.map((dir) => path.normalize(dir)))];
 }
 
 async function main() {

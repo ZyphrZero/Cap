@@ -161,7 +161,7 @@ async function main() {
 		for (const profile of ["debug", "release"]) {
 			await fs.mkdir(path.join(targetDir, profile), { recursive: true });
 			for (const name of await fs.readdir(path.join(ffmpegDir, "bin"))) {
-				await fs.copyFile(
+				await copyFileIfChanged(
 					path.join(ffmpegDir, "bin", name),
 					path.join(targetDir, profile, name),
 				);
@@ -209,21 +209,22 @@ async function main() {
 				libclangPath = vsLlvmPath;
 				console.log("Found LLVM in Visual Studio");
 			}
-		} catch (e) {
+		} catch {
 			// Visual Studio not found, will try standalone LLVM
 		}
 
 		// Fallback to standalone LLVM installation
 		if (!libclangPath) {
-			const standaloneLlvm = "C:/Program Files/LLVM/bin";
-			if (await fileExists(path.join(standaloneLlvm, "libclang.dll"))) {
+			const standaloneLlvm = await findLibclangPath();
+			if (standaloneLlvm) {
 				libclangPath = standaloneLlvm;
-				console.log("Found standalone LLVM installation");
+				console.log(`Found standalone LLVM at ${standaloneLlvm}`);
 			} else {
+				const defaultLlvm = "C:/Program Files/LLVM/bin";
 				console.warn(
 					"WARNING: LLVM not found! Please install LLVM or Visual Studio with C++ tools.",
 				);
-				libclangPath = standaloneLlvm; // Use default path anyway
+				libclangPath = defaultLlvm;
 			}
 		}
 
@@ -437,6 +438,39 @@ async function writeFileIfChanged(filePath, contents) {
 	if (currentContents !== contents) await fs.writeFile(filePath, contents);
 }
 
+async function copyFileIfChanged(sourcePath, destPath) {
+	if (await filesHaveSameContents(sourcePath, destPath)) return false;
+
+	try {
+		await fs.copyFile(sourcePath, destPath);
+		return true;
+	} catch (error) {
+		if (error?.code === "EBUSY") {
+			throw new Error(
+				`Cannot update ${destPath} because it is currently in use. Close Cap, cap-desktop.exe, and any process loading FFmpeg DLLs, then rerun the command.`,
+			);
+		}
+
+		throw error;
+	}
+}
+
+async function filesHaveSameContents(sourcePath, destPath) {
+	const [sourceStat, destStat] = await Promise.all([
+		fs.stat(sourcePath),
+		fs.stat(destPath).catch(() => null),
+	]);
+
+	if (!destStat || sourceStat.size !== destStat.size) return false;
+
+	const [source, dest] = await Promise.all([
+		fs.readFile(sourcePath),
+		fs.readFile(destPath).catch(() => null),
+	]);
+
+	return dest !== null && source.equals(dest);
+}
+
 async function signMacOSDylib(filePath) {
 	const signId = env.APPLE_SIGNING_IDENTITY || "-";
 	const keychain = env.APPLE_KEYCHAIN ? `--keychain ${env.APPLE_KEYCHAIN}` : "";
@@ -553,6 +587,23 @@ async function findExecutable(name) {
 	return await execFile(command, [name])
 		.then(({ stdout }) => stdout.trim().split(/\r?\n/).find(Boolean) ?? null)
 		.catch(() => null);
+}
+
+async function findLibclangPath() {
+	const fromPath = await findExecutable("libclang.dll");
+	if (fromPath) return path.dirname(fromPath);
+
+	const candidates = [
+		path.join(env.USERPROFILE ?? "", "scoop", "apps", "llvm", "current", "bin"),
+		"C:/Program Files/LLVM/bin",
+	];
+
+	for (const candidate of candidates) {
+		if (await fileExists(path.join(candidate, "libclang.dll")))
+			return candidate;
+	}
+
+	return null;
 }
 
 async function canUseSccache(sccachePath) {

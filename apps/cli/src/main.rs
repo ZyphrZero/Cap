@@ -9,7 +9,6 @@ mod recordings;
 mod screenshot;
 mod session;
 mod targets;
-mod update;
 mod upload;
 
 use std::{
@@ -115,8 +114,6 @@ enum Commands {
     Recordings(RecordingsArgs),
     /// Upload a recording or video file and get a shareable link
     Upload(upload::UploadArgs),
-    /// Update Cap Desktop and the bundled CLI
-    Update(FormatArgs),
     /// Show how `cap upload` will authenticate (env key or Cap Desktop login)
     Auth(AuthArgs),
     /// List available capture targets and devices
@@ -429,10 +426,6 @@ async fn run(cli: Cli) -> Result<(), String> {
         Commands::Screenshot(s) => s.run(json).await,
         Commands::Recordings(args) => args.run(json),
         Commands::Upload(args) => args.run(json).await,
-        Commands::Update(args) => {
-            let format = resolve_format(json, args.format);
-            finish_json(format, update::run(format))
-        }
         Commands::Auth(args) => match args.command {
             AuthCommands::Status(args) => {
                 let format = resolve_format(json, args.format);

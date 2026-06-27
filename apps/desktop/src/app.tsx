@@ -78,7 +78,6 @@ const OnboardingPage = lazy(
 	() => import("./routes/(window-chrome)/onboarding"),
 );
 const UpgradePage = lazy(() => import("./routes/(window-chrome)/upgrade"));
-const UpdatePage = lazy(() => import("./routes/(window-chrome)/update"));
 const CameraPage = lazy(() => import("./routes/camera"));
 const CaptureAreaPage = lazy(() => import("./routes/capture-area"));
 const DebugPage = lazy(() => import("./routes/debug"));
@@ -223,7 +222,6 @@ function Inner() {
 						</Route>
 						<Route path="/onboarding" component={OnboardingPage} />
 						<Route path="/upgrade" component={UpgradePage} />
-						<Route path="/update" component={UpdatePage} />
 					</Route>
 					<Route path="/camera" component={CameraPage} />
 					<Route path="/capture-area" component={CaptureAreaPage} />
@@ -314,8 +312,6 @@ function createThemeListener(currentWindow: WebviewWindow) {
 	function update(appTheme: AppTheme | null | undefined) {
 		if (location.pathname === "/camera") return;
 		if (appTheme === undefined || appTheme === null) return;
-
-		lastAppliedTheme = appTheme;
 
 		const isDark =
 			appTheme === "dark" ||

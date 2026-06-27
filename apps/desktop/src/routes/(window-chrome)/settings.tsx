@@ -1,11 +1,9 @@
 import { Button } from "@cap/ui-solid";
-import { A, type RouteSectionProps, useNavigate } from "@solidjs/router";
+import { A, type RouteSectionProps } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { getVersion } from "@tauri-apps/api/app";
-import * as dialog from "@tauri-apps/plugin-dialog";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import * as shell from "@tauri-apps/plugin-shell";
-import { check } from "@tauri-apps/plugin-updater";
 import {
 	createEffect,
 	createMemo,
@@ -18,13 +16,11 @@ import {
 	Suspense,
 } from "solid-js";
 import { CapErrorBoundary } from "~/components/CapErrorBoundary";
-import { t } from "~/components/I18nProvider";
 import { SignInButton } from "~/components/SignInButton";
 
 import { authStore, userProfileStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
 import { createSignInMutation } from "~/utils/auth";
-import { getUpdaterCheckOptions } from "~/utils/updater";
 import {
 	apiClient,
 	getConfiguredServerUrl,
@@ -133,14 +129,12 @@ function SettingsContentSkeleton() {
 }
 
 export default function Settings(props: RouteSectionProps) {
-	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const signIn = createSignInMutation();
 	const [auth, setAuth] =
 		createSignal<Awaited<ReturnType<typeof authStore.get>>>();
 	const [authLoaded, setAuthLoaded] = createSignal(false);
 	const [version, setVersion] = createSignal<string | null>(null);
-	const [isCheckingForUpdates, setIsCheckingForUpdates] = createSignal(false);
 	const [failedProfileImageUrl, setFailedProfileImageUrl] = createSignal<
 		string | null
 	>(null);
@@ -408,43 +402,6 @@ export default function Settings(props: RouteSectionProps) {
 		}
 	};
 
-	const checkForUpdates = async () => {
-		setIsCheckingForUpdates(true);
-
-		try {
-			const update = await check(getUpdaterCheckOptions());
-
-			if (!update) {
-				await dialog.message(
-					"You're already using the latest version of Cap.",
-					{
-						title: "No Update Available",
-						kind: "info",
-					},
-				);
-				return;
-			}
-
-			const shouldUpdate = await dialog.confirm(
-				`Version ${update.version} of Cap is available, would you like to install it?`,
-				{ title: "Update Cap", okLabel: "Update", cancelLabel: "Ignore" },
-			);
-
-			if (shouldUpdate) navigate("/update");
-		} catch (e) {
-			console.error("Failed to check for updates:", e);
-			const openDownload = await dialog
-				.confirm(
-					"Couldn't check for updates automatically. You can download the latest version of Cap from cap.so/download \u2014 your data won't be lost.",
-					{ title: "Update Cap", okLabel: "Download", cancelLabel: "Later" },
-				)
-				.catch(() => false);
-			if (openDownload) await shell.open("https://cap.so/download");
-		} finally {
-			setIsCheckingForUpdates(false);
-		}
-	};
-
 	return (
 		<div class="cap-settings-shell flex-1 flex flex-row divide-x divide-gray-3 text-[0.875rem] leading-5 overflow-y-hidden">
 			<div
@@ -519,16 +476,6 @@ export default function Settings(props: RouteSectionProps) {
 										}
 									>
 										View previous versions
-									</button>
-									<button
-										type="button"
-										class="text-gray-11 hover:text-gray-12 underline transition-colors disabled:cursor-default disabled:opacity-50 disabled:hover:text-gray-11"
-										disabled={isCheckingForUpdates()}
-										onClick={checkForUpdates}
-									>
-										{isCheckingForUpdates()
-											? "Checking..."
-											: "Check for updates"}
 									</button>
 								</div>
 							</div>

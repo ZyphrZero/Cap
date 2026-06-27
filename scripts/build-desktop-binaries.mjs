@@ -13,8 +13,16 @@ const binariesDir = path.join(
 	"binaries",
 );
 
+function rustupToolchainArgs() {
+	const toolchain = process.env.CAP_RUST_TOOLCHAIN ?? "stable";
+	if (!toolchain || toolchain === "default") return [];
+	return [toolchain.startsWith("+") ? toolchain : `+${toolchain}`];
+}
+
 function detectHostTriple() {
-	const result = spawnSync("rustc", ["-vV"], { encoding: "utf8" });
+	const result = spawnSync("rustc", [...rustupToolchainArgs(), "-vV"], {
+		encoding: "utf8",
+	});
 	if (result.status !== 0) {
 		const reason =
 			result.stderr || result.error?.message || `exit ${result.status}`;
@@ -131,7 +139,15 @@ async function buildSidecar(sidecar, target, ext) {
 	);
 	const cargo = spawnSync(
 		"cargo",
-		["build", "--release", "-p", sidecar.packageName, "--target", target],
+		[
+			...rustupToolchainArgs(),
+			"build",
+			"--release",
+			"-p",
+			sidecar.packageName,
+			"--target",
+			target,
+		],
 		{ stdio: "inherit", cwd: repoRoot },
 	);
 	if (cargo.status !== 0) {

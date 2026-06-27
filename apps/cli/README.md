@@ -79,7 +79,6 @@ step.
 - `cap project inspect` / `validate` / `config get|set` — inspect and edit `.cap` projects.
 - `cap recordings list` — list `.cap` recordings in the desktop library.
 - `cap upload` — upload a `.cap` project or video file and get a shareable link.
-- `cap update` — download and install the latest Cap Desktop bundle, then repair the `cap` shim.
 - `cap doctor` / `version` / `guide` — diagnostics, version info, and the agent capability manifest.
 - `cap automations list` — list the automation rules configured in Cap Desktop that the CLI honors.
 - `cap desktop status|install-cli|uninstall-cli` — manage the `cap` shim on PATH.
