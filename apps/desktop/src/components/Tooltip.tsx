@@ -2,6 +2,7 @@ import { Tooltip as KTooltip } from "@kobalte/core/tooltip";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import type { ComponentProps, JSX } from "solid-js";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 
 interface Props extends ComponentProps<typeof KTooltip> {
 	content?: JSX.Element;
@@ -31,7 +32,7 @@ const kbdSymbolModifier = (key: string, os: Os) => {
 };
 
 export default function Tooltip(props: Props) {
-	const os = ostype();
+	const os = getOsType();
 	return (
 		<KTooltip {...props} openDelay={props.openDelay ?? 200}>
 			<KTooltip.Trigger class={cx(props.childClass)} as="div">
@@ -54,4 +55,14 @@ export default function Tooltip(props: Props) {
 			</KTooltip.Portal>
 		</KTooltip>
 	);
+}
+
+function getOsType(): Os {
+	if (isTauriRuntime()) return ostype();
+
+	const platform = navigator.platform.toLowerCase();
+	if (platform.includes("mac")) return "macos";
+	if (platform.includes("win")) return "windows";
+	if (platform.includes("linux")) return "linux";
+	return "windows";
 }

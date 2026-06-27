@@ -8,6 +8,7 @@ import {
 	Show,
 	splitProps,
 } from "solid-js";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 
 export default function CaptionControlsMacOS(
 	props: ComponentProps<"div"> & { showMinimize?: boolean; showZoom?: boolean },
@@ -17,6 +18,8 @@ export default function CaptionControlsMacOS(
 		"showMinimize",
 		"showZoom",
 	]);
+	if (!isTauriRuntime()) return null;
+
 	const currentWindow = getCurrentWindow();
 	const [focused, setFocus] = createSignal(true);
 	const [hovered, setHovered] = createSignal(false);

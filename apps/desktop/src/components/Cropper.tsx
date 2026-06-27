@@ -4,7 +4,6 @@ import type {
 	CheckMenuItemOptions,
 	PredefinedMenuItemOptions,
 } from "@tauri-apps/api/menu";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import {
 	type Accessor,
 	children,
@@ -24,6 +23,7 @@ import { Transition } from "solid-transition-group";
 import { createKeyDownSignal } from "~/utils/events";
 
 import { commands } from "~/utils/tauri";
+import { getTauriOsType } from "~/utils/tauri-runtime";
 export interface CropBounds {
 	x: number;
 	y: number;
@@ -95,9 +95,9 @@ const clamp = (n: number, min = 0, max = 1) => Math.max(min, Math.min(max, n));
 const easeInOutCubic = (t: number) =>
 	t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-const shouldTriggerHaptic = ostype() === "macos";
 function triggerHaptic() {
-	if (shouldTriggerHaptic) commands.performHapticFeedback("alignment", null);
+	if (getTauriOsType() === "macos")
+		commands.performHapticFeedback("alignment", null);
 }
 
 function findClosestRatio(

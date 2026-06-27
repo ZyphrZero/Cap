@@ -1,5 +1,6 @@
 import { onCleanup } from "solid-js";
 import { events } from "./tauri";
+import { isTauriRuntime } from "./tauri-runtime";
 
 type EventListener<T> = {
 	listen: (cb: (event: { payload: T }) => void) => Promise<() => void>;
@@ -18,6 +19,8 @@ export function createTauriEventListener<T>(
 	eventListener: EventListener<T>,
 	callback: (payload: T) => void,
 ): void {
+	if (!isTauriRuntime()) return;
+
 	let aborted = false;
 	const unlisten = eventListener.listen((event) => {
 		if (aborted) return;

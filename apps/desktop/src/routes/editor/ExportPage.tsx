@@ -6,7 +6,6 @@ import { Channel } from "@tauri-apps/api/core";
 import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { remove } from "@tauri-apps/plugin-fs";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	createEffect,
@@ -42,6 +41,7 @@ import {
 	type FramesRendered,
 	type UploadProgress,
 } from "~/utils/tauri";
+import { getTauriOsType } from "~/utils/tauri-runtime";
 import { type RenderState, useEditorContext } from "./context";
 import { RESOLUTION_OPTIONS } from "./Header";
 import { Dialog, Field } from "./ui";
@@ -212,6 +212,7 @@ export function ExportPage() {
 	const auth = authStore.createQuery();
 	const organizationSelection = createSelectedOrganization();
 	const organisations = organizationSelection.organizations;
+	const osType = getTauriOsType();
 
 	const hasTransparentBackground = () => {
 		const backgroundSource =
@@ -799,12 +800,12 @@ export function ExportPage() {
 					data-tauri-drag-region
 					class={cx(
 						"flex flex-row flex-1 gap-2 items-center px-4 h-full",
-						ostype() !== "windows" && "pr-2",
+						osType !== "windows" && "pr-2",
 					)}
 				>
-					{ostype() === "macos" && <div class="h-full w-16" />}
+					{osType === "macos" && <div class="h-full w-16" />}
 					<div data-tauri-drag-region class="flex-1 h-full" />
-					{ostype() === "windows" && <CaptionControlsWindows11 />}
+					{osType === "windows" && <CaptionControlsWindows11 />}
 				</div>
 			</div>
 
@@ -1378,7 +1379,7 @@ export function ExportPage() {
 												</p>
 											</Show>
 
-											<Show when={ostype() === "macos"}>
+											<Show when={osType === "macos"}>
 												<div class="mt-4 pt-3 border-t border-gray-4">
 													<button
 														type="button"
@@ -1428,7 +1429,7 @@ export function ExportPage() {
 							<div class="flex flex-col items-center gap-2.5">
 								<SignInButton class="w-full justify-center">
 									<IconCapLink class="size-4" />
-									<span>Sign in to share</span>
+									<span>{t("signInToShare")}</span>
 								</SignInButton>
 							</div>
 						) : (
@@ -1561,7 +1562,7 @@ export function ExportPage() {
 											</Match>
 											<Match when={copyState.type === "done"}>
 												<CompletedExport
-													title="Copied to clipboard"
+													title={t("copiedToClipboardTitle")}
 													subtitle={`Your ${exportMediumLabel()} is ready to paste`}
 												/>
 											</Match>
@@ -1600,7 +1601,7 @@ export function ExportPage() {
 											</Match>
 											<Match when={saveState.type === "done"}>
 												<CompletedExport
-													title="Export complete"
+													title={t("exportCompleteTitle")}
 													subtitle={`Your ${exportMediumLabel()} is ready`}
 												/>
 											</Match>
@@ -1647,7 +1648,7 @@ export function ExportPage() {
 											</Match>
 											<Match when={uploadState.type === "done"}>
 												<CompletedExport
-													title="Upload complete"
+													title={t("uploadCompleteTitle")}
 													subtitle="Your Cap has been uploaded successfully"
 												/>
 											</Match>

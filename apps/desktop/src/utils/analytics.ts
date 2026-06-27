@@ -6,8 +6,9 @@ const key = import.meta.env.VITE_POSTHOG_KEY as string;
 const host = import.meta.env.VITE_POSTHOG_HOST as string;
 
 let isPostHogInitialized = false;
+let postHogInitStarted = false;
 
-let telemetryEnabledCache = true;
+let telemetryEnabledCache = false;
 
 async function isTelemetryEnabled(): Promise<boolean> {
 	try {
@@ -15,42 +16,64 @@ async function isTelemetryEnabled(): Promise<boolean> {
 		const settings =
 			(await store.get<{ enableTelemetry?: boolean }>("general_settings")) ??
 			null;
-		telemetryEnabledCache = settings?.enableTelemetry !== false;
+		telemetryEnabledCache = settings?.enableTelemetry === true;
 	} catch {
-		// fall back to cached value; defaults to enabled
+		telemetryEnabledCache = false;
 	}
 	return telemetryEnabledCache;
 }
 
-if (key && host) {
+function initPostHog() {
+	if (!key || !host || postHogInitStarted) {
+		return;
+	}
+
 	try {
+		postHogInitStarted = true;
 		posthog.init(key, {
 			api_host: host,
+			autocapture: false,
 			capture_pageview: false,
+			capture_pageleave: false,
+			capture_dead_clicks: false,
+			capture_exceptions: false,
+			capture_heatmaps: false,
+			capture_performance: false,
+			disable_session_recording: true,
+			disable_surveys: true,
+			advanced_disable_flags: true,
+			advanced_disable_feature_flags: true,
+			advanced_disable_feature_flags_on_first_load: true,
+			before_send: (event) => (telemetryEnabledCache ? event : null),
 			loaded: (_posthogInstance) => {
 				isPostHogInitialized = true;
 			},
 		});
 		console.log("PostHog initialization started");
 	} catch (error) {
+		postHogInitStarted = false;
 		console.error("Failed to initialize PostHog:", error);
 	}
 }
 
 export function initAnonymousUser() {
 	if (!key || !host) {
-		console.warn("Cannot initialize anonymous user - missing key or host");
 		return;
 	}
 
-	try {
-		const anonymousId = localStorage.getItem("anonymous_id") ?? uuid();
-		localStorage.setItem("anonymous_id", anonymousId);
-		posthog.identify(anonymousId);
-		console.log("Anonymous user identified:", anonymousId);
-	} catch (error) {
-		console.error("Error initializing anonymous user:", error);
-	}
+	void isTelemetryEnabled().then((enabled) => {
+		if (!enabled) return;
+		initPostHog();
+
+		try {
+			const anonymousId = localStorage.getItem("anonymous_id") ?? uuid();
+			localStorage.setItem("anonymous_id", anonymousId);
+			posthog.identify(anonymousId);
+			console.log("Anonymous user identified:", anonymousId);
+		} catch (error) {
+			console.error("Error initializing anonymous user:", error);
+		}
+	});
 }
 
 export function identifyUser(
@@ -62,27 +85,34 @@ export function identifyUser(
 		return;
 	}
 
-	try {
-		const currentId = posthog.get_distinct_id();
-		const anonymousId = localStorage.getItem("anonymous_id");
+	void isTelemetryEnabled().then((enabled) => {
+		if (!enabled) return;
+		initPostHog();
 
-		if (currentId !== userId) {
-			if (anonymousId && currentId === anonymousId) {
-				console.log(`Aliasing user ${userId} from anonymous ID ${anonymousId}`);
-				posthog.alias(userId, anonymousId);
+		try {
+			const currentId = posthog.get_distinct_id();
+			const anonymousId = localStorage.getItem("anonymous_id");
+
+			if (currentId !== userId) {
+				if (anonymousId && currentId === anonymousId) {
+					console.log(
+						`Aliasing user ${userId} from anonymous ID ${anonymousId}`,
+					);
+					posthog.alias(userId, anonymousId);
+				}
+				posthog.identify(userId);
+				if (properties) {
+					posthog.people.set(properties);
+				}
+				localStorage.removeItem("anonymous_id");
+				console.log(`User identified: ${userId}`);
+			} else {
+				console.log(`User already identified as ${userId}`);
 			}
-			posthog.identify(userId);
-			if (properties) {
-				posthog.people.set(properties);
-			}
-			localStorage.removeItem("anonymous_id");
-			console.log(`User identified: ${userId}`);
-		} else {
-			console.log(`User already identified as ${userId}`);
+		} catch (error) {
+			console.error("Error identifying user:", error);
 		}
-	} catch (error) {
-		console.error("Error identifying user:", error);
-	}
+	});
 }
 
 export function trackEvent(
@@ -97,12 +127,9 @@ export function trackEvent(
 		return;
 	}
 
-	if (!telemetryEnabledCache) {
-		return;
-	}
-
 	void isTelemetryEnabled().then((enabled) => {
 		if (!enabled) return;
+		initPostHog();
 
 		try {
 			if (!isPostHogInitialized) {

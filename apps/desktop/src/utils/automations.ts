@@ -1,3 +1,4 @@
+import { t } from "~/components/I18nProvider";
 import type {
 	Action as ActionBinding,
 	AutomationActionCheck,
@@ -16,6 +17,7 @@ import type {
 	Trigger,
 } from "~/utils/tauri";
 import { commands } from "~/utils/tauri";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 
 export type {
 	AutomationActionCheck,
@@ -48,40 +50,99 @@ export type ActionType = Action["type"];
 export type AutomationRule = DeepRequired<AutomationRuleBinding>;
 export type AutomationsStore = DeepRequired<AutomationsStoreBinding>;
 
+let browserAutomationsStore: AutomationsStore = {
+	version: 1,
+	rules: [],
+};
+
 export const TRIGGER_LABELS: Record<Trigger, string> = {
-	screenshotTaken: "On screenshot taken",
-	studioRecordingFinished: "On studio recording finished",
-	instantRecordingFinished: "On instant recording finished",
-	recordingStarted: "On recording started",
-	uploadCompleted: "On upload completed",
-	videoImported: "On video imported",
-	recordingDeleted: "On recording deleted",
+	get screenshotTaken() {
+		return t("triggerLabels.screenshotTaken");
+	},
+	get studioRecordingFinished() {
+		return t("triggerLabels.studioRecordingFinished");
+	},
+	get instantRecordingFinished() {
+		return t("triggerLabels.instantRecordingFinished");
+	},
+	get recordingStarted() {
+		return t("triggerLabels.recordingStarted");
+	},
+	get uploadCompleted() {
+		return t("triggerLabels.uploadCompleted");
+	},
+	get videoImported() {
+		return t("triggerLabels.videoImported");
+	},
+	get recordingDeleted() {
+		return t("triggerLabels.recordingDeleted");
+	},
 };
 
 export const ACTION_LABELS: Record<ActionType, string> = {
-	copyToClipboard: "Copy to clipboard",
-	saveToLocation: "Save to location",
-	export: "Export with profile",
-	upload: "Upload + copy link",
-	revealInFileManager: "Reveal in file manager",
-	openFile: "Open file",
-	runCommand: "Run command",
-	webhook: "Send webhook",
-	recognizeTextToClipboard: "Recognize text (OCR) to clipboard",
-	notify: "Show notification",
-	openEditor: "Open editor",
-	skipEditor: "Skip editor (headless)",
-	applyPreset: "Apply editor preset",
-	deleteLocalFiles: "Delete local files",
+	get copyToClipboard() {
+		return t("actionLabels.copyToClipboard");
+	},
+	get saveToLocation() {
+		return t("actionLabels.saveToLocation");
+	},
+	get export() {
+		return t("actionLabels.export");
+	},
+	get upload() {
+		return t("actionLabels.upload");
+	},
+	get revealInFileManager() {
+		return t("actionLabels.revealInFileManager");
+	},
+	get openFile() {
+		return t("actionLabels.openFile");
+	},
+	get runCommand() {
+		return t("actionLabels.runCommand");
+	},
+	get webhook() {
+		return t("actionLabels.webhook");
+	},
+	get recognizeTextToClipboard() {
+		return t("actionLabels.recognizeTextToClipboard");
+	},
+	get notify() {
+		return t("actionLabels.notify");
+	},
+	get openEditor() {
+		return t("actionLabels.openEditor");
+	},
+	get skipEditor() {
+		return t("actionLabels.skipEditor");
+	},
+	get applyPreset() {
+		return t("actionLabels.applyPreset");
+	},
+	get deleteLocalFiles() {
+		return t("actionLabels.deleteLocalFiles");
+	},
 };
 
 export const CONDITION_LABELS: Record<Condition["type"], string> = {
-	captureTargetIs: "Capture target is",
-	recordingModeIs: "Recording mode is",
-	durationAtLeast: "Duration at least (seconds)",
-	durationAtMost: "Duration at most (seconds)",
-	windowTitleContains: "Window title contains",
-	organizationIs: "Organization is",
+	get captureTargetIs() {
+		return t("conditionLabels.captureTargetIs");
+	},
+	get recordingModeIs() {
+		return t("conditionLabels.recordingModeIs");
+	},
+	get durationAtLeast() {
+		return t("conditionLabels.durationAtLeast");
+	},
+	get durationAtMost() {
+		return t("conditionLabels.durationAtMost");
+	},
+	get windowTitleContains() {
+		return t("conditionLabels.windowTitleContains");
+	},
+	get organizationIs() {
+		return t("conditionLabels.organizationIs");
+	},
 };
 
 export const DANGEROUS_ACTIONS: ActionType[] = ["runCommand", "webhook"];
@@ -254,15 +315,37 @@ export function createEmptyRule(): AutomationRule {
 }
 
 export async function getAutomations(): Promise<AutomationsStore> {
+	if (!isTauriRuntime()) return browserAutomationsStore;
 	return (await commands.getAutomations()) as AutomationsStore;
 }
 
 export async function setAutomations(store: AutomationsStore): Promise<void> {
+	if (!isTauriRuntime()) {
+		browserAutomationsStore = structuredClone(store);
+		return;
+	}
+
 	await commands.setAutomations(store);
 }
 
 export async function testAutomation(
 	ruleId: string,
 ): Promise<AutomationTestReport> {
+	if (!isTauriRuntime()) {
+		const rule = browserAutomationsStore.rules.find(
+			(rule) => rule.id === ruleId,
+		);
+		return {
+			ruleId,
+			ruleName: rule?.name ?? "",
+			actionChecks:
+				rule?.actions.map((action) => ({
+					actionType: action.type,
+					capability: action.type,
+					supported: false,
+				})) ?? [],
+		};
+	}
+
 	return await commands.testAutomation(ruleId);
 }

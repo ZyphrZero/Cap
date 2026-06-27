@@ -12,6 +12,7 @@ import {
 	Suspense,
 } from "solid-js";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { SignInButton } from "~/components/SignInButton";
 import {
 	createSelectedOrganization,
@@ -151,11 +152,11 @@ function BrandSettingsDialog(props: {
 
 	const selectLogoFile = (file: File) => {
 		if (!isSupportedLogoContentType(file.type)) {
-			toast.error("Unsupported logo file type");
+			toast.error(t("editor.organization.unsupportedLogo"));
 			return;
 		}
 		if (file.size > ORGANIZATION_LOGO_MAX_BYTES) {
-			toast.error("Logo file must be less than 1MB");
+			toast.error(t("editor.organization.logoTooLarge"));
 			return;
 		}
 
@@ -197,7 +198,7 @@ function BrandSettingsDialog(props: {
 				},
 			);
 
-			toast.success("Organization branding updated");
+			toast.success(t("editor.organization.brandingUpdated"));
 			props.onSaved(updatedOrganization);
 			props.onOpenChange(false);
 		} catch (error) {

@@ -14,6 +14,7 @@ import {
 import { createStore, produce } from "solid-js/store";
 import { Dynamic } from "solid-js/web";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { Toggle } from "~/components/Toggle";
 import { presetsStore } from "~/store";
 import {
@@ -113,57 +114,141 @@ const TRIGGER_ICONS: Record<Trigger, IconComponent> = {
 };
 
 const TRIGGER_PHRASE: Record<Trigger, string> = {
-	screenshotTaken: "Screenshot taken",
-	studioRecordingFinished: "Studio recording ends",
-	instantRecordingFinished: "Instant recording ends",
-	recordingStarted: "Recording starts",
-	uploadCompleted: "Upload completes",
-	videoImported: "Video imported",
-	recordingDeleted: "Recording deleted",
+	get screenshotTaken() {
+		return t("triggers.screenshotTaken");
+	},
+	get studioRecordingFinished() {
+		return t("triggers.studioRecordingFinished");
+	},
+	get instantRecordingFinished() {
+		return t("triggers.instantRecordingFinished");
+	},
+	get recordingStarted() {
+		return t("triggers.recordingStarted");
+	},
+	get uploadCompleted() {
+		return t("triggers.uploadCompleted");
+	},
+	get videoImported() {
+		return t("triggers.videoImported");
+	},
+	get recordingDeleted() {
+		return t("triggers.recordingDeleted");
+	},
 };
 
 const ACTION_SHORT: Record<ActionType, string> = {
-	copyToClipboard: "Copy to clipboard",
-	saveToLocation: "Save to folder",
-	export: "Export",
-	upload: "Upload & copy link",
-	revealInFileManager: "Reveal in file manager",
-	openFile: "Open file",
-	recognizeTextToClipboard: "Copy text (OCR)",
-	notify: "Notify",
-	openEditor: "Open editor",
-	skipEditor: "Skip editor",
-	applyPreset: "Apply preset",
-	runCommand: "Run command",
-	webhook: "Send webhook",
-	deleteLocalFiles: "Delete local files",
+	get copyToClipboard() {
+		return t("actionPhrases.copyToClipboard");
+	},
+	get saveToLocation() {
+		return t("actionPhrases.saveToLocation");
+	},
+	get export() {
+		return t("actionPhrases.export");
+	},
+	get upload() {
+		return t("actionPhrases.upload");
+	},
+	get revealInFileManager() {
+		return t("actionPhrases.revealInFileManager");
+	},
+	get openFile() {
+		return t("actionPhrases.openFile");
+	},
+	get recognizeTextToClipboard() {
+		return t("actionPhrases.recognizeTextToClipboard");
+	},
+	get notify() {
+		return t("actionPhrases.notify");
+	},
+	get openEditor() {
+		return t("actionPhrases.openEditor");
+	},
+	get skipEditor() {
+		return t("actionPhrases.skipEditor");
+	},
+	get applyPreset() {
+		return t("actionPhrases.applyPreset");
+	},
+	get runCommand() {
+		return t("actionPhrases.runCommand");
+	},
+	get webhook() {
+		return t("actionPhrases.webhook");
+	},
+	get deleteLocalFiles() {
+		return t("actionPhrases.deleteLocalFiles");
+	},
 };
 
 const TRIGGER_NOUN: Record<Trigger, string> = {
-	screenshotTaken: "Screenshot",
-	studioRecordingFinished: "Studio recording",
-	instantRecordingFinished: "Instant recording",
-	recordingStarted: "Recording start",
-	uploadCompleted: "Upload",
-	videoImported: "Import",
-	recordingDeleted: "Deletion",
+	get screenshotTaken() {
+		return t("triggerNouns.screenshotTaken");
+	},
+	get studioRecordingFinished() {
+		return t("triggerNouns.studioRecordingFinished");
+	},
+	get instantRecordingFinished() {
+		return t("triggerNouns.instantRecordingFinished");
+	},
+	get recordingStarted() {
+		return t("triggerNouns.recordingStarted");
+	},
+	get uploadCompleted() {
+		return t("triggerNouns.uploadCompleted");
+	},
+	get videoImported() {
+		return t("triggerNouns.videoImported");
+	},
+	get recordingDeleted() {
+		return t("triggerNouns.recordingDeleted");
+	},
 };
 
 const ACTION_NOUN: Record<ActionType, string> = {
-	copyToClipboard: "Clipboard",
-	saveToLocation: "Folder",
-	export: "Export",
-	upload: "Upload",
-	revealInFileManager: "Reveal",
-	openFile: "Open",
-	recognizeTextToClipboard: "Text",
-	notify: "Notify",
-	openEditor: "Editor",
-	skipEditor: "Skip editor",
-	applyPreset: "Preset",
-	runCommand: "Command",
-	webhook: "Webhook",
-	deleteLocalFiles: "Delete",
+	get copyToClipboard() {
+		return t("actionNouns.copyToClipboard");
+	},
+	get saveToLocation() {
+		return t("actionNouns.saveToLocation");
+	},
+	get export() {
+		return t("actionNouns.export");
+	},
+	get upload() {
+		return t("actionNouns.upload");
+	},
+	get revealInFileManager() {
+		return t("actionNouns.revealInFileManager");
+	},
+	get openFile() {
+		return t("actionNouns.openFile");
+	},
+	get recognizeTextToClipboard() {
+		return t("actionNouns.recognizeTextToClipboard");
+	},
+	get notify() {
+		return t("actionNouns.notify");
+	},
+	get openEditor() {
+		return t("actionNouns.openEditor");
+	},
+	get skipEditor() {
+		return t("actionNouns.skipEditor");
+	},
+	get applyPreset() {
+		return t("actionNouns.applyPreset");
+	},
+	get runCommand() {
+		return t("actionNouns.runCommand");
+	},
+	get webhook() {
+		return t("actionNouns.webhook");
+	},
+	get deleteLocalFiles() {
+		return t("actionNouns.deleteLocalFiles");
+	},
 };
 
 const FPS_PRESETS = [15, 30, 60] as const;
@@ -177,8 +262,8 @@ const RESOLUTION_PRESETS = [
 
 type Template = {
 	id: string;
-	name: string;
-	description: string;
+	name: () => string;
+	description: () => string;
 	icon: IconComponent;
 	build: () => AutomationRule;
 };
@@ -204,103 +289,110 @@ function buildRule(opts: {
 const TEMPLATES: Template[] = [
 	{
 		id: "copy-screenshot",
-		name: "Auto-copy new screenshots to clipboard",
-		description: "Snap a screenshot and it's right there, ready to paste.",
+		name: () => t("automationsPage.templateItems.copyScreenshot.name"),
+		description: () =>
+			t("automationsPage.templateItems.copyScreenshot.description"),
 		icon: IconLucideCopy,
 		build: () =>
 			buildRule({
-				name: "Auto-copy new screenshots to clipboard",
+				name: t("automationsPage.templateItems.copyScreenshot.name"),
 				trigger: "screenshotTaken",
 				actions: [{ type: "copyToClipboard", source: "raw" }],
 			}),
 	},
 	{
 		id: "ocr-screenshot",
-		name: "Pull the text out of screenshots",
-		description: "Cap reads the text in your screenshot and copies it for you.",
+		name: () => t("automationsPage.templateItems.ocrScreenshot.name"),
+		description: () =>
+			t("automationsPage.templateItems.ocrScreenshot.description"),
 		icon: IconLucideScanText,
 		build: () =>
 			buildRule({
-				name: "Pull the text out of screenshots",
+				name: t("automationsPage.templateItems.ocrScreenshot.name"),
 				trigger: "screenshotTaken",
 				actions: [{ type: "recognizeTextToClipboard" }],
 			}),
 	},
 	{
 		id: "save-screenshot",
-		name: "Tuck screenshots into a folder",
-		description: "Send every new screenshot straight to a folder you pick.",
+		name: () => t("automationsPage.templateItems.saveScreenshot.name"),
+		description: () =>
+			t("automationsPage.templateItems.saveScreenshot.description"),
 		icon: IconLucideFolderDown,
 		build: () =>
 			buildRule({
-				name: "Tuck screenshots into a folder",
+				name: t("automationsPage.templateItems.saveScreenshot.name"),
 				trigger: "screenshotTaken",
 				actions: [defaultActionForType("saveToLocation")],
 			}),
 	},
 	{
 		id: "reveal-screenshot",
-		name: "Jump to each new screenshot",
-		description: "Pop open every screenshot in Finder the moment you take it.",
+		name: () => t("automationsPage.templateItems.revealScreenshot.name"),
+		description: () =>
+			t("automationsPage.templateItems.revealScreenshot.description"),
 		icon: IconLucideFolderOpen,
 		build: () =>
 			buildRule({
-				name: "Jump to each new screenshot",
+				name: t("automationsPage.templateItems.revealScreenshot.name"),
 				trigger: "screenshotTaken",
 				actions: [{ type: "revealInFileManager" }],
 			}),
 	},
 	{
 		id: "export-studio",
-		name: "Auto-export when you finish recording",
-		description: "Render an MP4 the second a Studio recording wraps up.",
+		name: () => t("automationsPage.templateItems.exportStudio.name"),
+		description: () =>
+			t("automationsPage.templateItems.exportStudio.description"),
 		icon: IconLucideFilm,
 		build: () =>
 			buildRule({
-				name: "Auto-export when you finish recording",
+				name: t("automationsPage.templateItems.exportStudio.name"),
 				trigger: "studioRecordingFinished",
 				actions: [defaultActionForType("export")],
 			}),
 	},
 	{
 		id: "upload-share",
-		name: "Upload and grab the share link",
-		description:
-			"Finish a recording and the link is waiting on your clipboard.",
+		name: () => t("automationsPage.templateItems.uploadShare.name"),
+		description: () =>
+			t("automationsPage.templateItems.uploadShare.description"),
 		icon: IconLucideLink,
 		build: () =>
 			buildRule({
-				name: "Upload and grab the share link",
+				name: t("automationsPage.templateItems.uploadShare.name"),
 				trigger: "studioRecordingFinished",
 				actions: [defaultActionForType("upload")],
 			}),
 	},
 	{
 		id: "notify-upload",
-		name: "Ping me when an upload is ready",
-		description: "Get a gentle desktop nudge once your recording is shareable.",
+		name: () => t("automationsPage.templateItems.notifyUpload.name"),
+		description: () =>
+			t("automationsPage.templateItems.notifyUpload.description"),
 		icon: IconLucideBell,
 		build: () =>
 			buildRule({
-				name: "Ping me when an upload is ready",
+				name: t("automationsPage.templateItems.notifyUpload.name"),
 				trigger: "uploadCompleted",
 				actions: [
 					{
 						type: "notify",
 						titleTemplate: "Cap",
-						bodyTemplate: "Your recording is ready to share.",
+						bodyTemplate: t("automationsPage.notificationReadyBody"),
 					},
 				],
 			}),
 	},
 	{
 		id: "webhook-share",
-		name: "Tell Slack when you share something",
-		description: "Send the share link to Slack, Discord, or your own webhook.",
+		name: () => t("automationsPage.templateItems.webhookShare.name"),
+		description: () =>
+			t("automationsPage.templateItems.webhookShare.description"),
 		icon: IconLucideWebhook,
 		build: () =>
 			buildRule({
-				name: "Tell Slack when you share something",
+				name: t("automationsPage.templateItems.webhookShare.name"),
 				trigger: "instantRecordingFinished",
 				actions: [
 					{
@@ -317,7 +409,8 @@ const TEMPLATES: Template[] = [
 
 function ruleSummary(rule: AutomationRule): string {
 	const trigger = TRIGGER_PHRASE[rule.trigger];
-	if (rule.actions.length === 0) return `${trigger} → no actions yet`;
+	if (rule.actions.length === 0)
+		return `${trigger} → ${t("automationsPage.noActions")}`;
 	const actions = rule.actions.map((a) => ACTION_SHORT[a.type]).join(", ");
 	return `${trigger} → ${actions}`;
 }
@@ -325,7 +418,7 @@ function ruleSummary(rule: AutomationRule): string {
 function autoRuleName(rule: AutomationRule): string {
 	const trigger = TRIGGER_NOUN[rule.trigger];
 	const first = rule.actions[0];
-	if (!first) return `${trigger} automation`;
+	if (!first) return t("automationsPage.defaultAutomationName", { trigger });
 	return `${trigger} → ${ACTION_NOUN[first.type]}`;
 }
 
@@ -466,7 +559,7 @@ export default function AutomationsSettings() {
 			});
 		} catch (e) {
 			console.error("Failed to save automations", e);
-			toast.error("Failed to save automations");
+			toast.error(t("automationsPage.saveFailed"));
 		}
 	};
 
@@ -484,7 +577,9 @@ export default function AutomationsSettings() {
 
 	const addFromTemplate = (template: Template) => {
 		addRule(template.build());
-		toast.success(`Added "${template.name}"`);
+		toast.success(
+			t("automationsPage.templateAdded", { name: template.name() }),
+		);
 	};
 
 	const removeRule = (id: string) => {
@@ -501,17 +596,18 @@ export default function AutomationsSettings() {
 			setTestReports(ruleId, report);
 			const unsupported = report.actionChecks.filter((c) => !c.supported);
 			if (unsupported.length === 0) {
-				toast.success("All actions supported on this device");
+				toast.success(t("automationsPage.testSuccess"));
 			} else {
 				toast(
-					`${unsupported.length} action(s) not supported here: ${unsupported
-						.map((c) => c.actionType)
-						.join(", ")}`,
+					t("automationsPage.unsupportedActions", {
+						count: unsupported.length,
+						actions: unsupported.map((c) => c.actionType).join(", "),
+					}),
 				);
 			}
 		} catch (e) {
 			console.error("Failed to test automation", e);
-			toast.error("Failed to test automation");
+			toast.error(t("automationsPage.testFailed"));
 		}
 	};
 
@@ -519,8 +615,8 @@ export default function AutomationsSettings() {
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
 				<Section
-					title="Automations"
-					description="Run actions automatically when something happens in Cap. Rules are shared with the Cap CLI."
+					title={t("automationsPage.title")}
+					description={t("automationsPage.description")}
 				>
 					<Suspense
 						fallback={<div class="h-24 rounded-xl bg-gray-3 animate-pulse" />}
@@ -558,8 +654,8 @@ export default function AutomationsSettings() {
 				</Section>
 
 				<Section
-					title="Templates"
-					description="One click to add a ready-made automation. Tweak anything afterwards."
+					title={t("automationsPage.templates")}
+					description={t("automationsPage.templatesDescription")}
 				>
 					<div class="grid grid-cols-2 gap-2.5">
 						<For each={TEMPLATES}>
@@ -584,10 +680,11 @@ function EmptyState(props: { onCreate: () => void }) {
 				<div class="flex justify-center items-center mb-1 rounded-full size-11 bg-gray-3 text-gray-10">
 					<IconLucideZap class="size-5" />
 				</div>
-				<p class="text-[13px] font-medium text-gray-12">No automations yet</p>
+				<p class="text-[13px] font-medium text-gray-12">
+					{t("automationsPage.noAutomations")}
+				</p>
 				<p class="max-w-xs text-xs leading-relaxed text-gray-10">
-					Pick a template below to get started in one click, or build your own
-					from scratch.
+					{t("automationsPage.pickTemplate")}
 				</p>
 				<Button
 					variant="gray"
@@ -596,7 +693,7 @@ function EmptyState(props: { onCreate: () => void }) {
 					class="flex gap-1.5 items-center mt-1"
 				>
 					<IconLucidePlus class="size-3.5" />
-					Start from scratch
+					{t("automationsPage.startFromScratch")}
 				</Button>
 			</div>
 		</SectionCard>
@@ -611,7 +708,7 @@ function AddRuleButton(props: { onClick: () => void }) {
 			class="flex gap-1.5 justify-center items-center py-2.5 w-full text-[13px] rounded-xl border border-dashed transition-colors border-gray-4 text-gray-10 hover:text-gray-12 hover:border-gray-6 hover:bg-gray-2"
 		>
 			<IconLucidePlus class="size-4" />
-			New automation
+			{t("automationsPage.newAutomation")}
 		</button>
 	);
 }
@@ -628,10 +725,10 @@ function TemplateCard(props: { template: Template; onAdd: () => void }) {
 			</div>
 			<div class="flex-1 min-w-0">
 				<p class="text-[13px] font-medium text-gray-12">
-					{props.template.name}
+					{props.template.name()}
 				</p>
 				<p class="mt-0.5 text-[11px] leading-snug text-gray-10">
-					{props.template.description}
+					{props.template.description()}
 				</p>
 			</div>
 		</button>
@@ -692,7 +789,11 @@ function RuleCard(props: {
 				<button
 					type="button"
 					onClick={props.onToggleExpand}
-					title={props.expanded ? "Collapse" : "Edit"}
+					title={
+						props.expanded
+							? t("automationsPage.collapse")
+							: t("automationsPage.edit")
+					}
 					class="flex justify-center items-center rounded-lg transition-colors size-7 text-gray-10 hover:text-gray-12 hover:bg-gray-3"
 				>
 					<IconLucideChevronDown
@@ -749,7 +850,7 @@ function RuleEditorBody(props: {
 
 	return (
 		<div class="p-4 space-y-5">
-			<Field label="Name">
+			<Field label={t("automationsPage.fieldName")}>
 				<TextInput
 					value={props.rule.name}
 					placeholder={autoRuleName(props.rule)}
@@ -762,7 +863,7 @@ function RuleEditorBody(props: {
 			</Field>
 
 			<div class="space-y-1.5">
-				<GroupLabel>When this happens</GroupLabel>
+				<GroupLabel>{t("automationsPage.whenThisHappens")}</GroupLabel>
 				<SelectInput<Trigger>
 					value={props.rule.trigger}
 					options={ALL_TRIGGERS.map((t) => ({
@@ -779,15 +880,15 @@ function RuleEditorBody(props: {
 
 			<div class="space-y-2">
 				<div class="flex justify-between items-center">
-					<GroupLabel>Only run if</GroupLabel>
+					<GroupLabel>{t("automationsPage.onlyRunIf")}</GroupLabel>
 					<div class="flex gap-2 items-center">
 						<Show when={props.rule.conditions.length > 1}>
 							<SelectInput<MatchMode>
 								class="w-28"
 								value={props.rule.matchMode}
 								options={[
-									{ value: "all", label: "Match all" },
-									{ value: "any", label: "Match any" },
+									{ value: "all", label: t("automationsPage.matchAll") },
+									{ value: "any", label: t("automationsPage.matchAny") },
 								]}
 								onChange={(v) =>
 									props.onChange((r) => {
@@ -797,7 +898,7 @@ function RuleEditorBody(props: {
 							/>
 						</Show>
 						<Button variant="gray" size="xs" onClick={addCondition}>
-							Add condition
+							{t("automationsPage.addCondition")}
 						</Button>
 					</div>
 				</div>
@@ -805,7 +906,9 @@ function RuleEditorBody(props: {
 					when={props.rule.conditions.length > 0}
 					fallback={
 						<p class="text-xs text-gray-9">
-							Runs for every {TRIGGER_PHRASE[props.rule.trigger].toLowerCase()}.
+							{t("automationsPage.runsForEvery", {
+								trigger: TRIGGER_PHRASE[props.rule.trigger].toLowerCase(),
+							})}
 						</p>
 					}
 				>
@@ -837,9 +940,9 @@ function RuleEditorBody(props: {
 
 			<div class="space-y-2">
 				<div class="flex justify-between items-center">
-					<GroupLabel>Then do this</GroupLabel>
+					<GroupLabel>{t("automationsPage.thenDoThis")}</GroupLabel>
 					<Button variant="gray" size="xs" onClick={addAction}>
-						Add action
+						{t("automationsPage.addAction")}
 					</Button>
 				</div>
 				<div class="space-y-2">
@@ -878,15 +981,14 @@ function RuleEditorBody(props: {
 
 			<Show when={hasDangerous()}>
 				<p class="text-xs leading-relaxed text-amber-600 dark:text-amber-500">
-					This automation runs commands or sends network requests. Only use
-					values you trust — they execute automatically with your permissions.
+					{t("automationsPage.dangerousWarning")}
 				</p>
 			</Show>
 
 			<div class="flex justify-between items-center pt-4 border-t border-gray-3 -mx-4 px-4 -mb-4 pb-4 mt-2">
-				<span title="Checks which actions are supported on this device. Does not run the automation.">
+				<span title={t("automationsPage.testDescription")}>
 					<Button variant="gray" size="xs" onClick={props.onTest}>
-						Check compatibility
+						{t("automationsPage.checkCompatibility")}
 					</Button>
 				</span>
 				<button
@@ -895,7 +997,7 @@ function RuleEditorBody(props: {
 					class="flex gap-1.5 items-center px-2 h-6 text-[0.75rem] rounded-lg transition-colors text-gray-10 hover:text-red-500 hover:bg-red-500/10"
 				>
 					<IconLucideTrash2 class="size-3.5" />
-					Delete
+					{t("automationsPage.deleteRule")}
 				</button>
 			</div>
 		</div>
@@ -928,13 +1030,16 @@ function ConditionRow(props: {
 						onChange={props.onChange}
 					/>
 				</div>
-				<RowButton onClick={props.onRemove} title="Remove condition">
+				<RowButton
+					onClick={props.onRemove}
+					title={t("automationsPage.removeCondition")}
+				>
 					<IconLucideX class="size-4" />
 				</RowButton>
 			</div>
 			<Show when={!applies()}>
 				<p class="px-1 text-[11px] text-amber-600 dark:text-amber-500">
-					This condition never matches for the selected trigger.
+					{t("automationsPage.conditionNeverMatches")}
 				</p>
 			</Show>
 		</div>
@@ -952,9 +1057,15 @@ function ConditionValue(props: {
 				<SelectInput<CaptureTargetKind>
 					value={c.target}
 					options={[
-						{ value: "display", label: "Display" },
-						{ value: "window", label: "Window" },
-						{ value: "area", label: "Area" },
+						{
+							value: "display",
+							label: t("automationsPage.captureTargetDisplay"),
+						},
+						{
+							value: "window",
+							label: t("automationsPage.captureTargetWindow"),
+						},
+						{ value: "area", label: t("automationsPage.captureTargetArea") },
 					]}
 					onChange={(v) =>
 						props.onChange((cond) => {
@@ -968,8 +1079,14 @@ function ConditionValue(props: {
 				<SelectInput<AutomationRecordingMode>
 					value={c.mode}
 					options={[
-						{ value: "studio", label: "Studio" },
-						{ value: "instant", label: "Instant" },
+						{
+							value: "studio",
+							label: t("automationsPage.recordingModeStudio"),
+						},
+						{
+							value: "instant",
+							label: t("automationsPage.recordingModeInstant"),
+						},
 					]}
 					onChange={(v) =>
 						props.onChange((cond) => {
@@ -1010,7 +1127,7 @@ function ConditionValue(props: {
 			return (
 				<TextInput
 					value={c.id}
-					placeholder="Organization ID"
+					placeholder={t("automationsPage.organizationId")}
 					onInput={(v) =>
 						props.onChange((cond) => {
 							if (cond.type === "organizationIs") cond.id = v;
@@ -1048,34 +1165,37 @@ function ActionRow(props: {
 				/>
 				<Show when={props.support === false}>
 					<span
-						title="Not supported on this device; will be skipped"
+						title={t("automationsPage.notSupportedTitle")}
 						class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-500"
 					>
-						Skipped here
+						{t("automationsPage.skippedHere")}
 					</span>
 				</Show>
 				<RowButton
 					onClick={() => props.onMove(-1)}
-					title="Move up"
+					title={t("automationsPage.moveUp")}
 					disabled={props.isFirst}
 				>
 					<IconLucideChevronUp class="size-4" />
 				</RowButton>
 				<RowButton
 					onClick={() => props.onMove(1)}
-					title="Move down"
+					title={t("automationsPage.moveDown")}
 					disabled={props.isLast}
 				>
 					<IconLucideChevronDown class="size-4" />
 				</RowButton>
-				<RowButton onClick={props.onRemove} title="Remove action">
+				<RowButton
+					onClick={props.onRemove}
+					title={t("automationsPage.removeAction")}
+				>
 					<IconLucideX class="size-4" />
 				</RowButton>
 			</div>
 			<ActionParams action={props.action} onChange={props.onChange} />
 			<Show when={!applies()}>
 				<p class="text-[11px] text-amber-600 dark:text-amber-500">
-					This action has no effect for the selected trigger.
+					{t("automationsPage.noEffect")}
 				</p>
 			</Show>
 		</div>
@@ -1090,12 +1210,18 @@ function ActionParams(props: {
 	switch (a.type) {
 		case "copyToClipboard":
 			return (
-				<Field label="Source">
+				<Field label={t("automationsPage.source")}>
 					<SelectInput<ClipboardSource>
 						value={a.source}
 						options={[
-							{ value: "raw", label: "Original capture" },
-							{ value: "rendered", label: "Edited / rendered" },
+							{
+								value: "raw",
+								label: t("automationsPage.clipboardSource.original"),
+							},
+							{
+								value: "rendered",
+								label: t("automationsPage.clipboardSource.rendered"),
+							},
 						]}
 						onChange={(v) =>
 							props.onChange((act) => {
@@ -1108,7 +1234,7 @@ function ActionParams(props: {
 		case "saveToLocation":
 			return (
 				<div class="flex gap-2">
-					<Field label="Folder">
+					<Field label={t("automationsPage.folder")}>
 						<div class="flex gap-2">
 							<TextInput
 								value={a.dir}
@@ -1130,11 +1256,11 @@ function ActionParams(props: {
 										});
 								}}
 							>
-								Browse
+								{t("automationsPage.browse")}
 							</Button>
 						</div>
 					</Field>
-					<Field label="Filename template (optional)">
+					<Field label={t("automationsPage.filenameTemplate")}>
 						<TextInput
 							value={a.filenameTemplate ?? ""}
 							placeholder="{date}-{window}"
@@ -1153,7 +1279,7 @@ function ActionParams(props: {
 		case "upload":
 			return (
 				<div class="space-y-2">
-					<Field label="Organization ID (optional)">
+					<Field label={t("automationsPage.organizationId")}>
 						<TextInput
 							value={a.organizationId ?? ""}
 							onInput={(v) =>
@@ -1175,7 +1301,7 @@ function ActionParams(props: {
 									})
 								}
 							/>
-							Copy link to clipboard
+							{t("automationsPage.copyLink")}
 						</label>
 						<label class="flex gap-2 items-center text-[13px] text-gray-12">
 							<Toggle
@@ -1187,7 +1313,7 @@ function ActionParams(props: {
 									})
 								}
 							/>
-							Open in browser
+							{t("automationsPage.openInBrowser")}
 						</label>
 					</div>
 				</div>
@@ -1196,7 +1322,7 @@ function ActionParams(props: {
 			return (
 				<div class="space-y-2">
 					<div class="flex gap-2">
-						<Field label="Program">
+						<Field label={t("automationsPage.program")}>
 							<TextInput
 								value={a.program}
 								placeholder="/usr/local/bin/my-script"
@@ -1207,7 +1333,7 @@ function ActionParams(props: {
 								}
 							/>
 						</Field>
-						<Field label="Arguments (space-separated)">
+						<Field label={t("automationsPage.arguments")}>
 							<TextInput
 								value={a.args.join(" ")}
 								onInput={(v) =>
@@ -1229,7 +1355,7 @@ function ActionParams(props: {
 								})
 							}
 						/>
-						Run through shell
+						{t("automationsPage.runThroughShell")}
 					</label>
 				</div>
 			);
@@ -1237,7 +1363,7 @@ function ActionParams(props: {
 			return (
 				<div class="space-y-2">
 					<div class="flex gap-2">
-						<Field label="URL">
+						<Field label={t("automationsPage.url")}>
 							<TextInput
 								value={a.url}
 								placeholder="https://hooks.slack.com/..."
@@ -1248,14 +1374,23 @@ function ActionParams(props: {
 								}
 							/>
 						</Field>
-						<Field label="Method">
+						<Field label={t("automationsPage.method")}>
 							<SelectInput<string>
 								class="w-28"
 								value={a.method}
 								options={[
-									{ value: "POST", label: "POST" },
-									{ value: "PUT", label: "PUT" },
-									{ value: "GET", label: "GET" },
+									{
+										value: "POST",
+										label: t("automationsPage.httpMethodPost"),
+									},
+									{
+										value: "PUT",
+										label: t("automationsPage.httpMethodPut"),
+									},
+									{
+										value: "GET",
+										label: t("automationsPage.httpMethodGet"),
+									},
 								]}
 								onChange={(v) =>
 									props.onChange((act) => {
@@ -1265,7 +1400,7 @@ function ActionParams(props: {
 							/>
 						</Field>
 					</div>
-					<Field label="Body template (optional)">
+					<Field label={t("automationsPage.bodyTemplate")}>
 						<TextInput
 							value={a.bodyTemplate ?? ""}
 							placeholder='{"text":"{share_link}"}'
@@ -1282,7 +1417,7 @@ function ActionParams(props: {
 		case "notify":
 			return (
 				<div class="flex gap-2">
-					<Field label="Title">
+					<Field label={t("automationsPage.fieldTitle")}>
 						<TextInput
 							value={a.titleTemplate}
 							onInput={(v) =>
@@ -1292,7 +1427,7 @@ function ActionParams(props: {
 							}
 						/>
 					</Field>
-					<Field label="Body">
+					<Field label={t("automationsPage.body")}>
 						<TextInput
 							value={a.bodyTemplate}
 							onInput={(v) =>
@@ -1306,7 +1441,7 @@ function ActionParams(props: {
 			);
 		case "applyPreset":
 			return (
-				<Field label="Preset">
+				<Field label={t("automationsPage.preset")}>
 					<PresetSelect
 						value={a.name}
 						onChange={(name) =>
@@ -1330,7 +1465,9 @@ function PresetSelect(props: {
 	const presets = presetsStore.createQuery();
 	const names = () => presets.data?.presets.map((p) => p.name) ?? [];
 	const options = () => [
-		...(props.allowNone ? [{ value: "", label: "None" }] : []),
+		...(props.allowNone
+			? [{ value: "", label: t("automationsPage.none") }]
+			: []),
 		...names().map((n) => ({ value: n, label: n })),
 	];
 
@@ -1339,7 +1476,7 @@ function PresetSelect(props: {
 			when={props.allowNone || names().length > 0}
 			fallback={
 				<p class="px-0.5 py-1.5 text-[11px] text-gray-9">
-					No presets yet — create one in the editor first.
+					{t("automationsPage.noPresets")}
 				</p>
 			}
 		>
@@ -1372,13 +1509,13 @@ function ExportParams(props: {
 	return (
 		<div class="space-y-2">
 			<div class="flex gap-2">
-				<Field label="Format">
+				<Field label={t("automationsPage.format")}>
 					<SelectInput<ExportFormat>
 						value={a.profile.format}
 						options={[
-							{ value: "mp4", label: "MP4" },
-							{ value: "gif", label: "GIF" },
-							{ value: "mov", label: "MOV" },
+							{ value: "mp4", label: t("automationsPage.formatMp4") },
+							{ value: "gif", label: t("automationsPage.formatGif") },
+							{ value: "mov", label: t("automationsPage.formatMov") },
 						]}
 						onChange={(v) =>
 							updateProfile((p) => {
@@ -1387,7 +1524,7 @@ function ExportParams(props: {
 						}
 					/>
 				</Field>
-				<Field label="Resolution">
+				<Field label={t("automationsPage.resolution")}>
 					<SelectInput
 						value={resolutionValue()}
 						options={RESOLUTION_PRESETS.map((r) => ({
@@ -1405,7 +1542,7 @@ function ExportParams(props: {
 				</Field>
 			</div>
 			<div class="flex gap-2">
-				<Field label="Frame rate">
+				<Field label={t("automationsPage.frameRate")}>
 					<SelectInput
 						value={String(a.profile.fps)}
 						options={FPS_PRESETS.map((f) => ({
@@ -1420,14 +1557,23 @@ function ExportParams(props: {
 					/>
 				</Field>
 				<Show when={a.profile.format === "mp4"}>
-					<Field label="Compression">
+					<Field label={t("automationsPage.compression")}>
 						<SelectInput<ExportCompression>
 							value={a.profile.compression ?? "web"}
 							options={[
-								{ value: "maximum", label: "Maximum" },
-								{ value: "social", label: "Social" },
-								{ value: "web", label: "Web" },
-								{ value: "potato", label: "Potato" },
+								{
+									value: "maximum",
+									label: t("automationsPage.compressionMaximum"),
+								},
+								{
+									value: "social",
+									label: t("automationsPage.compressionSocial"),
+								},
+								{ value: "web", label: t("automationsPage.compressionWeb") },
+								{
+									value: "potato",
+									label: t("automationsPage.compressionPotato"),
+								},
 							]}
 							onChange={(v) =>
 								updateProfile((p) => {
@@ -1438,7 +1584,7 @@ function ExportParams(props: {
 					</Field>
 				</Show>
 			</div>
-			<Field label="Destination folder (optional, blank = project folder)">
+			<Field label={t("automationsPage.destinationFolder")}>
 				<div class="flex gap-2">
 					<TextInput
 						value={
@@ -1446,7 +1592,7 @@ function ExportParams(props: {
 								? ""
 								: a.destination.customPath.dir
 						}
-						placeholder="Project folder"
+						placeholder={t("automationsPage.projectFolder")}
 						onInput={(v) =>
 							props.onChange((act) => {
 								if (act.type === "export")
@@ -1467,7 +1613,7 @@ function ExportParams(props: {
 								});
 						}}
 					>
-						Browse
+						{t("automationsPage.browse")}
 					</Button>
 				</div>
 			</Field>

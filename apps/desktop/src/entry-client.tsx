@@ -1,7 +1,10 @@
 // @refresh reload
 import { mount, StartClient } from "@solidjs/start/client";
+import { isTauriRuntime } from "./utils/tauri-runtime";
 
 function initPlatformClass() {
+	if (!isTauriRuntime()) return;
+
 	import("@tauri-apps/plugin-os")
 		.then(({ type }) => {
 			const osType = type();

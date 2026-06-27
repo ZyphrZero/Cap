@@ -25,6 +25,7 @@ import {
 import { produce, reconcile } from "solid-js/store";
 import { Portal } from "solid-js/web";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { createDevicesQuery } from "~/utils/devices";
 import {
 	createCameraMutation,
@@ -892,7 +893,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 														onClick={() =>
 															startRename(index(), segment.name ?? "")
 														}
-														aria-label="Rename clip"
+														aria-label={t("renameClip")}
 														class="flex flex-none justify-center items-center rounded-md opacity-0 transition-colors size-7 text-gray-10 hover:bg-gray-5 hover:text-gray-12 group-hover:opacity-100"
 													>
 														<IconCapPencil class="size-3.5" />
@@ -902,7 +903,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 															type="button"
 															data-clip-delete
 															onClick={() => deleteClip(index())}
-															aria-label="Remove clip"
+															aria-label={t("removeClip")}
 															class="flex flex-none justify-center items-center rounded-md opacity-0 transition-colors size-7 text-gray-10 hover:bg-red-3 hover:text-red-11 group-hover:opacity-100"
 														>
 															<IconCapTrash class="size-3.5" />
@@ -987,7 +988,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 																});
 															}}
 															aria-haspopup="menu"
-															aria-label="Choose display"
+															aria-label={t("chooseDisplay")}
 														/>
 													</div>
 													<div
@@ -1020,7 +1021,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 																});
 															}}
 															aria-haspopup="menu"
-															aria-label="Choose window"
+															aria-label={t("chooseWindow")}
 														/>
 													</div>
 												</div>

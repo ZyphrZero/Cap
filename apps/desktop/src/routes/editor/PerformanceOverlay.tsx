@@ -8,6 +8,7 @@ import {
 	Show,
 } from "solid-js";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { useEditorContext } from "./context";
 
 type PerformanceOverlayProps = {
@@ -185,7 +186,7 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 			.join("\n");
 
 		await writeText(statsText);
-		toast.success("Performance stats copied to clipboard");
+		toast.success(t("editor.performance.copiedToClipboard"));
 	};
 
 	const fpsColor = createMemo(() => {
@@ -224,7 +225,7 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 						border: "1px solid rgba(255, 255, 255, 0.15)",
 					}}
 					onClick={copyStatsToClipboard}
-					title="Click to copy stats"
+					title={t("clickToCopyStats")}
 				>
 					<div class="flex flex-col gap-0.5">
 						<div class="flex items-center gap-2">

@@ -2,7 +2,6 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { createSignal } from "solid-js";
 import toast from "solid-toast";
-import { t } from "~/components/I18nProvider";
 import { commands } from "~/utils/tauri";
 import { getArrowHeadPoints } from "./arrow";
 import {

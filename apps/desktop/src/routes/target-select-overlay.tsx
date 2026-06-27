@@ -9,7 +9,6 @@ import {
 	type PhysicalPosition,
 	type PhysicalSize,
 } from "@tauri-apps/api/dpi";
-import { emit } from "@tauri-apps/api/event";
 import {
 	CheckMenuItem,
 	Menu,
@@ -60,6 +59,7 @@ import SelectionHint from "~/components/selection-hint";
 import { authStore, generalSettingsStore } from "~/store";
 import { getCameraWindow } from "~/utils/camera-window";
 import { createDevicesQuery } from "~/utils/devices";
+import { hasDesktopProAccess } from "~/utils/plans";
 import {
 	createCameraMutation,
 	createOptionsQuery,
@@ -1852,7 +1852,7 @@ function RecordingControls(props: {
 					<IconCapInfo class="opacity-70 will-change-transform size-3" />
 					<p class="text-sm text-white drop-shadow-md">
 						{t("targetSelect.whatIsMode", {
-							mode: t(`targetSelect.modes.${rawOptions.mode}` as any),
+							mode: t(`targetSelect.modes.${rawOptions.mode}`),
 						})}
 					</p>
 				</div>
@@ -1863,10 +1863,17 @@ function RecordingControls(props: {
 
 function ShowCapFreeWarning(props: { isInstantMode: boolean }) {
 	const auth = authStore.createQuery();
+	const generalSettings = generalSettingsStore.createQuery();
 
 	return (
 		<Suspense>
-			<Show when={props.isInstantMode && auth.data?.plan?.upgraded === false}>
+			<Show
+				when={
+					props.isInstantMode &&
+					auth.data &&
+					!hasDesktopProAccess(auth.data, generalSettings.data)
+				}
+			>
 				<p class="text-sm text-center max-w-64 text-gray-3 mt-3">
 					Instant Mode recordings are limited to 5 mins,{" "}
 					<button

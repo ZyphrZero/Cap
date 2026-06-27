@@ -14,7 +14,6 @@ import {
 import { createStore } from "solid-js/store";
 import { t } from "~/components/I18nProvider";
 import { hotkeysStore } from "~/store";
-
 import {
 	commands,
 	type Hotkey,
@@ -23,21 +22,21 @@ import {
 } from "~/utils/tauri";
 import { Section, SectionCard, SettingsPageContent } from "./Setting";
 
-const ACTION_TEXT = {
-	startStudioRecording: "Start studio recording",
-	startInstantRecording: "Start instant recording",
-	restartRecording: "Restart recording",
-	stopRecording: "Stop recording",
-	togglePauseRecording: "Pause/resume recording",
-	cycleRecordingMode: "Cycle recording mode",
-	openRecordingPicker: "Open recording picker",
-	openRecordingPickerDisplay: "Record display",
-	openRecordingPickerWindow: "Record window",
-	openRecordingPickerArea: "Record area",
-	screenshotDisplay: "Screenshot current display",
-	screenshotWindow: "Screenshot current window",
-	screenshotArea: "Screenshot area picker",
-} satisfies { [K in HotkeyAction]?: string };
+const ACTION_LABEL: Record<HotkeyAction, string> = {
+	startStudioRecording: "actions.startStudioRecording",
+	startInstantRecording: "actions.startInstantRecording",
+	restartRecording: "actions.restartRecording",
+	stopRecording: "actions.stopRecording",
+	togglePauseRecording: "actions.togglePauseRecording",
+	cycleRecordingMode: "actions.cycleRecordingMode",
+	openRecordingPicker: "actions.openRecordingPicker",
+	openRecordingPickerDisplay: "actions.openRecordingPickerDisplay",
+	openRecordingPickerWindow: "actions.openRecordingPickerWindow",
+	openRecordingPickerArea: "actions.openRecordingPickerArea",
+	screenshotDisplay: "actions.screenshotDisplay",
+	screenshotWindow: "actions.screenshotWindow",
+	screenshotArea: "actions.screenshotArea",
+} satisfies { [K in HotkeyAction]: string };
 
 export default function () {
 	const [store] = createResource(() => hotkeysStore.get());
@@ -102,8 +101,8 @@ function Inner(props: { initialStore: HotkeysStore | null }) {
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
 				<Section
-					title="Shortcuts"
-					description="Configure system-wide keyboard shortcuts to control Cap."
+					title={t("hotkeysPage.title")}
+					description={t("hotkeysPage.description")}
 				>
 					<SectionCard class="flex flex-col gap-3 p-4">
 						<Index each={actions()}>
@@ -121,7 +120,7 @@ function Inner(props: { initialStore: HotkeysStore | null }) {
 									<>
 										<div class="flex flex-row justify-between items-center w-full h-8">
 											<p class="text-[13px] text-gray-12">
-												{ACTION_TEXT[item()]}
+												{t(ACTION_LABEL[item()])}
 											</p>
 											<Switch>
 												<Match when={listening()?.action === item()}>
@@ -130,7 +129,7 @@ function Inner(props: { initialStore: HotkeysStore | null }) {
 															when={hotkeys[item()]}
 															fallback={
 																<p class="text-[13px] text-gray-11">
-																	Set hotkeys...
+																	{t("hotkeysPage.setHotkeys")}
 																</p>
 															}
 														>
@@ -193,7 +192,7 @@ function Inner(props: { initialStore: HotkeysStore | null }) {
 																	class="flex items-center text-[11px] uppercase transition-colors hover:bg-gray-6 hover:border-gray-7
                         cursor-pointer py-3 px-2.5 h-5 bg-gray-4 border border-gray-5 rounded-lg text-gray-11 hover:text-gray-12"
 																>
-																	None
+																	{t("hotkeysPage.none")}
 																</p>
 															}
 														>

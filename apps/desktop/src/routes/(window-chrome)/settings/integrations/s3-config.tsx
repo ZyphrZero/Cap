@@ -2,6 +2,7 @@ import { Button } from "@cap/ui-solid";
 import { createWritableMemo } from "@solid-primitives/memo";
 import { useMutation } from "@tanstack/solid-query";
 import { createResource, Show, Suspense } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { Input } from "~/routes/editor/ui";
 import { createSelectedOrganization } from "~/utils/organization-branding";
 import { commands } from "~/utils/tauri";
@@ -25,7 +26,7 @@ const DEFAULT_CONFIG = {
 	endpoint: "https://s3.amazonaws.com",
 	bucketName: "",
 	region: "us-east-1",
-};
+} satisfies S3Config;
 
 export default function S3ConfigPage() {
 	const organizationSelection = createSelectedOrganization();
@@ -37,7 +38,8 @@ export default function S3ConfigPage() {
 				headers: await protectedHeaders(),
 			});
 
-			if (response.status !== 200) throw new Error("Failed to fetch S3 config");
+			if (response.status !== 200)
+				throw new Error(t("s3ConfigPage.error.fetch"));
 
 			return response.body;
 		},
@@ -150,22 +152,23 @@ export default function S3ConfigPage() {
 	return (
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
-				<IntegrationConfigHeader title="S3 Config" />
+				<IntegrationConfigHeader
+					title={t("integrationsPage.apps.s3Config.name")}
+				/>
 				<Section
 					title="Configuration"
 					description={
 						<>
-							It should take under 10 minutes to set up and connect your storage
-							bucket to Cap. View the{" "}
+							{t("s3ConfigPage.guideTextPre")}
 							<a
 								href="https://cap.so/docs/s3-config"
 								target="_blank"
 								class="underline text-gray-12"
 								rel="noopener"
 							>
-								Storage Config Guide
-							</a>{" "}
-							to get started.
+								{t("s3ConfigPage.guideLink")}
+							</a>
+							{t("s3ConfigPage.guideTextPost")}
 						</>
 					}
 				>
@@ -181,32 +184,44 @@ export default function S3ConfigPage() {
 								<Show when={managedByOrganization()}>
 									{(organization) => (
 										<p class="text-xs leading-relaxed text-gray-10">
-											Managed by your organization: {organization().name}
+											{t("s3ConfigPage.managedBy", {
+												name: organization().name,
+											})}
 										</p>
 									)}
 								</Show>
 
 								<div class="space-y-2">
 									<label class="text-[13px] text-gray-12">
-										Storage Provider
+										{t("s3ConfigPage.storageProvider")}
 									</label>
 									<div class="relative">
 										<select
 											value={s3Config().provider}
 											disabled={!!managedByOrganization()}
 											onChange={(e) =>
-												setS3Config((c) => ({
-													...c,
+												setS3Config((config) => ({
+													...config,
 													provider: e.currentTarget.value,
 												}))
 											}
 											class="px-3 py-2 pr-10 w-full rounded-lg border border-transparent transition-all duration-200 appearance-none outline-hidden bg-gray-3 focus:border-gray-8"
 										>
-											<option value="aws">AWS S3</option>
-											<option value="cloudflare">Cloudflare R2</option>
-											<option value="supabase">Supabase</option>
-											<option value="minio">MinIO</option>
-											<option value="other">Other S3-Compatible</option>
+											<option value="aws">
+												{t("s3ConfigPage.providers.aws")}
+											</option>
+											<option value="cloudflare">
+												{t("s3ConfigPage.providers.cloudflare")}
+											</option>
+											<option value="supabase">
+												{t("s3ConfigPage.providers.supabase")}
+											</option>
+											<option value="minio">
+												{t("s3ConfigPage.providers.minio")}
+											</option>
+											<option value="other">
+												{t("s3ConfigPage.providers.other")}
+											</option>
 										</select>
 										<div class="flex absolute inset-y-0 right-0 items-center px-2 pointer-events-none">
 											<svg
@@ -226,24 +241,32 @@ export default function S3ConfigPage() {
 								</div>
 
 								{renderInput(
-									"Access Key ID",
+									t("s3ConfigPage.labels.accessKeyId"),
 									"accessKeyId",
 									"PL31OADSQNK",
 									"password",
 								)}
 								{renderInput(
-									"Secret Access Key",
+									t("s3ConfigPage.labels.secretAccessKey"),
 									"secretAccessKey",
 									"PL31OADSQNK",
 									"password",
 								)}
 								{renderInput(
-									"Endpoint",
+									t("s3ConfigPage.labels.endpoint"),
 									"endpoint",
 									"https://s3.amazonaws.com",
 								)}
-								{renderInput("Bucket Name", "bucketName", "my-bucket")}
-								{renderInput("Region", "region", "us-east-1")}
+								{renderInput(
+									t("s3ConfigPage.labels.bucketName"),
+									"bucketName",
+									"my-bucket",
+								)}
+								{renderInput(
+									t("s3ConfigPage.labels.region"),
+									"region",
+									"us-east-1",
+								)}
 							</div>
 						</Suspense>
 					</SectionCard>
@@ -265,14 +288,18 @@ export default function S3ConfigPage() {
 									variant="destructive"
 									onClick={() => deleteConfig.mutate()}
 								>
-									{deleteConfig.isPending ? "Removing..." : "Remove Config"}
+									{deleteConfig.isPending
+										? t("s3ConfigPage.buttons.removing")
+										: t("s3ConfigPage.buttons.remove")}
 								</Button>
 							)}
 							<Button
 								variant="gray"
 								onClick={() => testConfig.mutate(s3Config())}
 							>
-								{testConfig.isPending ? "Testing..." : "Test Connection"}
+								{testConfig.isPending
+									? t("s3ConfigPage.buttons.testing")
+									: t("s3ConfigPage.buttons.test")}
 							</Button>
 						</div>
 						<Button
@@ -280,7 +307,9 @@ export default function S3ConfigPage() {
 							variant="primary"
 							onClick={() => saveConfig.mutate(s3Config())}
 						>
-							{saveConfig.isPending ? "Saving..." : "Save"}
+							{saveConfig.isPending
+								? t("s3ConfigPage.buttons.saving")
+								: t("s3ConfigPage.buttons.save")}
 						</Button>
 					</fieldset>
 				</div>

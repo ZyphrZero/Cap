@@ -8,6 +8,7 @@ import {
 	deriveGeneralSettings,
 	type GeneralSettingsStore,
 } from "~/utils/general-settings";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import {
 	Section,
 	SectionRows,
@@ -17,7 +18,7 @@ import {
 
 export default function ExperimentalSettings() {
 	const [store] = createResource(() => generalSettingsStore.get());
-	const osType = type();
+	const osType = getOsType();
 
 	return (
 		<Show when={store.state === "ready" && ([store()] as const)}>
@@ -43,12 +44,10 @@ function Inner(props: {
 		const previousValue = settings[key];
 		setSettings(key as keyof GeneralSettingsStore, value);
 		try {
-			if (key === "enableNativeCameraPreview") {
+			if (key === "enableNativeCameraPreview" && isTauriRuntime()) {
 				await invoke("set_native_camera_preview_enabled", { enabled: value });
-				await generalSettingsStore.set({ [key]: value });
-			} else {
-				await generalSettingsStore.set({ [key]: value });
 			}
+			await generalSettingsStore.set({ [key]: value });
 		} catch (error) {
 			setSettings(key as keyof GeneralSettingsStore, previousValue);
 			console.error(`Failed to update ${key}`, error);
@@ -62,15 +61,17 @@ function Inner(props: {
 					when={props.osType !== "windows"}
 					fallback={
 						<p class="text-xs leading-relaxed text-gray-10 px-1">
-							No experimental features are currently available on this platform.
+							{t("experimentalPage.notAvailable")}
 						</p>
 					}
 				>
-					<Section title="Preview">
+					<Section title={t("experimentalPage.preview")}>
 						<SectionRows>
 							<ToggleSettingItem
-								label="Native camera preview"
-								description="Render the camera preview using a native GPU surface instead of through the webview. On by default on macOS; turn off if you run into camera preview issues."
+								label={t("experimentalPage.features.nativeCamera.label")}
+								description={t(
+									"experimentalPage.features.nativeCamera.description",
+								)}
 								value={!!settings.enableNativeCameraPreview}
 								onChange={(value) =>
 									handleChange("enableNativeCameraPreview", value)
@@ -80,11 +81,13 @@ function Inner(props: {
 					</Section>
 				</Show>
 
-				<Section title="Reliability">
+				<Section title={t("experimentalPage.reliability")}>
 					<SectionRows>
 						<ToggleSettingItem
-							label="Out-of-process muxer"
-							description="Run the fragmented-MP4 muxer in an isolated subprocess so muxer crashes can't take down your recording. Requires the bundled cap-muxer binary."
+							label={t("experimentalPage.features.outOfProcessMuxer.label")}
+							description={t(
+								"experimentalPage.features.outOfProcessMuxer.description",
+							)}
 							value={!!settings.outOfProcessMuxer}
 							onChange={(value) => handleChange("outOfProcessMuxer", value)}
 						/>
@@ -93,4 +96,14 @@ function Inner(props: {
 			</SettingsPageContent>
 		</div>
 	);
+}
+
+function getOsType(): ReturnType<typeof type> {
+	if (isTauriRuntime()) return type();
+
+	if (typeof navigator === "undefined") return "windows";
+	const platform = navigator.platform.toLowerCase();
+	if (platform.includes("mac")) return "macos";
+	if (platform.includes("linux")) return "linux";
+	return "windows";
 }

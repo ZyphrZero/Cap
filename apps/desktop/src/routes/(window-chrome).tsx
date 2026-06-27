@@ -15,6 +15,7 @@ import { AbsoluteInsetLoader } from "~/components/Loader";
 import CaptionControlsMacOS from "~/components/titlebar/controls/CaptionControlsMacOS";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { applyMacOSWindowMaterial } from "~/utils/macos-window-material";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import { initializeTitlebar } from "~/utils/titlebar-state";
 import {
 	useWindowChromeContext,
@@ -26,6 +27,8 @@ export default function (props: RouteSectionProps) {
 	const location = useLocation();
 
 	onMount(async () => {
+		if (!isTauriRuntime()) return;
+
 		console.log("window chrome mounted");
 		void initializeTitlebar().then((unlisten) => {
 			unlistenResize = unlisten;
@@ -33,14 +36,16 @@ export default function (props: RouteSectionProps) {
 	});
 
 	const handleKeyDown = (e: KeyboardEvent) => {
-		const isMac = ostype() === "macos";
+		const isMac = getOsType() === "macos";
 		const closeShortcut = isMac
 			? e.metaKey && e.key === "w"
 			: e.ctrlKey && e.key === "w";
 
 		if (closeShortcut) {
 			e.preventDefault();
-			getCurrentWindow().close();
+			if (isTauriRuntime()) {
+				getCurrentWindow().close();
+			}
 		}
 	};
 
@@ -53,9 +58,11 @@ export default function (props: RouteSectionProps) {
 		window.removeEventListener("keydown", handleKeyDown);
 	});
 
-	const isMacOS = ostype() === "macos";
+	const isMacOS = getOsType() === "macos";
 
 	createEffect(() => {
+		if (!isTauriRuntime()) return;
+
 		void applyMacOSWindowMaterial(
 			location.pathname.startsWith("/settings") ? "settings" : "panel",
 		).catch((error) => {
@@ -100,9 +107,10 @@ function Header() {
 			"useWindowChrome must be used within a WindowChromeContext",
 		);
 
-	const isWindows = ostype() === "windows";
-	const isMacOS = ostype() === "macos";
-	const isLinux = ostype() === "linux";
+	const osType = getOsType();
+	const isWindows = osType === "windows";
+	const isMacOS = osType === "macos";
+	const isLinux = osType === "linux";
 	const isSettings = () => location.pathname.startsWith("/settings");
 
 	if (isMacOS && isSettings()) return null;
@@ -130,6 +138,8 @@ function Header() {
 
 function Inner(props: ParentProps) {
 	onMount(() => {
+		if (!isTauriRuntime()) return;
+
 		const initialTargetMode = (
 			window as typeof window & {
 				__CAP__?: { initialTargetMode?: unknown };
@@ -148,4 +158,14 @@ function Inner(props: ParentProps) {
 			{props.children}
 		</div>
 	);
+}
+
+function getOsType() {
+	if (isTauriRuntime()) return ostype();
+
+	const platform = navigator.platform.toLowerCase();
+	if (platform.includes("mac")) return "macos";
+	if (platform.includes("win")) return "windows";
+	if (platform.includes("linux")) return "linux";
+	return "windows";
 }

@@ -26,6 +26,7 @@ import SettingsLayout from "./routes/(window-chrome)/settings";
 import { generalSettingsStore } from "./store";
 import { initAnonymousUser } from "./utils/analytics";
 import { type AppTheme, commands } from "./utils/tauri";
+import { isTauriRuntime } from "./utils/tauri-runtime";
 import titlebar from "./utils/titlebar-state";
 
 const NewMainPage = lazy(() => import("./routes/(window-chrome)/new-main"));
@@ -49,9 +50,6 @@ const SettingsHotkeysPage = lazy(
 );
 const SettingsCliPage = lazy(
 	() => import("./routes/(window-chrome)/settings/cli"),
-);
-const SettingsChangelogPage = lazy(
-	() => import("./routes/(window-chrome)/settings/changelog"),
 );
 const SettingsFeedbackPage = lazy(
 	() => import("./routes/(window-chrome)/settings/feedback"),
@@ -124,13 +122,14 @@ export default function App() {
 }
 
 function Inner() {
-	const currentWindow = getCurrentWebviewWindow();
+	const currentWindow = isTauriRuntime() ? getCurrentWebviewWindow() : null;
 	createThemeListener(currentWindow);
 
 	onMount(() => {
 		initAnonymousUser();
-		// Reset startup state so user can see the welcome screen again
-		generalSettingsStore.set({ hasCompletedStartup: false });
+		if (isTauriRuntime()) {
+			generalSettingsStore.set({ hasCompletedStartup: false });
+		}
 	});
 
 	return (
@@ -173,13 +172,13 @@ function Inner() {
 							}
 
 							if (autoShow) {
-								void currentWindow.show();
-								void currentWindow.setFocus();
+								void currentWindow?.show();
+								void currentWindow?.setFocus();
 							} else {
 								// The route reveals itself after its first themed paint to
 								// avoid a load flash. Safety net so the window is never left
 								// hidden if that self-reveal never runs (e.g. chunk load error).
-								setTimeout(() => void currentWindow.show(), 2000);
+								setTimeout(() => void currentWindow?.show(), 2000);
 							}
 						});
 
@@ -200,7 +199,6 @@ function Inner() {
 							<Route path="/automations" component={SettingsAutomationsPage} />
 							<Route path="/hotkeys" component={SettingsHotkeysPage} />
 							<Route path="/cli" component={SettingsCliPage} />
-							<Route path="/changelog" component={SettingsChangelogPage} />
 							<Route path="/feedback" component={SettingsFeedbackPage} />
 							<Route
 								path="/experimental"
@@ -254,7 +252,7 @@ function Inner() {
 	);
 }
 
-function createThemeListener(currentWindow: WebviewWindow) {
+function createThemeListener(currentWindow: WebviewWindow | null) {
 	const [appTheme, setAppTheme] = createSignal<AppTheme | null | undefined>();
 	let disposed = false;
 	let stopSettingsListening: (() => void) | undefined;
@@ -265,6 +263,8 @@ function createThemeListener(currentWindow: WebviewWindow) {
 	});
 
 	onMount(() => {
+		if (!isTauriRuntime()) return;
+
 		void generalSettingsStore
 			.get()
 			.then((settings) => {
@@ -290,7 +290,7 @@ function createThemeListener(currentWindow: WebviewWindow) {
 			);
 
 		void currentWindow
-			.onThemeChanged(() => update(appTheme()))
+			?.onThemeChanged(() => update(appTheme()))
 			.then((unlisten) => {
 				if (disposed) {
 					unlisten();
@@ -325,6 +325,11 @@ function createThemeListener(currentWindow: WebviewWindow) {
 				localStorage.setItem("cap-theme", appTheme);
 			}
 		} catch {}
+
+		if (!isTauriRuntime()) {
+			document.documentElement.classList.toggle("dark", isDark);
+			return;
+		}
 
 		commands.setTheme(appTheme).then(() => {
 			document.documentElement.classList.toggle("dark", isDark);

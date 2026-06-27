@@ -156,7 +156,7 @@ export function BackgroundSettingsPopover() {
 
 	// Background tabs
 	const [backgroundTab, setBackgroundTab] =
-		createSignal<keyof ReturnType<typeof BACKGROUND_THEMES>>("macOS");
+		createSignal<keyof typeof BACKGROUND_THEMES>("macOS");
 
 	const [wallpapers] = createResource(async () => {
 		// Only load visible wallpapers initially
@@ -302,7 +302,7 @@ export function BackgroundSettingsPopover() {
 													class="z-10 flex-1 py-2.5 px-2 text-xs text-gray-11 data-selected:border-gray-3 data-selected:bg-gray-3 not-data-selected:hover:border-gray-7 rounded-[10px] transition-colors duration-200 outline-hidden border data-selected:text-gray-12 peer"
 													value={item}
 												>
-													{BACKGROUND_SOURCES()[item]}
+													{BACKGROUND_SOURCES[item]}
 												</KTabs.Trigger>
 											);
 										}}
@@ -317,14 +317,12 @@ export function BackgroundSettingsPopover() {
 										value={backgroundTab()}
 									>
 										<KTabs.List class="flex overflow-x-auto overscroll-contain relative z-10 flex-row gap-2 items-center mb-3 text-xs hide-scroll">
-											<For each={Object.entries(BACKGROUND_THEMES())}>
+											<For each={Object.entries(BACKGROUND_THEMES)}>
 												{([key, value]) => (
 													<KTabs.Trigger
 														onClick={() =>
 															setBackgroundTab(
-																key as keyof ReturnType<
-																	typeof BACKGROUND_THEMES
-																>,
+																key as keyof typeof BACKGROUND_THEMES,
 															)
 														}
 														value={key}

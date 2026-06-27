@@ -28,8 +28,6 @@ import InfoPill from "./InfoPill";
 import TargetSelectInfoPill from "./TargetSelectInfoPill";
 import useRequestPermission from "./useRequestPermission";
 
-const NO_CAMERA = "No Camera";
-
 export default function CameraSelect(props: {
 	disabled?: boolean;
 	options: CameraInfo[];
@@ -99,7 +97,7 @@ export default function CameraSelect(props: {
 	const label = () =>
 		props.value?.display_name ??
 		(hasSelection() ? props.selectedLabel : null) ??
-		(hasSelection() ? "Camera" : NO_CAMERA);
+		(hasSelection() ? "Camera" : t("recording.noCamera"));
 
 	const showHiddenIndicator = () =>
 		props.value !== null &&
@@ -136,8 +134,8 @@ export default function CameraSelect(props: {
 							onClick={openCameraWindow}
 							onPointerDown={(e) => e.stopPropagation()}
 							class={DEVICE_SHORTCUT_BUTTON_CLASS}
-							title="Show camera preview"
-							aria-label="Show camera preview"
+							title={t("cameraPreviewTooltip")}
+							aria-label={t("cameraPreviewTooltip")}
 						>
 							<IconLucideEyeOff class="size-3.5" />
 						</button>
@@ -152,8 +150,8 @@ export default function CameraSelect(props: {
 							}}
 							onPointerDown={(e) => e.stopPropagation()}
 							class={DEVICE_SHORTCUT_BUTTON_CLASS}
-							title="Camera settings"
-							aria-label="Camera settings"
+							title={t("cameraSettingsTooltip")}
+							aria-label={t("cameraSettingsTooltip")}
 						>
 							<IconLucideSettings class="size-3.5" />
 						</button>

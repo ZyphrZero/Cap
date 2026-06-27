@@ -1,6 +1,7 @@
 import { Button } from "@cap/ui-solid";
 
 import type { ComponentProps } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { createSignInMutation } from "~/utils/auth";
 
 export function SignInButton(
@@ -23,7 +24,9 @@ export function SignInButton(
 				}
 			}}
 		>
-			{signIn.isPending ? "Cancel Sign In" : (props.children ?? "Sign In")}
+			{signIn.isPending
+				? t("actions.cancelSignIn")
+				: (props.children ?? t("nav.signIn"))}
 		</Button>
 	);
 }

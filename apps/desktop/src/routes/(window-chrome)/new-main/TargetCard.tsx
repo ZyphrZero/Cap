@@ -336,9 +336,7 @@ export default function TargetCard(props: TargetCardProps) {
 					{(src) => (
 						<img
 							src={src()}
-							alt={`${
-								local.variant === "display" ? "Display" : "Window"
-							} preview for ${label()}`}
+							alt={`${t(local.variant === "display" ? "recording.display" : "modes.window")} preview for ${label()}`}
 							class="object-cover w-full h-full"
 							loading="lazy"
 							draggable={false}

@@ -3,6 +3,7 @@ import { cx } from "cva";
 import { For, Show, Suspense } from "solid-js";
 import { reconcile } from "solid-js/store";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { normalizeProject, useEditorContext } from "./context";
 import {
 	DropdownItem,

@@ -16,6 +16,7 @@ import {
 	type ParentProps,
 	Show,
 } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { Input } from "~/routes/editor/ui";
 import { trackEvent } from "~/utils/analytics";
 import { createTauriEventListener } from "~/utils/createEventListener";
@@ -128,8 +129,8 @@ export default function Screenshots() {
 		<div class="cap-settings-page flex relative flex-col w-full h-full custom-scroll">
 			<SettingsPageContent class="max-w-none space-y-4">
 				<Section
-					title="Screenshots"
-					description="Manage your screenshots and perform actions."
+					title={t("screenshotsPage.title")}
+					description={t("screenshotsPage.description")}
 					right={
 						<Button
 							variant="gray"
@@ -147,7 +148,7 @@ export default function Screenshots() {
 						fallback={
 							<div class="flex flex-1 items-center justify-center">
 								<p class="text-center text-(--text-tertiary)">
-									No screenshots found
+									{t("screenshotsPage.notFound")}
 								</p>
 							</div>
 						}
@@ -166,12 +167,12 @@ export default function Screenshots() {
 											setSearch("");
 										}
 									}}
-									placeholder="Search"
+									placeholder={t("common.search")}
 									autoCapitalize="off"
 									autocorrect="off"
 									autocomplete="off"
 									spellcheck={false}
-									aria-label="Search screenshots"
+									aria-label={t("searchScreenshots")}
 								/>
 							</div>
 						</div>

@@ -32,3 +32,28 @@ export function isUserOnProPlan({
 	}
 	return false;
 }
+
+export function isDesktopPlanPro(
+	plan?: { upgraded?: boolean; manual?: boolean } | null,
+) {
+	return Boolean(plan?.upgraded || plan?.manual);
+}
+
+export function hasDesktopCommercialLicense(
+	settings?: { commercialLicense?: unknown | null } | null,
+) {
+	return Boolean(settings?.commercialLicense);
+}
+
+export function hasDesktopProAccess(
+	auth?: { plan?: { upgraded?: boolean; manual?: boolean } | null } | null,
+	settings?: { commercialLicense?: unknown | null } | null,
+) {
+	return isDesktopPlanPro(auth?.plan) || hasDesktopCommercialLicense(settings);
+}
+
+export function isDesktopLicensePro(
+	license?: { type?: "pro" | "commercial" | "personal" } | null,
+) {
+	return license?.type === "pro" || license?.type === "commercial";
+}

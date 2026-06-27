@@ -3190,7 +3190,7 @@ async fn upload_exported_video(
     let metadata = build_video_meta(&file_path)
         .map_err(|err| format!("Error getting output video meta: {err}"))?;
 
-    if !auth.is_upgraded() && metadata.duration_in_secs > 300.0 {
+    if !auth.has_pro_access(&app) && metadata.duration_in_secs > 300.0 {
         return Ok(UploadResult::UpgradeRequired);
     }
 
@@ -3304,7 +3304,7 @@ async fn upload_screenshot(
         return Ok(UploadResult::NotAuthenticated);
     };
 
-    if !auth.is_upgraded() {
+    if !auth.has_pro_access(&app) {
         ShowCapWindow::Upgrade.show(&app).await.ok();
         return Ok(UploadResult::UpgradeRequired);
     }
@@ -4424,6 +4424,7 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
             recovery::find_incomplete_recordings,
             recovery::recover_recording,
             recovery::discard_incomplete_recording,
+            tray::set_tray_language,
             automation::get_automations,
             automation::set_automations,
             automation::test_automation,

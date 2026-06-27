@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { createResource, createSignal, Show } from "solid-js";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import { Section, SectionCard, SettingsPageContent } from "./Setting";
 
 type CliInstallStatus = {
@@ -17,12 +19,32 @@ type CliInstallStatus = {
 	pathConfigured: boolean;
 };
 
+const browserPreviewCliStatus: CliInstallStatus = {
+	installDir: "",
+	shimPath: "Desktop app only",
+	targetPath: "Desktop app only",
+	installed: false,
+	onPath: false,
+	conflict: null,
+	pathEntry: "",
+	shellCommand: "",
+	pathConfigured: false,
+};
+
 const getCliInstallStatus = () =>
-	invoke<CliInstallStatus>("get_cli_install_status");
+	isTauriRuntime()
+		? invoke<CliInstallStatus>("get_cli_install_status")
+		: Promise.resolve(browserPreviewCliStatus);
 
-const installCli = () => invoke<CliInstallStatus>("install_cli");
+const installCli = () =>
+	isTauriRuntime()
+		? invoke<CliInstallStatus>("install_cli")
+		: Promise.resolve(browserPreviewCliStatus);
 
-const uninstallCli = () => invoke<CliInstallStatus>("uninstall_cli");
+const uninstallCli = () =>
+	isTauriRuntime()
+		? invoke<CliInstallStatus>("uninstall_cli")
+		: Promise.resolve(browserPreviewCliStatus);
 
 function errorMessage(error: unknown, fallback: string) {
 	if (error instanceof Error) return error.message;
@@ -34,11 +56,15 @@ export default function CliSettings() {
 	const [status, { refetch, mutate }] = createResource(getCliInstallStatus);
 	const [isInstalling, setIsInstalling] = createSignal(false);
 	const [isUninstalling, setIsUninstalling] = createSignal(false);
+	const isDesktopRuntime = isTauriRuntime();
 
 	const installButtonLabel = () => {
+		if (!isDesktopRuntime) return "Desktop app only";
 		if (isInstalling())
-			return status()?.installed ? "Repairing..." : "Installing...";
-		return status()?.installed ? "Repair" : "Install CLI";
+			return status()?.installed
+				? t("cliPage.repairing")
+				: t("cliPage.installing");
+		return status()?.installed ? t("cliPage.repair") : t("cliPage.installCli");
 	};
 
 	const handleInstall = async () => {
@@ -46,9 +72,9 @@ export default function CliSettings() {
 
 		try {
 			mutate(await installCli());
-			toast.success("Cap CLI installed");
+			toast.success(t("cliPage.installSuccess"));
 		} catch (error) {
-			toast.error(errorMessage(error, "Failed to install CLI"));
+			toast.error(errorMessage(error, t("cliPage.installFailed")));
 			await refetch();
 		} finally {
 			setIsInstalling(false);
@@ -60,9 +86,9 @@ export default function CliSettings() {
 
 		try {
 			mutate(await uninstallCli());
-			toast.success("Cap CLI removed");
+			toast.success(t("cliPage.uninstallSuccess"));
 		} catch (error) {
-			toast.error(errorMessage(error, "Failed to remove CLI"));
+			toast.error(errorMessage(error, t("cliPage.uninstallFailed")));
 			await refetch();
 		} finally {
 			setIsUninstalling(false);
@@ -70,16 +96,20 @@ export default function CliSettings() {
 	};
 
 	const copyPathCommand = async (command: string) => {
-		await writeText(command);
-		toast.success("Copied to clipboard");
+		if (isTauriRuntime()) {
+			await writeText(command);
+		} else if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(command);
+		}
+		toast.success(t("cliPage.copiedToClipboard"));
 	};
 
 	return (
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
 				<Section
-					title="Command Line"
-					description="Install the Cap command for terminals, agents, scripts, and local automation."
+					title={t("cliPage.title")}
+					description={t("cliPage.description")}
 				>
 					<SectionCard padded>
 						<Show
@@ -93,8 +123,9 @@ export default function CliSettings() {
 								>
 									<div class="flex flex-col gap-2">
 										<p class="text-xs leading-relaxed text-red-11">
-											Couldn't load CLI status:{" "}
-											{errorMessage(status.error, "unknown error")}
+											{t("cliPage.loadError", {
+												error: errorMessage(status.error, "unknown error"),
+											})}
 										</p>
 										<Button
 											size="sm"
@@ -102,7 +133,7 @@ export default function CliSettings() {
 											class="self-start"
 											onClick={() => refetch()}
 										>
-											Retry
+											{t("cliPage.retry")}
 										</Button>
 									</div>
 								</Show>
@@ -114,13 +145,21 @@ export default function CliSettings() {
 										<div class="flex flex-col gap-1 min-w-0">
 											<p class="text-[13px] text-gray-12">
 												{currentStatus().installed
-													? "Installed"
-													: "Not installed"}
+													? t("cliPage.installed")
+													: t("cliPage.notInstalled")}
 											</p>
 											<p class="text-xs leading-snug text-gray-10">
-												The desktop app installs a local{" "}
-												<code class="font-mono text-gray-12">cap</code> command
-												that points back to the bundled CLI.
+												<Show
+													when={isDesktopRuntime}
+													fallback={
+														<>
+															CLI installation is available in the desktop app
+															runtime.
+														</>
+													}
+												>
+													{t("cliPage.descriptionDetail")}
+												</Show>
 											</p>
 										</div>
 										<div class="flex shrink-0 gap-2">
@@ -128,16 +167,18 @@ export default function CliSettings() {
 												<Button
 													size="sm"
 													variant="gray"
-													disabled={isUninstalling()}
+													disabled={isUninstalling() || !isDesktopRuntime}
 													onClick={handleUninstall}
 												>
-													{isUninstalling() ? "Removing..." : "Remove"}
+													{isUninstalling()
+														? t("cliPage.removing")
+														: t("cliPage.remove")}
 												</Button>
 											</Show>
 											<Button
 												size="sm"
 												variant="dark"
-												disabled={isInstalling()}
+												disabled={isInstalling() || !isDesktopRuntime}
 												onClick={handleInstall}
 											>
 												{installButtonLabel()}
@@ -146,9 +187,12 @@ export default function CliSettings() {
 									</div>
 
 									<div class="grid gap-2 text-xs">
-										<PathRow label="Command" value={currentStatus().shimPath} />
 										<PathRow
-											label="Target"
+											label={t("cliPage.command")}
+											value={currentStatus().shimPath}
+										/>
+										<PathRow
+											label={t("cliPage.target")}
 											value={currentStatus().targetPath}
 										/>
 									</div>
@@ -168,21 +212,11 @@ export default function CliSettings() {
 											<p class="text-xs leading-relaxed text-gray-10">
 												<Show
 													when={currentStatus().pathConfigured}
-													fallback={
-														<>
-															Add{" "}
-															<code class="font-mono text-gray-12">
-																{currentStatus().pathEntry}
-															</code>{" "}
-															to your PATH to use{" "}
-															<code class="font-mono text-gray-12">cap</code>{" "}
-															from a new terminal.
-														</>
-													}
+													fallback={t("cliPage.pathInstruction", {
+														path: currentStatus().pathEntry,
+													})}
 												>
-													Added <code class="font-mono text-gray-12">cap</code>{" "}
-													to your PATH. Restart your terminal to use it, or run
-													this now:
+													{t("cliPage.pathInstructionConfigured")}
 												</Show>
 											</p>
 											<div class="flex items-center gap-2">
@@ -196,7 +230,7 @@ export default function CliSettings() {
 														copyPathCommand(currentStatus().shellCommand)
 													}
 												>
-													Copy
+													{t("cliPage.copy")}
 												</Button>
 											</div>
 										</div>

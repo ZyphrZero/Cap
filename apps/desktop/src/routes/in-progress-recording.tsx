@@ -24,9 +24,10 @@ import {
 import { createStore, produce } from "solid-js/store";
 import { TransitionGroup } from "solid-transition-group";
 import { t } from "~/components/I18nProvider";
-import { authStore } from "~/store";
+import { authStore, generalSettingsStore } from "~/store";
 import { getCameraWindow } from "~/utils/camera-window";
 import { createTauriEventListener } from "~/utils/createEventListener";
+import { hasDesktopProAccess } from "~/utils/plans";
 import {
 	createCurrentRecordingQuery,
 	createOptionsQuery,
@@ -56,8 +57,6 @@ declare global {
 }
 
 const MAX_RECORDING_FOR_FREE = 5 * 60 * 1000;
-const NO_MICROPHONE = "No Microphone";
-const NO_WEBCAM = "No Webcam";
 const FAKE_WINDOW_BOUNDS_NAME = "recording-controls-interactive-area";
 
 export default function () {
@@ -89,13 +88,19 @@ function InProgressRecordingInner() {
 	const startedWithCameraInput = optionsQuery.rawOptions.cameraID != null;
 
 	const [authData, setAuthData] = createSignal<{
-		plan?: { upgraded?: boolean };
+		plan?: { upgraded?: boolean; manual?: boolean };
 	} | null>(null);
+	const [generalSettings, setGeneralSettings] =
+		createSignal<Awaited<ReturnType<typeof generalSettingsStore.get>>>(null);
 	onMount(() => {
 		authStore
 			.get()
 			.then(setAuthData)
 			.catch(() => setAuthData(null));
+		generalSettingsStore
+			.get()
+			.then(setGeneralSettings)
+			.catch(() => setGeneralSettings(null));
 	});
 
 	const audioLevel = createAudioInputLevel();
@@ -643,12 +648,11 @@ function InProgressRecordingInner() {
 	};
 
 	const isMaxRecordingLimitEnabled = () => {
-		// Only enforce the limit on instant mode.
-		// We enforce it on studio mode when exporting.
+		const auth = authData();
 		return (
 			optionsQuery.rawOptions.mode === "instant" &&
-			// If the data is loaded and the user is not upgraded
-			authData()?.plan?.upgraded === false
+			!!auth &&
+			!hasDesktopProAccess(auth, generalSettings())
 		);
 	};
 
@@ -732,8 +736,8 @@ function InProgressRecordingInner() {
 											requestStopRecording();
 										}}
 										onClick={requestStopRecording}
-										title="Stop recording"
-										aria-label="Stop recording"
+										title={t("stopRecording")}
+										aria-label={t("stopRecording")}
 									>
 										<IconCapStopCircle />
 										<span class="text-[0.875rem] font-medium tabular-nums">
@@ -830,7 +834,7 @@ function InProgressRecordingInner() {
 									<Show when={hasCameraInput() && disconnectedInputs.camera}>
 										<div
 											class="flex h-8 w-8 items-center justify-center"
-											title="Camera disconnected - recording continues without camera overlay"
+											title={t("cameraDisconnected")}
 										>
 											<IconLucideVideoOff class="size-5 text-amber-11" />
 										</div>
@@ -840,7 +844,7 @@ function InProgressRecordingInner() {
 											<div
 												class="flex h-8 w-8 items-center justify-center"
 												title={reason()}
-												aria-label="Recording quality degraded"
+												aria-label={t("recordingQualityDegraded")}
 											>
 												<div class="size-2 rounded-full bg-amber-9 animate-pulse" />
 											</div>
@@ -853,8 +857,8 @@ function InProgressRecordingInner() {
 												onClick={() => {
 													void closeStartingBar();
 												}}
-												title="Close recording controls"
-												aria-label="Close recording controls"
+												title={t("closeRecordingControls")}
+												aria-label={t("closeRecordingControls")}
 											>
 												<IconLucideX class="size-5" />
 											</ActionButton>
@@ -870,7 +874,7 @@ function InProgressRecordingInner() {
 												onClick={() => toggleIssuePanel()}
 												title={issueMessages().join(", ")}
 												aria-pressed={issuePanelVisible() ? "true" : "false"}
-												aria-label="Recording issues"
+												aria-label={t("recordingIssues")}
 											>
 												<IconLucideAlertTriangle class="size-5" />
 											</ActionButton>
@@ -902,16 +906,16 @@ function InProgressRecordingInner() {
 										<ActionButton
 											disabled={restartRecording.isPending || isCountdown()}
 											onClick={() => restartRecording.mutate()}
-											title="Restart recording"
-											aria-label="Restart recording"
+											title={t("restartRecording")}
+											aria-label={t("restartRecording")}
 										>
 											<IconCapRestart />
 										</ActionButton>
 										<ActionButton
 											disabled={deleteRecording.isPending || isCountdown()}
 											onClick={() => deleteRecording.mutate()}
-											title="Delete recording"
-											aria-label="Delete recording"
+											title={t("deleteRecording")}
+											aria-label={t("deleteRecording")}
 										>
 											<IconCapTrash />
 										</ActionButton>
@@ -922,8 +926,8 @@ function InProgressRecordingInner() {
 											onClick={() => {
 												void openRecordingSettingsMenu();
 											}}
-											title="Recording settings"
-											aria-label="Recording settings"
+											title={t("recordingSettings")}
+											aria-label={t("recordingSettings")}
 										>
 											<IconCapSettings class="size-5" />
 										</ActionButton>

@@ -5,7 +5,13 @@ import {
 	OrganizationBrandColors as OrganizationBrandColorsSchema,
 	type OrganizationBrandingPatchBody,
 } from "@cap/web-api-contract";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import {
+	createEffect,
+	createMemo,
+	createSignal,
+	onCleanup,
+	onMount,
+} from "solid-js";
 import { authStore, recordingSettingsStore } from "~/store";
 import { commands } from "./tauri";
 import { apiClient, protectedHeaders } from "./web-api";
@@ -141,18 +147,102 @@ export function normalizeDesktopOrganization(
 }
 
 export function getSelectedOrganizationId(
-	organizations: DesktopOrganization[],
+	organizations: { id: string }[] | null | undefined,
 	storedId?: string | null,
 ) {
+	const normalizedOrganizations = organizations ?? [];
 	if (
 		storedId &&
-		(organizations.length === 0 ||
-			organizations.some((org) => org.id === storedId))
+		(normalizedOrganizations.length === 0 ||
+			normalizedOrganizations.some((org) => org.id === storedId))
 	) {
 		return storedId;
 	}
 
-	return organizations[0]?.id ?? null;
+	return normalizedOrganizations[0]?.id ?? null;
+}
+
+export function createStoredSelectedOrganizationId() {
+	const [auth, setAuth] =
+		createSignal<Awaited<ReturnType<typeof authStore.get>>>();
+	const [settings, setSettings] =
+		createSignal<Awaited<ReturnType<typeof recordingSettingsStore.get>>>();
+	const [authLoaded, setAuthLoaded] = createSignal(false);
+	const [settingsLoaded, setSettingsLoaded] = createSignal(false);
+	let disposed = false;
+	let stopAuthListening: (() => void) | undefined;
+	let stopSettingsListening: (() => void) | undefined;
+
+	const organizations = createMemo(() => auth()?.organizations ?? []);
+	const selectedOrganizationId = createMemo(() =>
+		getSelectedOrganizationId(
+			organizations(),
+			settings()?.organizationId ?? null,
+		),
+	);
+	const loaded = createMemo(() => authLoaded() && settingsLoaded());
+
+	onMount(() => {
+		void authStore
+			.get()
+			.then((value) => {
+				if (!disposed) setAuth(() => value);
+			})
+			.catch((error) => console.error("Failed to load auth store:", error))
+			.finally(() => {
+				if (!disposed) setAuthLoaded(true);
+			});
+
+		void authStore
+			.listen((value) => setAuth(() => value))
+			.then((unlisten) => {
+				if (disposed) {
+					unlisten();
+					return;
+				}
+				stopAuthListening = unlisten;
+			})
+			.catch((error) =>
+				console.error("Failed to listen to auth store:", error),
+			);
+
+		void recordingSettingsStore
+			.get()
+			.then((value) => {
+				if (!disposed) setSettings(() => value);
+			})
+			.catch((error) =>
+				console.error("Failed to load recording settings store:", error),
+			)
+			.finally(() => {
+				if (!disposed) setSettingsLoaded(true);
+			});
+
+		void recordingSettingsStore
+			.listen((value) => setSettings(() => value))
+			.then((unlisten) => {
+				if (disposed) {
+					unlisten();
+					return;
+				}
+				stopSettingsListening = unlisten;
+			})
+			.catch((error) =>
+				console.error("Failed to listen to recording settings store:", error),
+			);
+	});
+
+	onCleanup(() => {
+		disposed = true;
+		stopAuthListening?.();
+		stopSettingsListening?.();
+	});
+
+	return {
+		auth,
+		loaded,
+		selectedOrganizationId,
+	};
 }
 
 export function getOrganizationBrandColorSwatches(
@@ -354,11 +444,8 @@ export function createSelectedOrganization() {
 
 	const selectedOrganization = createMemo(() => {
 		const id = selectedOrganizationId();
-		return (
-			organizationQuery
-				.organizations()
-				.find((organization) => organization.id === id) ?? null
-		);
+		const organizations = organizationQuery.organizations() ?? [];
+		return organizations.find((organization) => organization.id === id) ?? null;
 	});
 
 	const setSelectedOrganizationId = async (organizationId: string | null) => {

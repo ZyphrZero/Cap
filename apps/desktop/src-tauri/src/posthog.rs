@@ -348,7 +348,7 @@ pub fn set_server_url(url: &str) {
 
 static API_SERVER_IS_CAP_CLOUD: OnceLock<RwLock<Option<bool>>> = OnceLock::new();
 
-static TELEMETRY_ENABLED: AtomicBool = AtomicBool::new(true);
+static TELEMETRY_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn set_telemetry_enabled(enabled: bool) {
     TELEMETRY_ENABLED.store(enabled, Ordering::Release);

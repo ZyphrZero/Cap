@@ -1,8 +1,8 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import type { JSX } from "solid-js";
 import { createStore } from "solid-js/store";
+import { getTauriOsType, isTauriRuntime } from "./tauri-runtime";
 
 export interface TitlebarState {
 	height: string;
@@ -34,7 +34,8 @@ const [state, setState] = createStore<TitlebarState>({
 
 async function initializeTitlebar(): Promise<UnlistenFn | undefined> {
 	console.log("initailizing titlebar");
-	if (ostype() === "macos") return;
+	if (!isTauriRuntime()) return;
+	if (getTauriOsType() === "macos") return;
 	const currentWindow = getCurrentWindow();
 	const resizable = await currentWindow.isResizable();
 	if (!resizable) return;

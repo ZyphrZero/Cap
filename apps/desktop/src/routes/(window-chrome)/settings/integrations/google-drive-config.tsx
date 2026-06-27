@@ -1,7 +1,8 @@
 import { Button } from "@cap/ui-solid";
 import { useMutation } from "@tanstack/solid-query";
-import { createResource, createSignal, Show, Suspense } from "solid-js";
-import { createSelectedOrganization } from "~/utils/organization-branding";
+import { createEffect, createSignal, on, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
+import { createStoredSelectedOrganizationId } from "~/utils/organization-branding";
 import { commands } from "~/utils/tauri";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
 import { Section, SectionCard, SettingsPageContent } from "../Setting";
@@ -76,26 +77,26 @@ const fetchS3Config = async (orgId: string | null) => {
 	return response.body;
 };
 
+type StorageIntegrations = Awaited<ReturnType<typeof fetchStorageIntegrations>>;
+type S3ConfigResponse = Awaited<ReturnType<typeof fetchS3Config>>;
+
 export default function GoogleDriveConfigPage() {
-	const organizationSelection = createSelectedOrganization();
+	const organizationSelection = createStoredSelectedOrganizationId();
 	const [isWaitingForConnection, setIsWaitingForConnection] =
 		createSignal(false);
 	const [isRefreshing, setIsRefreshing] = createSignal(false);
-	const [storage, { mutate: setStorage }] = createResource(
-		() => organizationSelection.selectedOrganizationId(),
-		(orgId) => fetchStorageIntegrations(orgId),
-	);
+	const [storage, setStorage] = createSignal<StorageIntegrations | null>(null);
+	const [s3Config, setS3Config] = createSignal<S3ConfigResponse | null>(null);
+	const [storageLoading, setStorageLoading] = createSignal(false);
+	const [s3ConfigLoading, setS3ConfigLoading] = createSignal(false);
+	let storageRequestId = 0;
+	let s3ConfigRequestId = 0;
 
 	const googleDrive = () => storage()?.googleDrive;
 	const storageQuota = () => googleDrive()?.storageQuota ?? null;
 	const isConnected = () => googleDrive()?.connected === true;
 	const isActive = () => storage()?.activeProvider === "googleDrive";
 	const managedByOrganization = () => storage()?.managedByOrganization ?? null;
-
-	const [s3Config, { mutate: setS3Config }] = createResource(
-		() => organizationSelection.selectedOrganizationId(),
-		(orgId) => fetchS3Config(orgId),
-	);
 
 	const hasS3Config = () => {
 		const result = s3Config();
@@ -106,29 +107,62 @@ export default function GoogleDriveConfigPage() {
 		);
 	};
 
-	const updateStorage = async (refreshStorageQuota = false) => {
+	const updateStorage = async (
+		refreshStorageQuota = false,
+		requestId = storageRequestId,
+	) => {
 		const nextStorage = await fetchStorageIntegrations(
 			organizationSelection.selectedOrganizationId(),
 			refreshStorageQuota,
 		);
+		if (requestId !== storageRequestId) return storage();
 		setStorage(nextStorage);
 		return nextStorage;
 	};
 
-	const updateS3Config = async () => {
+	const updateS3Config = async (requestId = s3ConfigRequestId) => {
 		const nextConfig = await fetchS3Config(
 			organizationSelection.selectedOrganizationId(),
 		);
+		if (requestId !== s3ConfigRequestId) return s3Config();
 		setS3Config(nextConfig);
 		return nextConfig;
 	};
 
 	const refetch = async () => {
+		storageRequestId += 1;
+		s3ConfigRequestId += 1;
+		const nextStorageRequestId = storageRequestId;
+		const nextS3ConfigRequestId = s3ConfigRequestId;
 		setIsRefreshing(true);
-		await Promise.all([updateStorage(true), updateS3Config()]).finally(() => {
+		setStorageLoading(true);
+		setS3ConfigLoading(true);
+		await Promise.all([
+			updateStorage(true, nextStorageRequestId),
+			updateS3Config(nextS3ConfigRequestId),
+		]).finally(() => {
+			if (nextStorageRequestId === storageRequestId) setStorageLoading(false);
+			if (nextS3ConfigRequestId === s3ConfigRequestId)
+				setS3ConfigLoading(false);
 			setIsRefreshing(false);
 		});
 	};
+
+	createEffect(
+		on(
+			() =>
+				[
+					organizationSelection.loaded(),
+					organizationSelection.selectedOrganizationId(),
+				] as const,
+			([loaded]) => {
+				if (!loaded) return;
+				void refetch().catch((error) => {
+					console.error("Failed to load Google Drive config:", error);
+				});
+			},
+		),
+	);
 
 	const quotaUsageLabel = () => {
 		const quota = storageQuota();
@@ -263,8 +297,10 @@ export default function GoogleDriveConfigPage() {
 	}));
 
 	const busy = () =>
-		storage.loading ||
-		s3Config.loading ||
+		storageLoading() ||
+		s3ConfigLoading() ||
+		!storage() ||
+		!s3Config() ||
 		!!managedByOrganization() ||
 		isRefreshing() ||
 		connect.isPending ||
@@ -276,176 +312,180 @@ export default function GoogleDriveConfigPage() {
 	return (
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
-				<IntegrationConfigHeader title="Google Drive" />
+				<IntegrationConfigHeader title={t("googleDrivePage.title")} />
 				<Section
-					title="Connection"
-					description="Google Drive stores new uploads in a private Cap folder in your Drive. Existing Cap-hosted and S3 videos keep using their current storage."
+					title={t("googleDrivePage.connection")}
+					description={t("googleDrivePage.connectionDescription")}
 				>
 					<SectionCard padded class="custom-scroll">
-						<Suspense
-							fallback={
-								<div class="flex justify-center items-center w-full h-screen">
-									<IconCapLogo class="animate-spin size-16" />
-								</div>
-							}
-						>
-							<div class="space-y-4 animate-in fade-in">
-								<Show when={managedByOrganization()}>
-									{(organization) => (
-										<p class="text-xs leading-relaxed text-gray-10">
-											Managed by your organization: {organization().name}
+						<div class="space-y-4 animate-in fade-in">
+							<Show when={managedByOrganization()}>
+								{(organization) => (
+									<p class="text-xs leading-relaxed text-gray-10">
+										{t("googleDrivePage.managedBy", {
+											name: organization().name,
+										})}
+									</p>
+								)}
+							</Show>
+
+							<div class="space-y-3">
+								<div class="flex justify-between items-start gap-4">
+									<div class="flex flex-col gap-0.5 min-w-0">
+										<p class="text-[13px] text-gray-12">
+											{isConnected()
+												? googleDrive()?.displayName
+												: t("googleDrivePage.title")}
 										</p>
-									)}
-								</Show>
-
-								<div class="space-y-3">
-									<div class="flex justify-between items-start gap-4">
-										<div class="flex flex-col gap-0.5 min-w-0">
-											<p class="text-[13px] text-gray-12">
-												{isConnected()
-													? googleDrive()?.displayName
-													: "Google Drive"}
-											</p>
-											<p class="text-xs leading-snug text-gray-10">
-												{isConnected()
-													? isActive()
-														? "Active for new uploads"
-														: "Connected but not active"
-													: "Not connected"}
-											</p>
-										</div>
-										<Button
-											variant="gray"
-											disabled={busy()}
-											onClick={() => refetch()}
-										>
-											{isRefreshing() ? "Refreshing..." : "Refresh"}
-										</Button>
+										<p class="text-xs leading-snug text-gray-10">
+											{isConnected()
+												? isActive()
+													? t("googleDrivePage.activeForUploads")
+													: t("googleDrivePage.connectedNotActive")
+												: t("googleDrivePage.notConnected")}
+										</p>
 									</div>
-
-									<Show
-										when={isConnected()}
-										fallback={
-											<Button
-												variant="primary"
-												disabled={busy()}
-												onClick={() => connect.mutate()}
-											>
-												{isWaitingForConnection()
-													? "Waiting..."
-													: connect.isPending
-														? "Opening..."
-														: "Connect Google Drive"}
-											</Button>
-										}
+									<Button
+										variant="gray"
+										disabled={busy()}
+										onClick={() => refetch()}
 									>
-										<Show when={storageQuota()}>
-											<div class="pt-3 space-y-2 border-t border-gray-3">
-												<div class="flex justify-between items-start gap-4">
-													<div class="flex flex-col gap-0.5 min-w-0">
-														<p class="text-[13px] text-gray-12">Storage</p>
-														<Show when={quotaUsageLabel()}>
-															{(label) => (
-																<p class="text-xs leading-snug text-gray-10">
-																	{label()}
-																</p>
-															)}
-														</Show>
-													</div>
-													<Show when={quotaTimestampLabel()}>
+										{isRefreshing()
+											? t("googleDrivePage.refreshing")
+											: t("googleDrivePage.refresh")}
+									</Button>
+								</div>
+
+								<Show
+									when={isConnected()}
+									fallback={
+										<Button
+											variant="primary"
+											disabled={busy()}
+											onClick={() => connect.mutate()}
+										>
+											{isWaitingForConnection()
+												? t("googleDrivePage.waiting")
+												: connect.isPending
+													? t("googleDrivePage.opening")
+													: t("googleDrivePage.connectDrive")}
+										</Button>
+									}
+								>
+									<Show when={storageQuota()}>
+										<div class="pt-3 space-y-2 border-t border-gray-3">
+											<div class="flex justify-between items-start gap-4">
+												<div class="flex flex-col gap-0.5 min-w-0">
+													<p class="text-[13px] text-gray-12">
+														{t("googleDrivePage.storage")}
+													</p>
+													<Show when={quotaUsageLabel()}>
 														{(label) => (
-															<p class="text-[12px] text-gray-9 text-right">
+															<p class="text-xs leading-snug text-gray-10">
 																{label()}
 															</p>
 														)}
 													</Show>
 												</div>
-												<Show when={quotaUsagePercent() !== null}>
-													<div class="overflow-hidden h-1.5 rounded-full bg-gray-4">
-														<div
-															class="h-full rounded-full bg-blue-9"
-															style={{
-																width: `${quotaUsagePercent() ?? 0}%`,
-															}}
-														/>
-													</div>
+												<Show when={quotaTimestampLabel()}>
+													{(label) => (
+														<p class="text-[12px] text-gray-9 text-right">
+															{label()}
+														</p>
+													)}
 												</Show>
-												<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
-													<Show when={formatBytes(storageQuota()?.remaining)}>
-														{(remaining) => (
-															<>
-																<p class="text-gray-10">Remaining</p>
-																<p class="text-right text-gray-11">
-																	{remaining()}
-																</p>
-															</>
-														)}
-													</Show>
-													<Show
-														when={formatBytes(storageQuota()?.usageInDrive)}
-													>
-														{(usageInDrive) => (
-															<>
-																<p class="text-gray-10">Drive files</p>
-																<p class="text-right text-gray-11">
-																	{usageInDrive()}
-																</p>
-															</>
-														)}
-													</Show>
-													<Show
-														when={formatBytes(
-															storageQuota()?.usageInDriveTrash,
-														)}
-													>
-														{(usageInDriveTrash) => (
-															<>
-																<p class="text-gray-10">Trash</p>
-																<p class="text-right text-gray-11">
-																	{usageInDriveTrash()}
-																</p>
-															</>
-														)}
-													</Show>
-												</div>
 											</div>
-										</Show>
-										<div class="flex flex-wrap gap-2">
-											<Button
-												variant="primary"
-												disabled={busy() || isActive()}
-												onClick={() => setActive.mutate("googleDrive")}
-											>
-												{isActive() ? "Active" : "Use Google Drive"}
-											</Button>
-											<Show when={hasS3Config()}>
-												<Button
-													variant="gray"
-													disabled={busy() || !isActive()}
-													onClick={() => setActive.mutate("s3")}
-												>
-													Use S3
-												</Button>
+											<Show when={quotaUsagePercent() !== null}>
+												<div class="overflow-hidden h-1.5 rounded-full bg-gray-4">
+													<div
+														class="h-full rounded-full bg-blue-9"
+														style={{
+															width: `${quotaUsagePercent() ?? 0}%`,
+														}}
+													/>
+												</div>
 											</Show>
-											<Button
-												variant="gray"
-												disabled={busy()}
-												onClick={() => testConnection.mutate()}
-											>
-												{testConnection.isPending ? "Testing..." : "Test"}
-											</Button>
-											<Button
-												variant="destructive"
-												disabled={busy()}
-												onClick={() => disconnect.mutate()}
-											>
-												Disconnect
-											</Button>
+											<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+												<Show when={formatBytes(storageQuota()?.remaining)}>
+													{(remaining) => (
+														<>
+															<p class="text-gray-10">
+																{t("googleDrivePage.remaining")}
+															</p>
+															<p class="text-right text-gray-11">
+																{remaining()}
+															</p>
+														</>
+													)}
+												</Show>
+												<Show when={formatBytes(storageQuota()?.usageInDrive)}>
+													{(usageInDrive) => (
+														<>
+															<p class="text-gray-10">
+																{t("googleDrivePage.driveFiles")}
+															</p>
+															<p class="text-right text-gray-11">
+																{usageInDrive()}
+															</p>
+														</>
+													)}
+												</Show>
+												<Show
+													when={formatBytes(storageQuota()?.usageInDriveTrash)}
+												>
+													{(usageInDriveTrash) => (
+														<>
+															<p class="text-gray-10">
+																{t("googleDrivePage.trash")}
+															</p>
+															<p class="text-right text-gray-11">
+																{usageInDriveTrash()}
+															</p>
+														</>
+													)}
+												</Show>
+											</div>
 										</div>
 									</Show>
-								</div>
+									<div class="flex flex-wrap gap-2">
+										<Button
+											variant="primary"
+											disabled={busy() || isActive()}
+											onClick={() => setActive.mutate("googleDrive")}
+										>
+											{isActive()
+												? t("googleDrivePage.active")
+												: t("googleDrivePage.useDrive")}
+										</Button>
+										<Show when={hasS3Config()}>
+											<Button
+												variant="gray"
+												disabled={busy() || !isActive()}
+												onClick={() => setActive.mutate("s3")}
+											>
+												{t("googleDrivePage.useS3")}
+											</Button>
+										</Show>
+										<Button
+											variant="gray"
+											disabled={busy()}
+											onClick={() => testConnection.mutate()}
+										>
+											{testConnection.isPending
+												? t("googleDrivePage.testing")
+												: t("googleDrivePage.test")}
+										</Button>
+										<Button
+											variant="destructive"
+											disabled={busy()}
+											onClick={() => disconnect.mutate()}
+										>
+											{t("googleDrivePage.disconnect")}
+										</Button>
+									</div>
+								</Show>
 							</div>
-						</Suspense>
+						</div>
 					</SectionCard>
 				</Section>
 			</SettingsPageContent>

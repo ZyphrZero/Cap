@@ -9,6 +9,7 @@ import {
 	Show,
 	splitProps,
 } from "solid-js";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import titlebarState from "~/utils/titlebar-state";
 import { WindowControlButton as ControlButton } from "./WindowControlButton";
 
@@ -16,6 +17,8 @@ export default function (
 	props: ComponentProps<"div"> & { maximizable?: boolean },
 ) {
 	const [local, otherProps] = splitProps(props, ["class"]);
+	if (!isTauriRuntime()) return null;
+
 	const currentWindow = getCurrentWindow();
 	const [focused, setFocus] = createSignal(true);
 

@@ -22,8 +22,6 @@ import InfoPill from "./InfoPill";
 import TargetSelectInfoPill from "./TargetSelectInfoPill";
 import useRequestPermission from "./useRequestPermission";
 
-const NO_MICROPHONE = "No Microphone";
-
 export default function MicrophoneSelect(props: {
 	disabled?: boolean;
 	options: string[];
@@ -96,7 +94,9 @@ export default function MicrophoneSelect(props: {
 					/>
 				</Show>
 				<IconCapMicrophone class={DEVICE_ROW_ICON_CLASS} />
-				<p class={DEVICE_ROW_LABEL_CLASS}>{props.value ?? NO_MICROPHONE}</p>
+				<p class={DEVICE_ROW_LABEL_CLASS}>
+					{props.value ?? t("recording.noMicrophone")}
+				</p>
 				<div class={DEVICE_ROW_TRAILING_CLASS}>
 					<Show when={showSettingsShortcut()}>
 						<button
@@ -108,8 +108,8 @@ export default function MicrophoneSelect(props: {
 							}}
 							onPointerDown={(e) => e.stopPropagation()}
 							class={DEVICE_SHORTCUT_BUTTON_CLASS}
-							title="Microphone settings"
-							aria-label="Microphone settings"
+							title={t("microphoneSettingsTooltip")}
+							aria-label={t("microphoneSettingsTooltip")}
 						>
 							<IconLucideSettings class="size-3.5" />
 						</button>

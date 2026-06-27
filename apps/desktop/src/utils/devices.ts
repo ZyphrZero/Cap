@@ -14,6 +14,7 @@ import {
 	events,
 	type OSPermissionsCheck,
 } from "./tauri";
+import { isTauriRuntime } from "./tauri-runtime";
 
 export type DevicesSnapshot = {
 	cameras: CameraInfo[];
@@ -40,7 +41,22 @@ export type MicrophoneWithDetails = {
 
 export const devicesSnapshot = queryOptions({
 	queryKey: ["devicesSnapshot"] as const,
-	queryFn: () => commands.getDevicesSnapshot(),
+	queryFn: () => {
+		if (!isTauriRuntime()) {
+			return {
+				cameras: [],
+				microphones: [],
+				permissions: {
+					screenRecording: "notNeeded",
+					microphone: "notNeeded",
+					camera: "notNeeded",
+					accessibility: "notNeeded",
+				},
+			} satisfies DevicesSnapshot;
+		}
+
+		return commands.getDevicesSnapshot();
+	},
 	staleTime: 3_000,
 	refetchInterval: 5_000,
 });
@@ -53,6 +69,8 @@ export function createDevicesQuery(enabled: Accessor<boolean> = () => true) {
 	}));
 
 	createEffect(() => {
+		if (!isTauriRuntime()) return;
+
 		const unlisten = events.devicesUpdated.listen(() => {
 			if (!enabled()) return;
 			query.refetch();

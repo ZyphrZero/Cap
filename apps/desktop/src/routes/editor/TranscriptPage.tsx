@@ -11,6 +11,7 @@ import {
 	Show,
 } from "solid-js";
 import { produce } from "solid-js/store";
+import { t } from "~/components/I18nProvider";
 import { defaultCaptionSettings } from "~/store/captions";
 import { commands } from "~/utils/tauri";
 import {
@@ -780,7 +781,7 @@ function TranscriptEditor(props: {
 				fallback={
 					<div class="flex flex-col items-center justify-center h-full text-gray-9">
 						<IconCapCaptions class="size-10 mb-3 text-gray-7" />
-						<span class="text-sm">No transcript available</span>
+						<span class="text-sm">{t("editor.transcript.noTranscript")}</span>
 						<span class="text-xs mt-1">
 							Generate captions in the editor first
 						</span>

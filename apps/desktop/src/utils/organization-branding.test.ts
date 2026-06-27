@@ -103,6 +103,8 @@ describe("desktop organization branding", () => {
 
 	it("preserves the stored organization while organizations are unavailable", () => {
 		expect(getSelectedOrganizationId([], "org-2")).toBe("org-2");
+		expect(getSelectedOrganizationId(undefined, "org-2")).toBe("org-2");
+		expect(getSelectedOrganizationId(null, "org-2")).toBe("org-2");
 	});
 
 	it("returns available organization brand colour swatches", () => {

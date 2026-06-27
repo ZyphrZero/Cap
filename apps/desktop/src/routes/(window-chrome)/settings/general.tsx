@@ -33,6 +33,8 @@ import {
 	deriveGeneralSettings,
 	type GeneralSettingsStore,
 } from "~/utils/general-settings";
+import { languages } from "~/utils/i18n";
+import { hasDesktopProAccess } from "~/utils/plans";
 import {
 	type AppTheme,
 	type CaptureWindow,
@@ -41,9 +43,11 @@ import {
 	type MainWindowRecordingStartBehaviour,
 	type PostDeletionBehaviour,
 	type PostStudioRecordingBehaviour,
+	type RecordingMode,
 	type StudioRecordingQuality,
 	type WindowExclusion,
 } from "~/utils/tauri";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import IconLucideAlertTriangle from "~icons/lucide/alert-triangle";
 import IconLucidePlus from "~icons/lucide/plus";
 import IconLucideX from "~icons/lucide/x";
@@ -110,18 +114,134 @@ const coversDefaultExclusion = (
 type ExtendedGeneralSettingsStore = GeneralSettingsStore;
 
 const MAX_FPS_OPTIONS = [
-	{ value: 30, label: "30 FPS" },
-	{ value: 60, label: "60 FPS (Recommended)" },
-	{ value: 120, label: "120 FPS" },
+	{ value: 30, labelKey: "fps.30" },
+	{ value: 60, labelKey: "fps.60" },
+	{ value: 120, labelKey: "fps.120" },
 ] satisfies {
 	value: number;
-	label: string;
+	labelKey: string;
 }[];
 
 const DEFAULT_PROJECT_NAME_TEMPLATE =
 	"{target_name} ({target_kind}) {date} {time}";
+const PROJECT_NAME_TARGET_NAME_CHAR_LIMIT = 180;
 const FREE_INSTANT_MODE_MAX_RESOLUTION = 1280;
 const PRO_INSTANT_MODE_MAX_RESOLUTION = 1920;
+
+async function ensureNotificationPermission() {
+	if (isTauriRuntime()) {
+		if (await isPermissionGranted()) return true;
+		return (await requestPermission()) === "granted";
+	}
+
+	if (typeof Notification === "undefined") return true;
+	if (Notification.permission === "granted") return true;
+	if (Notification.permission === "denied") return false;
+	return (await Notification.requestPermission()) === "granted";
+}
+
+async function confirmAction(message: string) {
+	if (isTauriRuntime()) return confirm(message);
+	return window.confirm(message);
+}
+
+async function writeClipboardString(text: string) {
+	if (isTauriRuntime()) {
+		await commands.writeClipboardString(text);
+		return;
+	}
+
+	if (navigator.clipboard?.writeText) {
+		await navigator.clipboard.writeText(text);
+	}
+}
+
+async function formatProjectName(
+	template: string | null,
+	targetName: string,
+	targetKind: string,
+	recordingMode: RecordingMode,
+	datetime: string | null,
+) {
+	if (isTauriRuntime()) {
+		return commands.formatProjectName(
+			template,
+			targetName,
+			targetKind,
+			recordingMode,
+			datetime,
+		);
+	}
+
+	const date = datetime ? new Date(datetime) : new Date();
+	const targetNameChars = Array.from(targetName);
+	const truncatedTargetName =
+		targetNameChars.length > PROJECT_NAME_TARGET_NAME_CHAR_LIMIT
+			? `${targetNameChars
+					.slice(0, PROJECT_NAME_TARGET_NAME_CHAR_LIMIT)
+					.join("")}...`
+			: targetName;
+	const recordingModeLabels: Record<RecordingMode, string> = {
+		studio: t("recording.modeSelect.studio.title"),
+		instant: t("recording.modeSelect.instant.title"),
+		screenshot: t("recording.modeSelect.screenshot.title"),
+	};
+	let result = template ?? DEFAULT_PROJECT_NAME_TEMPLATE;
+	result = result
+		.replaceAll("{recording_mode}", recordingModeLabels[recordingMode])
+		.replaceAll("{mode}", recordingMode)
+		.replaceAll("{target_kind}", targetKind)
+		.replaceAll("{target_name}", truncatedTargetName);
+	result = result.replace(
+		/\{date(?::([^}]+))?\}/g,
+		(_match, format: string | undefined) =>
+			formatBrowserDate(date, format ?? "YYYY-MM-DD"),
+	);
+	result = result.replace(
+		/\{time(?::([^}]+))?\}/g,
+		(_match, format: string | undefined) =>
+			formatBrowserDate(date, format ?? "hh:mm A"),
+	);
+	return result.replace(
+		/\{moment(?::([^}]+))?\}/g,
+		(_match, format: string | undefined) =>
+			formatBrowserDate(date, format ?? "YYYY-MM-DD HH:mm"),
+	);
+}
+
+function formatBrowserDate(date: Date, format: string) {
+	const hour = date.getHours();
+	const hour12 = hour % 12 || 12;
+	const values: Record<string, string> = {
+		YYYY: String(date.getFullYear()),
+		YY: String(date.getFullYear()).slice(-2),
+		MMMM: new Intl.DateTimeFormat("en-US", { month: "long" }).format(date),
+		MMM: new Intl.DateTimeFormat("en-US", { month: "short" }).format(date),
+		MM: padDatePart(date.getMonth() + 1),
+		M: String(date.getMonth() + 1),
+		DDDD: new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date),
+		dddd: new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date),
+		DD: padDatePart(date.getDate()),
+		D: String(date.getDate()),
+		HH: padDatePart(hour),
+		H: String(hour),
+		hh: padDatePart(hour12),
+		h: String(hour12),
+		mm: padDatePart(date.getMinutes()),
+		m: String(date.getMinutes()),
+		A: hour >= 12 ? "PM" : "AM",
+		a: hour >= 12 ? "pm" : "am",
+	};
+
+	return format.replace(
+		/DDDD|dddd|YYYY|MMMM|MMM|YY|MM|M|DD|D|HH|H|hh|h|mm|m|A|a/g,
+		(token) => values[token] ?? token,
+	);
+}
+
+function padDatePart(value: number) {
+	return value.toString().padStart(2, "0");
+}
 
 export default function GeneralSettings() {
 	const [store] = createResource(() => generalSettingsStore.get());
@@ -137,11 +257,14 @@ function AppearanceSection(props: {
 	currentTheme: AppTheme;
 	onThemeChange: (theme: AppTheme) => void;
 }) {
-	const options = [
-		{ id: "system", name: "System" },
-		{ id: "light", name: "Light" },
-		{ id: "dark", name: "Dark" },
-	] satisfies { id: AppTheme; name: string }[];
+	const options = createMemo(
+		() =>
+			[
+				{ id: "system", name: t("common.system") },
+				{ id: "light", name: t("common.light") },
+				{ id: "dark", name: t("common.dark") },
+			] satisfies { id: AppTheme; name: string }[],
+	);
 
 	const previews = {
 		system: themePreviewAuto,
@@ -151,22 +274,24 @@ function AppearanceSection(props: {
 
 	return (
 		<Section
-			title="Appearance"
-			description="Match Cap to your system theme or pick a fixed look."
+			title={t("settings.appearance")}
+			description={t("settingsPage.appearanceDescription")}
 		>
 			<SectionCard padded>
 				<div
 					class="grid grid-cols-3 gap-3"
 					onContextMenu={(e) => e.preventDefault()}
 				>
-					<For each={options}>
+					<For each={options()}>
 						{(theme) => {
 							const isSelected = () => props.currentTheme === theme.id;
 							return (
 								<button
 									type="button"
 									aria-checked={isSelected()}
-									aria-label={`Select theme: ${theme.name}`}
+									aria-label={t("settingsPage.selectTheme", {
+										theme: theme.name,
+									})}
 									onClick={() => props.onThemeChange(theme.id)}
 									class="flex flex-col gap-2 items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-9 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 rounded-xl"
 								>
@@ -184,7 +309,9 @@ function AppearanceSection(props: {
 													class="object-cover w-full h-full animate-in fade-in duration-200"
 													draggable={false}
 													src={preview}
-													alt={`Preview of ${theme.name} theme`}
+													alt={t("settingsPage.themePreviewAlt", {
+														theme: theme.name,
+													})}
 												/>
 											)}
 										</Show>
@@ -213,8 +340,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 	);
 	const auth = authStore.createQuery();
 	const hasCapPro = createMemo(() => {
-		const plan = auth.data?.plan;
-		return !!plan && (plan.upgraded || plan.manual);
+		return hasDesktopProAccess(auth.data, settings);
 	});
 	const instantModeMaxResolution = createMemo(() =>
 		hasCapPro()
@@ -255,10 +381,12 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 	};
 
 	onMount(() => {
-		commands
-			.updateAuthPlan()
-			.then(() => auth.refetch())
-			.catch(console.error);
+		if (isTauriRuntime()) {
+			commands
+				.updateAuthPlan()
+				.then(() => auth.refetch())
+				.catch(console.error);
+		}
 
 		let pending: string | null = null;
 		try {
@@ -268,16 +396,20 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 			scrollToSection(pending);
 		}
 
-		const unlisten = events.requestScrollToSettingsSection.listen((event) => {
-			scrollToSection(event.payload.section);
-		});
-		onCleanup(() => {
-			unlisten.then((cb) => cb()).catch(() => {});
-		});
+		if (isTauriRuntime()) {
+			const unlisten = events.requestScrollToSettingsSection.listen((event) => {
+				scrollToSection(event.payload.section);
+			});
+			onCleanup(() => {
+				unlisten.then((cb) => cb()).catch(() => {});
+			});
+		}
 	});
 
 	const [windows, { refetch: refetchWindows }] = createResource(
 		async () => {
+			if (!isTauriRuntime()) return [];
+
 			// Fetch windows with a small delay to avoid blocking initial render
 			await new Promise((resolve) => setTimeout(resolve, 100));
 			return commands.listCaptureWindows();
@@ -287,7 +419,10 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 		},
 	);
 	const [defaultExcludedWindows] = createResource(
-		() => commands.getDefaultExcludedWindows(),
+		() => {
+			if (!isTauriRuntime()) return [];
+			return commands.getDefaultExcludedWindows();
+		},
 		{
 			initialValue: [] as WindowExclusion[],
 		},
@@ -310,7 +445,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 		}
 	};
 
-	const ostype: OsType = type();
+	const ostype = getOsType();
 	const excludedWindows = createMemo(() => settings.excludedWindows ?? []);
 	const missingDefaultExclusions = createMemo(() =>
 		defaultExcludedWindows().filter(
@@ -386,6 +521,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 		setSettings("excludedWindows", windows);
 		try {
 			await generalSettingsStore.set({ excludedWindows: windows });
+			if (!isTauriRuntime()) return;
 			await commands.refreshWindowContentProtection();
 			if (ostype === "macos") {
 				await events.requestScreenCapturePrewarm.emit({ force: true });
@@ -416,7 +552,9 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 	};
 
 	const handleResetExclusions = async () => {
-		const defaults = await commands.getDefaultExcludedWindows();
+		const defaults = isTauriRuntime()
+			? await commands.getDefaultExcludedWindows()
+			: defaultExcludedWindows();
 		await applyExcludedWindows(defaults);
 	};
 
@@ -442,6 +580,16 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 					class="flex flex-row gap-1.5 text-xs items-center px-2.5 py-1.5 rounded-lg border transition-colors bg-gray-3 hover:bg-gray-4 text-gray-12 border-gray-4"
 					onClick={async () => {
 						const currentValue = props.value;
+						if (!isTauriRuntime()) {
+							const currentIndex = props.options.findIndex(
+								(option) => option.value === currentValue,
+							);
+							const next =
+								props.options[(currentIndex + 1) % props.options.length];
+							if (next) props.onChange(next.value);
+							return;
+						}
+
 						const items = props.options.map((option) =>
 							CheckMenuItem.new({
 								text: option.text,
@@ -483,51 +631,51 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 					}}
 				/>
 
-				<div class="flex flex-col gap-3 px-4 py-3 mt-6 rounded-xl border border-gray-3 bg-gray-2">
-					<div class="flex flex-col gap-3">
-						<p class="text-sm text-gray-12">{t('settings.language')}</p>
-						<div class="flex gap-2">
-							<LanguageSelector />
-						</div>
-					</div>
-				</div>
-
-				<SettingGroup
-					title={t('settingsPage.capPro')}
-					titleStyling="bg-blue-500 py-1.5 mb-4 text-white text-xs px-2 rounded-lg"
+				<Section
+					title={t("settings.language")}
+					description={t("settingsPage.languageDescription")}
 				>
-					<ToggleSettingItem
-						label={t('settingsPage.autoOpenShareableLinks')}
-						description={t('settingsPage.autoOpenShareableLinksDescription')}
-						value={!settings.disableAutoOpenLinks}
-						onChange={(v) => handleChange("disableAutoOpenLinks", !v)}
-					/>
-				</SettingGroup>
+					<SectionRows>
+						<SettingItem
+							label={t("settingsPage.displayLanguage")}
+							description={t("settingsPage.displayLanguageDescription")}
+						>
+							<LanguageSelector />
+						</SettingItem>
+					</SectionRows>
+				</Section>
+
+				<Section title={t("settingsPage.capPro")} pro>
+					<SectionRows>
+						<ToggleSettingItem
+							label={t("settingsPage.autoOpenShareableLinks")}
+							description={t("settingsPage.autoOpenShareableLinksDescription")}
+							value={!settings.disableAutoOpenLinks}
+							onChange={(v) => handleChange("disableAutoOpenLinks", !v)}
+						/>
+					</SectionRows>
+				</Section>
 
 				{ostype === "macos" && (
 					<Section
-						title="App"
-						description="Choose how Cap shows up on your system."
+						title={t("settingsPage.app")}
+						description={t("settingsPage.appDescription")}
 					>
 						<SectionRows>
 							<ToggleSettingItem
-								label="Always show dock icon"
-								description="Keep Cap in the dock even when no windows are open."
+								label={t("settingsPage.alwaysShowDockIcon")}
+								description={t("settingsPage.alwaysShowDockIconDescription")}
 								value={!settings.hideDockIcon}
 								onChange={(v) => handleChange("hideDockIcon", !v)}
 							/>
 							<ToggleSettingItem
-								label="System notifications"
-								description="Show notifications for clipboard copies, saved files, and more. You may need to allow Cap in your system's notification settings."
+								label={t("settingsPage.enableSystemNotifications")}
+								description={t(
+									"settingsPage.enableSystemNotificationsDescription",
+								)}
 								value={!!settings.enableNotifications}
 								onChange={async (value) => {
-									if (value) {
-										const permissionGranted = await isPermissionGranted();
-										if (!permissionGranted) {
-											const permission = await requestPermission();
-											if (permission !== "granted") return;
-										}
-									}
+									if (value && !(await ensureNotificationPermission())) return;
 									handleChange("enableNotifications", value);
 								}}
 							/>
@@ -555,106 +703,108 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 				/>
 
 				<Section
-					title="Recording"
-					description="Behaviour while you record and after you stop."
+					title={t("modes.recording")}
+					description={t("settingsPage.recordingDescription")}
 				>
 					<SectionRows>
 						<SelectSettingItem
-							label="Countdown"
-							description="Wait before the recording starts."
+							label={t("recording.countdown")}
+							description={t("recording.countdownDescription")}
 							value={settings.recordingCountdown ?? 0}
 							onChange={(value) => handleChange("recordingCountdown", value)}
 							options={[
-								{ text: "Off", value: 0 },
-								{ text: "3 seconds", value: 3 },
-								{ text: "5 seconds", value: 5 },
-								{ text: "10 seconds", value: 10 },
+								{ text: t("common.off"), value: 0 },
+								{ text: t("time.threeSeconds"), value: 3 },
+								{ text: t("time.fiveSeconds"), value: 5 },
+								{ text: t("time.tenSeconds"), value: 10 },
 							]}
 						/>
 						<SelectSettingItem
-							label="Main window when recording starts"
-							description="What happens to the main window once a recording begins."
+							label={t("recording.mainWindowStartBehaviour")}
+							description={t("recording.mainWindowStartBehaviourDescription")}
 							value={settings.mainWindowRecordingStartBehaviour ?? "close"}
 							onChange={(value) =>
 								handleChange("mainWindowRecordingStartBehaviour", value)
 							}
 							options={[
-								{ text: "Close", value: "close" },
-								{ text: "Minimise", value: "minimise" },
+								{ text: t("behaviours.close"), value: "close" },
+								{ text: t("behaviours.minimise"), value: "minimise" },
 							]}
 						/>
 						<SelectSettingItem
-							label="After a Studio recording"
-							description="What happens once you stop a Studio recording."
+							label={t("recording.studioFinishBehaviour")}
+							description={t("recording.studioFinishBehaviourDescription")}
 							value={settings.postStudioRecordingBehaviour ?? "openEditor"}
 							onChange={(value) =>
 								handleChange("postStudioRecordingBehaviour", value)
 							}
 							options={[
-								{ text: "Open editor", value: "openEditor" },
-								{ text: "Show in overlay", value: "showOverlay" },
+								{ text: t("behaviours.openEditor"), value: "openEditor" },
+								{ text: t("behaviours.showOverlay"), value: "showOverlay" },
 							]}
 						/>
 						<SelectSettingItem
-							label="After deleting a recording"
-							description="Whether the recording window should reopen."
+							label={t("recording.afterDeleteBehaviour")}
+							description={t("recording.afterDeleteBehaviourDescription")}
 							value={settings.postDeletionBehaviour ?? "doNothing"}
 							onChange={(value) => handleChange("postDeletionBehaviour", value)}
 							options={[
-								{ text: "Do nothing", value: "doNothing" },
+								{ text: t("behaviours.doNothing"), value: "doNothing" },
 								{
-									text: "Reopen recording window",
+									text: t("behaviours.reopenRecordingWindow"),
 									value: "reopenRecordingWindow",
 								},
 							]}
 						/>
 						<ToggleSettingItem
-							label="Delete Instant recordings after upload"
-							description="Cap removes the local file once it has uploaded successfully."
+							label={t("recording.deleteAfterUpload")}
+							description={t("recording.deleteAfterUploadDescription")}
 							value={settings.deleteInstantRecordingsAfterUpload ?? false}
 							onChange={(v) =>
 								handleChange("deleteInstantRecordingsAfterUpload", v)
 							}
 						/>
 						<ToggleSettingItem
-							label="Crash-recoverable recording"
-							description="Record in fragments that can be recovered after a crash or power loss. Slightly larger files during capture."
+							label={t("recording.crashRecovery")}
+							description={t("recording.crashRecoveryDescription")}
 							value={settings.crashRecoveryRecording ?? true}
 							onChange={(value) =>
 								handleChange("crashRecoveryRecording", value)
 							}
 						/>
 						<ToggleSettingItem
-							label="Custom cursor capture (Studio)"
-							description="Capture cursor state separately so you can adjust size and smoothing in the editor."
+							label={t("experimentalPage.features.customCursor.label")}
+							description={t(
+								"experimentalPage.features.customCursor.description",
+							)}
 							value={!!settings.custom_cursor_capture2}
 							onChange={(value) =>
 								handleChange("custom_cursor_capture2", value)
 							}
 						/>
 						<ToggleSettingItem
-							label="Auto zoom on clicks"
-							description="Automatically add zoom segments around mouse clicks in Studio recordings."
+							label={t("experimentalPage.features.autoZoom.label")}
+							description={t("experimentalPage.features.autoZoom.description")}
 							value={!!settings.autoZoomOnClicks}
 							onChange={(value) => handleChange("autoZoomOnClicks", value)}
 						/>
 						<ToggleSettingItem
-							label="Capture keyboard presses"
-							description="Record key presses so you can add keyboard overlays in the editor."
+							label={t("settingsPage.captureKeyboardEvents")}
+							description={t("settingsPage.captureKeyboardEventsDescription")}
 							value={!!settings.captureKeyboardEvents}
 							onChange={(value) => handleChange("captureKeyboardEvents", value)}
 						/>
 						<SelectSettingItem
-							label="Max capture framerate"
+							label={t("recording.maxFramerate")}
 							description={
 								(settings.maxFps ?? 60) > 60
-									? "Maximum framerate for screen capture. Higher values may cause drops or increased CPU usage on some systems."
-									: "Maximum framerate for screen capture."
+									? t("recording.highFramerateWarning")
+									: t("recording.maxFramerateDescription")
 							}
 							value={settings.maxFps ?? 60}
 							onChange={(value) => handleChange("maxFps", value)}
 							options={MAX_FPS_OPTIONS.map((option) => ({
-								text: option.label,
+								text: t(option.labelKey),
 								value: option.value,
 							}))}
 						/>
@@ -688,20 +838,22 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 						const origin = url.origin;
 
 						if (
-							!(await confirm(
-								t('settingsPage.confirmServerChange', { origin }),
+							!(await confirmAction(
+								t("settingsPage.confirmServerChange", { origin }),
 							))
 						)
 							return;
 
 						await authStore.set(undefined);
-						await commands.setServerUrl(origin);
+						if (isTauriRuntime()) {
+							await commands.setServerUrl(origin);
+						}
 						handleChange("serverUrl", origin);
 					}}
 				/>
 
 				<TelemetryCard
-					value={settings.enableTelemetry !== false}
+					value={settings.enableTelemetry === true}
 					onChange={(v) => handleChange("enableTelemetry", v)}
 				/>
 			</SettingsPageContent>
@@ -714,11 +866,11 @@ function TelemetryCard(props: {
 	onChange: (value: boolean) => void;
 }) {
 	return (
-		<Section title="Privacy">
+		<Section title={t("settingsPage.privacy")}>
 			<SectionRows>
 				<ToggleSettingItem
-					label="Share anonymous telemetry"
-					description="Cap uses anonymous telemetry to improve reliability and fix bugs. We never collect recording contents, window titles, file paths, or personal information."
+					label={t("settingsPage.telemetry")}
+					description={t("settingsPage.telemetryDescription")}
 					value={props.value}
 					onChange={props.onChange}
 				/>
@@ -737,21 +889,39 @@ type StudioQualityTier = {
 const STUDIO_QUALITY_TIERS: StudioQualityTier[] = [
 	{
 		value: "compatibility",
-		label: "Compatibility",
-		summary: "Lower bitrate to keep older or low-power machines smooth.",
-		bestFor: "Older Intel Macs, 8GB MacBook Air, weaker laptops.",
+		get label() {
+			return t("settingsPage.qualityProfiles.compatibility.label");
+		},
+		get summary() {
+			return t("settingsPage.qualityProfiles.compatibility.summary");
+		},
+		get bestFor() {
+			return t("settingsPage.qualityProfiles.compatibility.bestFor");
+		},
 	},
 	{
 		value: "balanced",
-		label: "Balanced",
-		summary: "Sharp footage with sensible CPU and disk usage.",
-		bestFor: "Most modern Macs and PCs with 16GB+ RAM.",
+		get label() {
+			return t("settingsPage.qualityProfiles.balanced.label");
+		},
+		get summary() {
+			return t("settingsPage.qualityProfiles.balanced.summary");
+		},
+		get bestFor() {
+			return t("settingsPage.qualityProfiles.balanced.bestFor");
+		},
 	},
 	{
 		value: "ultra",
-		label: "Ultra",
-		summary: "Maximum detail for color-graded, large-display edits.",
-		bestFor: "M-series Pro/Max, discrete GPUs, 32GB+ RAM, NVMe.",
+		get label() {
+			return t("settingsPage.qualityProfiles.ultra.label");
+		},
+		get summary() {
+			return t("settingsPage.qualityProfiles.ultra.summary");
+		},
+		get bestFor() {
+			return t("settingsPage.qualityProfiles.ultra.bestFor");
+		},
 	},
 ];
 
@@ -762,14 +932,42 @@ type InstantResolutionTier = {
 };
 
 const INSTANT_RESOLUTION_TIERS: InstantResolutionTier[] = [
-	{ value: 1280, label: "720p", summary: "Smallest size, low bandwidth." },
+	{
+		value: 1280,
+		get label() {
+			return t("settingsPage.instantResolutions.720p.label");
+		},
+		get summary() {
+			return t("settingsPage.instantResolutions.720p.summary");
+		},
+	},
 	{
 		value: 1920,
-		label: "1080p",
-		summary: "Recommended. Sharp on most networks.",
+		get label() {
+			return t("settingsPage.instantResolutions.1080p.label");
+		},
+		get summary() {
+			return t("settingsPage.instantResolutions.1080p.summary");
+		},
 	},
-	{ value: 2560, label: "1440p", summary: "More detail for desktop content." },
-	{ value: 3840, label: "4K", summary: "Max clarity. Needs fast upload." },
+	{
+		value: 2560,
+		get label() {
+			return t("settingsPage.instantResolutions.1440p.label");
+		},
+		get summary() {
+			return t("settingsPage.instantResolutions.1440p.summary");
+		},
+	},
+	{
+		value: 3840,
+		get label() {
+			return t("settingsPage.instantResolutions.4K.label");
+		},
+		get summary() {
+			return t("settingsPage.instantResolutions.4K.summary");
+		},
+	},
 ];
 
 function SegmentedControl<T extends string | number>(props: {
@@ -819,9 +1017,11 @@ function StudioQualitySubsection(props: {
 		>
 			<div class="flex justify-between items-start gap-4">
 				<div class="flex flex-col gap-0.5 min-w-0">
-					<p class="text-[13px] text-gray-12">Studio mode</p>
+					<p class="text-[13px] text-gray-12">
+						{t("settingsPage.studioModeLabel")}
+					</p>
 					<p class="text-xs leading-snug text-gray-10">
-						Encoder profile for local Studio recordings.
+						{t("settingsPage.qualityDescription")}
 					</p>
 				</div>
 				<SegmentedControl
@@ -873,7 +1073,9 @@ function InstantQualitySetting(props: {
 						class="px-2.5 py-1 text-xs font-medium rounded-lg transition-colors bg-blue-9 text-white hover:bg-blue-10"
 						onClick={() => {
 							toast.dismiss(t.id);
-							void commands.showWindow("Upgrade");
+							if (isTauriRuntime()) {
+								void commands.showWindow("Upgrade");
+							}
 						}}
 					>
 						Upgrade
@@ -887,11 +1089,11 @@ function InstantQualitySetting(props: {
 	return (
 		<SettingItem
 			id="settings-section-instant-quality"
-			label="Instant Mode quality"
+			label={t("settingsPage.instantQuality")}
 			description={
 				props.hasCapPro
-					? "Choose the maximum upload resolution for Instant recordings."
-					: "Instant recordings are locked to 720p. Cap Pro unlocks higher resolutions."
+					? t("settingsPage.instantQualityDescription")
+					: t("settingsPage.instantQualityProDescription")
 			}
 		>
 			<div class="flex flex-col items-end gap-1.5">
@@ -933,8 +1135,8 @@ function CapProSection(props: {
 }) {
 	return (
 		<Section
-			title="Cap Pro"
-			description="Settings available with a Cap Pro license."
+			title={t("settingsPage.capPro")}
+			description={t("settingsPage.capProDescription")}
 			pro
 		>
 			<SectionRows>
@@ -944,8 +1146,8 @@ function CapProSection(props: {
 					onChange={props.onInstantResolutionChange}
 				/>
 				<ToggleSettingItem
-					label="Auto-open shareable links"
-					description="Open the share link in your browser as soon as the upload finishes."
+					label={t("settingsPage.autoOpenShareableLinks")}
+					description={t("settingsPage.autoOpenShareableLinksDescription")}
 					value={props.autoOpenShareableLinks}
 					onChange={props.onAutoOpenShareableLinksChange}
 				/>
@@ -960,8 +1162,8 @@ function QualitySection(props: {
 }) {
 	return (
 		<Section
-			title="Quality"
-			description="Pick the right profile for local Studio recordings."
+			title={t("settingsPage.quality")}
+			description={t("settingsPage.qualityDescription")}
 		>
 			<SectionCard>
 				<StudioQualitySubsection
@@ -992,8 +1194,8 @@ function ServerURLSetting(props: {
 
 	return (
 		<Section
-			title="Self-host"
-			description="Only change this if you are running your own instance of Cap Web."
+			title={t("settingsPage.selfHost")}
+			description={t("settingsPage.capServerUrlDescription")}
 		>
 			<SectionCard padded>
 				<div class="flex flex-col gap-3">
@@ -1020,7 +1222,7 @@ function ServerURLSetting(props: {
 							disabled={props.value === value()}
 							onClick={() => props.onChange(value())}
 						>
-							{t('common.update')}
+							{t("common.update")}
 						</Button>
 					</div>
 				</div>
@@ -1034,7 +1236,7 @@ function DefaultProjectNameCard(props: {
 	onChange: (name: string | null) => Promise<void>;
 }) {
 	const MOMENT_EXAMPLE_TEMPLATE = "{moment:DDDD, MMMM D, YYYY h:mm A}";
-	const macos = type() === "macos";
+	const macos = getOsType() === "macos";
 	const today = new Date();
 	const datetime = new Date(
 		today.getFullYear(),
@@ -1056,7 +1258,7 @@ function DefaultProjectNameCard(props: {
 	const [momentExample, setMomentExample] = createSignal("");
 
 	async function updatePreview(val = inputValue()) {
-		const formatted = await commands.formatProjectName(
+		const formatted = await formatProjectName(
 			val,
 			macos ? "Safari" : "Chrome",
 			"Window",
@@ -1067,15 +1269,13 @@ function DefaultProjectNameCard(props: {
 	}
 
 	onMount(() => {
-		commands
-			.formatProjectName(
-				MOMENT_EXAMPLE_TEMPLATE,
-				macos ? "Safari" : "Chrome",
-				"Window",
-				"instant",
-				datetime,
-			)
-			.then(setMomentExample);
+		formatProjectName(
+			MOMENT_EXAMPLE_TEMPLATE,
+			macos ? "Safari" : "Chrome",
+			"Window",
+			"instant",
+			datetime,
+		).then(setMomentExample);
 
 		const seed = initialTemplate();
 		setInputValue(seed);
@@ -1096,9 +1296,9 @@ function DefaultProjectNameCard(props: {
 		return (
 			<button
 				type="button"
-				title="Click to copy"
+				title={t("settingsPage.clickToCopy")}
 				class="px-1.5 py-0.5 mx-0.5 font-mono text-[11px] rounded-md transition-[background-color,color,transform] duration-150 ease-out cursor-pointer bg-gray-3 hover:bg-gray-4 active:scale-95 text-gray-12"
-				onClick={() => commands.writeClipboardString(props.children)}
+				onClick={() => void writeClipboardString(props.children)}
 			>
 				{props.children}
 			</button>
@@ -1107,8 +1307,8 @@ function DefaultProjectNameCard(props: {
 
 	return (
 		<Section
-			title="Default project name"
-			description="Template used for new recordings and exported files."
+			title={t("settingsPage.defaultProjectName")}
+			description={t("settingsPage.defaultProjectNameDescription")}
 			right={
 				<>
 					<Button
@@ -1126,7 +1326,7 @@ function DefaultProjectNameCard(props: {
 							await updatePreview(newTemplate);
 						}}
 					>
-						{t('common.reset')}
+						{t("common.reset")}
 					</Button>
 					<Button
 						size="sm"
@@ -1137,7 +1337,7 @@ function DefaultProjectNameCard(props: {
 							await updatePreview();
 						}}
 					>
-						{t('common.save')}
+						{t("common.save")}
 					</Button>
 				</>
 			}
@@ -1219,6 +1419,16 @@ function DefaultProjectNameCard(props: {
 	);
 }
 
+function getOsType(): OsType {
+	if (isTauriRuntime()) return type();
+
+	const platform = navigator.platform.toLowerCase();
+	if (platform.includes("mac")) return "macos";
+	if (platform.includes("win")) return "windows";
+	if (platform.includes("linux")) return "linux";
+	return "windows";
+}
+
 function ExcludedWindowsCard(props: {
 	excludedWindows: WindowExclusion[];
 	missingDefaultExclusions: WindowExclusion[];
@@ -1296,11 +1506,11 @@ function ExcludedWindowsCard(props: {
 
 	return (
 		<Section
-			title="Excluded windows"
+			title={t("settingsPage.excludedWindows")}
 			description={
 				props.isWindows
-					? "Hide windows from recordings. On Windows, only Cap-related windows can be excluded."
-					: "Hide windows from recordings."
+					? t("settingsPage.excludedWindowsDescriptionSimpleWindows")
+					: t("settingsPage.excludedWindowsDescriptionSimple")
 			}
 			right={
 				<>
@@ -1378,7 +1588,7 @@ function ExcludedWindowsCard(props: {
 											type="button"
 											class="flex justify-center items-center rounded-full transition-colors size-5 text-gray-10 hover:bg-gray-5 hover:text-gray-12"
 											onClick={() => void props.onRemove(index())}
-											aria-label="Remove excluded window"
+											aria-label={t("removeExcludedWindow")}
 										>
 											<IconLucideX class="size-3" />
 										</button>
@@ -1420,10 +1630,10 @@ function LanguageSelector() {
 		<For each={languages}>
 			{(language) => (
 				<Button
-					variant={currentLanguage === language.code ? "primary" : "gray"}
+					variant={currentLanguage() === language.code ? "primary" : "gray"}
 					size="sm"
 					class="text-xs"
-					onClick={() => changeLanguage(language.code)}
+					onClick={() => void changeLanguage(language.code)}
 				>
 					{language.label}
 				</Button>

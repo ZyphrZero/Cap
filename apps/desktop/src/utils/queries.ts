@@ -16,6 +16,7 @@ import {
 	recordingSettingsStore,
 } from "~/store";
 import { createQueryInvalidate } from "./events";
+import { isDesktopPlanPro } from "./plans";
 import {
 	type CameraInfo,
 	commands,
@@ -245,8 +246,9 @@ export function createLicenseQuery() {
 		queryFn: async () => {
 			const settings = await generalSettingsStore.get();
 			const auth = await authStore.get();
+			const plan = auth?.plan;
 
-			if (auth?.plan?.upgraded) return { type: "pro" as const, ...auth.plan };
+			if (plan && isDesktopPlanPro(plan)) return { type: "pro" as const, ...plan };
 			if (settings?.commercialLicense)
 				return {
 					type: "commercial" as const,

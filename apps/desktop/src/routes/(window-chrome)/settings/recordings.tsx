@@ -21,6 +21,7 @@ import {
 	Show,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
+import { t } from "~/components/I18nProvider";
 import CapTooltip from "~/components/Tooltip";
 import { Input } from "~/routes/editor/ui";
 import { trackEvent } from "~/utils/analytics";
@@ -47,19 +48,19 @@ type Recording = {
 const Tabs = [
 	{
 		id: "all",
-		label: "Show all",
+		labelKey: "recordingsPage.tabs.all",
 	},
 	{
 		id: "instant",
 		icon: <IconCapInstant class="invert size-3 dark:invert-0" />,
-		label: "Instant",
+		labelKey: "recordingsPage.tabs.instant",
 	},
 	{
 		id: "studio",
 		icon: <IconCapFilmCut class="invert size-3 dark:invert-0" />,
-		label: "Studio",
+		labelKey: "recordingsPage.tabs.studio",
 	},
-] satisfies { id: string; label: string; icon?: JSX.Element }[];
+] satisfies { id: string; labelKey: string; icon?: JSX.Element }[];
 
 const PAGE_SIZE = 20;
 
@@ -160,9 +161,14 @@ export default function Recordings() {
 
 	const emptyMessage = createMemo(() => {
 		const tabLabel =
-			activeTab() === "all" ? "recordings" : `${activeTab()} recordings`;
-		const prefix = trimmedSearch() ? "No matching" : "No";
-		return `${prefix} ${tabLabel}`;
+			activeTab() === "all"
+				? t("recordingsPage.tabs.all").toLowerCase()
+				: activeTab() === "instant"
+					? t("recordingsPage.tabs.instant").toLowerCase()
+					: t("recordingsPage.tabs.studio").toLowerCase();
+		return trimmedSearch()
+			? t("recordingsPage.noMatchingCategoryRecordings", { category: tabLabel })
+			: t("recordingsPage.noCategoryRecordings", { category: tabLabel });
 	});
 
 	const handleRecordingClick = (recording: Recording) => {
@@ -202,8 +208,8 @@ export default function Recordings() {
 		<div class="cap-settings-page flex relative flex-col w-full h-full custom-scroll">
 			<SettingsPageContent class="max-w-none space-y-4">
 				<Section
-					title="Recordings"
-					description="Manage your recordings and perform actions."
+					title={t("recordingsPage.title")}
+					description={t("recordingsPage.description")}
 					right={
 						<Button
 							variant="gray"
@@ -212,7 +218,7 @@ export default function Recordings() {
 							onClick={handleVideoImport}
 						>
 							<IconLucideImport class="size-3.5" />
-							<span>Import</span>
+							<span>{t("recordingsPage.import")}</span>
 						</Button>
 					}
 				>
@@ -220,7 +226,7 @@ export default function Recordings() {
 						when={recordings.data && recordings.data.length > 0}
 						fallback={
 							<p class="text-center text-(--text-tertiary) absolute flex items-center justify-center w-full h-full">
-								No recordings found
+								{t("recordingsPage.notFound")}
 							</p>
 						}
 					>
@@ -238,7 +244,7 @@ export default function Recordings() {
 											onClick={() => setActiveTab(tab.id)}
 										>
 											{tab.icon && tab.icon}
-											<p class="text-xs text-gray-12">{tab.label}</p>
+											<p class="text-xs text-gray-12">{t(tab.labelKey)}</p>
 										</div>
 									)}
 								</For>
@@ -256,12 +262,12 @@ export default function Recordings() {
 											setSearch("");
 										}
 									}}
-									placeholder="Search"
+									placeholder={t("recordingsPage.search")}
 									autoCapitalize="off"
 									autocorrect="off"
 									autocomplete="off"
 									spellcheck={false}
-									aria-label="Search recordings"
+									aria-label={t("recordingsPage.searchAriaLabel")}
 								/>
 							</div>
 						</div>
@@ -308,7 +314,7 @@ export default function Recordings() {
 											)
 										}
 									>
-										Load more
+										{t("recordingsPage.loadMore")}
 									</Button>
 								</div>
 							</Show>
@@ -332,6 +338,14 @@ function RecordingItem(props: {
 	const mode = () => props.recording.meta.mode;
 	const firstLetterUpperCase = () =>
 		mode().charAt(0).toUpperCase() + mode().slice(1);
+
+	const modeLabel = () => {
+		const key = mode();
+		if (key === "instant" || key === "studio") {
+			return t(`recordingsPage.tabs.${key}`);
+		}
+		return firstLetterUpperCase();
+	};
 
 	const queryClient = useQueryClient();
 	const studioCompleteCheck = () =>
@@ -358,7 +372,7 @@ function RecordingItem(props: {
 				>
 					<img
 						class="object-cover rounded-sm size-12"
-						alt="Recording thumbnail"
+						alt={t("recordingsPage.thumbnailAlt")}
 						src={`${convertFileSrc(
 							props.recording.thumbnailPath,
 						)}?t=${Date.now()}`}
@@ -379,12 +393,16 @@ function RecordingItem(props: {
 							) : (
 								<IconCapFilmCut class="invert size-2.5 dark:invert-0" />
 							)}
-							<p>{firstLetterUpperCase()}</p>
+							<p>{modeLabel()}</p>
 						</div>
 
 						<Show when={props.recording.meta.clip_count > 1}>
 							<div class="px-2 py-0.5 flex items-center font-medium text-[11px] text-gray-12 rounded-full w-fit bg-gray-4">
-								<p>{props.recording.meta.clip_count} clips</p>
+								<p>
+									{t("recordingsPage.clipsCount", {
+										count: props.recording.meta.clip_count,
+									})}
+								</p>
 							</div>
 						</Show>
 
@@ -508,7 +526,7 @@ function RecordingItem(props: {
 					}}
 				</Show>
 				<TooltipIconButton
-					tooltipText="Open recording bundle"
+					tooltipText={t("recordingsPage.actions.openBundle")}
 					onClick={() => {
 						props.onOpenFolder();
 					}}

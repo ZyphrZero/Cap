@@ -10,6 +10,7 @@ import {
 	Switch,
 } from "solid-js";
 import { Transition } from "solid-transition-group";
+import { t } from "~/components/I18nProvider";
 import type {
 	CaptureDisplayWithThumbnail,
 	CaptureWindowWithThumbnail,
@@ -196,11 +197,11 @@ export default function TargetMenuGrid(props: TargetMenuGridProps) {
 			return (
 				<EmptyState
 					icon={<IconLucideSquarePlay class="size-5 text-gray-10" />}
-					title="No recordings yet"
-					description="Your screen recordings will appear here. Start recording to get started!"
+					title={t("recordingsPage.emptyTitle")}
+					description={t("recordingsPage.emptyDescription")}
 					action={
 						onViewAll
-							? { label: "View All Recordings", onClick: onViewAll }
+							? { label: t("recordingsPage.viewAll"), onClick: onViewAll }
 							: undefined
 					}
 				/>
@@ -211,11 +212,11 @@ export default function TargetMenuGrid(props: TargetMenuGridProps) {
 			return (
 				<EmptyState
 					icon={<IconLucideImage class="size-5 text-gray-10" />}
-					title="No screenshots yet"
-					description="Your screenshots will appear here. Take a screenshot to get started!"
+					title={t("screenshotsPage.emptyTitle")}
+					description={t("screenshotsPage.emptyDescription")}
 					action={
 						onViewAll
-							? { label: "View All Screenshots", onClick: onViewAll }
+							? { label: t("screenshotsPage.viewAll"), onClick: onViewAll }
 							: undefined
 					}
 				/>

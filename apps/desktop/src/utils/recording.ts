@@ -1,6 +1,7 @@
 import { emit } from "@tauri-apps/api/event";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { t } from "~/components/I18nProvider";
 import type { createOptionsQuery } from "./queries";
 import { commands, type RecordingAction, type RecordingMode } from "./tauri";
 
@@ -31,14 +32,14 @@ export function handleRecordingResult(
 					},
 				);
 
-				if (
-					dialogResult === (buttons as any).yes ||
-					dialogResult === (buttons as any).ok
-				)
+				if (setOptions) {
+					if (dialogResult === buttons.yes) emit("start-sign-in");
+					else if (dialogResult === buttons.no) {
+						setOptions({ mode: "studio" });
+						commands.setRecordingMode("studio");
+					}
+				} else if (dialogResult === buttons.ok) {
 					emit("start-sign-in");
-				else if (dialogResult === (buttons as any).no && setOptions) {
-					setOptions({ mode: "studio" });
-					commands.setRecordingMode("studio");
 				}
 			} else if (result === "UpgradeRequired") commands.showWindow("Upgrade");
 			else

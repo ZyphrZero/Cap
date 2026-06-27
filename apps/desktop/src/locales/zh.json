@@ -31,18 +31,21 @@
 		"comingSoon": "敬请期待",
 		"off": "关",
 		"on": "开",
-		"unknown": "未知"
+		"unknown": "未知",
+		"helpTour": "帮助与引导"
 	},
 	"nav": {
 		"general": "通用",
 		"shortcuts": "快捷键",
+		"cli": "命令行",
 		"recordings": "录制",
 		"screenshots": "截图",
+		"automations": "自动化",
+		"transcription": "转录",
 		"integrations": "集成",
 		"license": "许可证",
 		"experimental": "实验性功能",
 		"feedback": "反馈",
-		"changelog": "更新日志",
 		"signIn": "登录",
 		"signOut": "退出登录"
 	},
@@ -86,6 +89,10 @@
 			"noWindows": "未找到匹配的窗口",
 			"noRecordings": "未找到匹配的录制",
 			"noScreenshots": "未找到匹配的截图",
+			"noCameras": "未找到匹配的摄像头",
+			"noMicrophones": "未找到匹配的麦克风",
+			"cameras": "搜索摄像头",
+			"microphones": "搜索麦克风",
 			"errorLoadingDisplays": "无法加载显示器。请尝试点击“显示器”按钮。",
 			"errorLoadingWindows": "无法加载窗口。请尝试点击“窗口”按钮。"
 		},
@@ -124,13 +131,22 @@
 			"noAudio": "不录制系统音频",
 			"notSupported": "系统音频录制需要 macOS 13.0 或更高版本"
 		},
+		"noCamera": "禁用摄像头",
+		"noMicrophone": "禁用麦克风",
+		"display": "显示器",
+		"area": "区域",
+		"cameraOnly": "仅摄像头",
 		"back": "返回"
 	},
 	"recordingsPage": {
 		"title": "录制历史",
 		"description": "管理您的录制。在这里您可以查看、编辑、分享或删除您的录制。",
 		"notFound": "未找到任何录制",
+		"emptyTitle": "暂无录制",
+		"emptyDescription": "您的录制将显示在这里。开始录制吧！",
+		"viewAll": "查看所有录制",
 		"noCategoryRecordings": "未找到 {{category}} 录制",
+		"noMatchingCategoryRecordings": "未找到匹配的 {{category}} 录制",
 		"tabs": {
 			"all": "全部",
 			"instant": "即时",
@@ -167,13 +183,20 @@
 			"export": "导出",
 			"close": "关闭",
 			"copyLink": "复制链接",
-			"createLink": "创建链接"
+			"createLink": "创建链接",
+			"import": "导入"
 		},
 		"confirm": {
 			"corruptedTitle": "录制可能已损坏",
 			"corruptedMessage": "此录制可能已损坏或某些片段丢失。是否仍要尝试打开？",
 			"deleteMessage": "确定要永久删除此录制吗？此操作无法撤销。"
-		}
+		},
+		"search": "搜索",
+		"searchAriaLabel": "搜索录制",
+		"import": "导入",
+		"thumbnailAlt": "录制缩略图",
+		"clipsCount": "{{count}} 个片段",
+		"loadMore": "加载更多"
 	},
 	"screenshot": {
 		"copied": "截图已复制到剪贴板",
@@ -214,18 +237,31 @@
 		"integrations": "集成",
 		"license": "许可证",
 		"experimental": "实验性",
-		"feedback": "反馈",
-		"changelog": "更新日志"
+		"feedback": "反馈"
 	},
 	"settingsPage": {
 		"capPro": "Cap Pro",
 		"autoOpenShareableLinks": "自动打开可分享链接",
 		"autoOpenShareableLinksDescription": "Cap 是否应该自动在浏览器中打开即时录制",
 		"app": "应用",
+		"appDescription": "选择 Cap 在系统中的显示方式。",
+		"appearanceDescription": "跟随系统主题，或选择固定外观。",
+		"selectTheme": "选择主题：{{theme}}",
+		"themePreviewAlt": "{{theme}}主题预览",
+		"languageDescription": "选择桌面应用使用的语言。",
+		"displayLanguage": "显示语言",
+		"displayLanguageDescription": "在英文和中文之间切换。你的选择会保存在此设备上。",
+		"clickToSignIn": "点击登录",
+		"signedIn": "已登录",
+		"account": "账户",
+		"viewPreviousVersions": "查看历史版本",
 		"alwaysShowDockIcon": "始终显示 Dock 图标",
 		"alwaysShowDockIconDescription": "即使没有可关闭的窗口，也在 Dock 中显示 Cap。",
 		"enableSystemNotifications": "启用系统通知",
 		"enableSystemNotificationsDescription": "显示系统通知，例如复制到剪贴板、保存文件等。您可能需要通过系统通知设置手动允许 Cap 访问。",
+		"recordingDescription": "录制期间及停止录制后的行为。",
+		"captureKeyboardEvents": "捕获键盘按键",
+		"captureKeyboardEventsDescription": "记录按键，方便在编辑器中添加键盘叠加层。",
 		"defaultProjectName": "默认项目名称",
 		"defaultProjectNameDescription": "选择用作默认项目和文件名的模板。",
 		"howToCustomize": "如何自定义？",
@@ -244,7 +280,67 @@
 		"target": "目标",
 		"dateAndTime": "日期和时间",
 		"customFormats": "自定义格式",
-		"windowsExclusionNote": "注意：由于技术限制，在 Windows 上只能排除 Cap 相关的窗口。"
+		"windowsExclusionNote": "注意：由于技术限制，在 Windows 上只能排除 Cap 相关的窗口。",
+		"privacy": "隐私",
+		"telemetry": "分享匿名遥测数据",
+		"telemetryDescription": "Cap 使用匿名遥测来提高可靠性并修复错误。我们绝不会收集录制内容、窗口标题、文件路径或个人信息。",
+		"quality": "质量",
+		"qualityDescription": "为本地工作室录制选择合适的配置文件。",
+		"qualityProfiles": {
+			"compatibility": {
+				"label": "兼容模式",
+				"summary": "降低比特率以保持老旧或低性能设备流畅运行。",
+				"bestFor": "旧款 Intel Mac、8GB MacBook Air、低性能笔记本。"
+			},
+			"balanced": {
+				"label": "均衡模式",
+				"summary": "清晰的画质，合理的 CPU 和磁盘占用。",
+				"bestFor": "大多数现代 Mac 和 PC（16GB+ 内存）。"
+			},
+			"ultra": {
+				"label": "极致模式",
+				"summary": "最高画质，适合色彩调校和大屏编辑。",
+				"bestFor": "M 系列 Pro/Max、独显、32GB+ 内存、NVMe 硬盘。"
+			}
+		},
+		"studioModeLabel": "工作室模式",
+		"studioModeDescription": "本地工作室录制的编码器配置文件。",
+		"bestFor": "最适合：",
+		"instantResolutions": {
+			"720p": { "label": "720p", "summary": "最小文件，低带宽。" },
+			"1080p": {
+				"label": "1080p",
+				"summary": "推荐。在大多数网络上清晰流畅。"
+			},
+			"1440p": { "label": "1440p", "summary": "桌面内容更多细节。" },
+			"4K": { "label": "4K", "summary": "最高清晰度。需快速上传。" }
+		},
+		"instantQuality": "即时模式质量",
+		"instantQualityDescription": "选择即时录制上传的最大分辨率。",
+		"instantQualityProDescription": "即时录制锁定为 720p。Cap Pro 可解锁更高分辨率。",
+		"instantQualityUpgradeToast": "升级到 Cap Pro 以录制 720p 以上的即时模式视频。",
+		"upgrade": "升级",
+		"capProDescription": "Cap Pro 许可证可用的设置。",
+		"clickToCopy": "点击复制",
+		"availablePlaceholders": "可用占位符",
+		"clickPlaceholderToCopy": "点击任意占位符即可复制。时间支持自定义格式，通过",
+		"recordingModeSection": "录制模式",
+		"recordingModeExample": "→ \"Studio\"、\"Instant\" 或 \"Screenshot\"",
+		"modeExample": "→ \"studio\"、\"instant\" 或 \"screenshot\"",
+		"targetSection": "目标",
+		"targetExample": "→ \"Display\"、\"Window\" 或 \"Area\"",
+		"targetNameDescription": "→ 显示器名称或窗口标题。",
+		"dateAndTimeSection": "日期和时间",
+		"excludedWindowsSection": "排除的窗口",
+		"excludedWindowsDescriptionSimple": "在录制中隐藏窗口。",
+		"excludedWindowsDescriptionSimpleWindows": "在录制中隐藏窗口。在 Windows 上，只能排除 Cap 相关的窗口。",
+		"add": "添加",
+		"reset": "重置",
+		"restore": "恢复",
+		"recommendedNotExcluded": "推荐的 Cap 窗口未被排除",
+		"recommendedNotExcludedDescription": "摄像头、设置或录制窗口可能在屏幕录制中显示为黑框。缺失：",
+		"noExclusionsMessage": "当前没有排除任何窗口。",
+		"removeExcludedWindow": "移除排除的窗口"
 	},
 	"hotkeysPage": {
 		"title": "快捷键",
@@ -263,6 +359,9 @@
 		"openRecordingPickerDisplay": "选择显示器录制",
 		"openRecordingPickerWindow": "选择窗口录制",
 		"openRecordingPickerArea": "录制区域",
+		"screenshotDisplay": "截取当前显示器",
+		"screenshotWindow": "截取当前窗口",
+		"screenshotArea": "截取区域选择器",
 		"chooseDisplay": "选择显示器",
 		"chooseWindow": "选择窗口",
 		"signingIn": "正在登录...",
@@ -272,6 +371,9 @@
 		"title": "截图",
 		"description": "管理您的截图并执行操作。",
 		"notFound": "未找到截图",
+		"emptyTitle": "暂无截图",
+		"emptyDescription": "您的截图将显示在这里。截图开始吧！",
+		"viewAll": "查看所有截图",
 		"tabs": {
 			"all": "全部显示"
 		},
@@ -315,6 +417,9 @@
 	"experimentalPage": {
 		"title": "实验性功能",
 		"description": "这些功能仍在开发中，可能无法按预期工作。",
+		"notAvailable": "此平台上目前没有可用的实验性功能。",
+		"preview": "预览",
+		"reliability": "可靠性",
 		"recordingFeatures": "录制功能",
 		"features": {
 			"customCursor": {
@@ -323,22 +428,54 @@
 			},
 			"nativeCamera": {
 				"label": "原生摄像头预览",
-				"description": "使用原生 GPU 表面而不是在 webview 中渲染摄像头预览。这在某些 Windows 系统上不可用，因此效果可能因人而异。"
+				"description": "使用原生 GPU 表面而不是在 webview 中渲染摄像头预览。在 macOS 上默认开启；如果遇到摄像头预览问题请关闭。"
 			},
 			"autoZoom": {
 				"label": "点击时自动缩放",
 				"description": "在工作室模式录制期间，围绕鼠标点击自动生成缩放片段。这有助于突出显示录制中的重要交互。"
+			},
+			"outOfProcessMuxer": {
+				"label": "进程外多路复用器",
+				"description": "在隔离的子进程中运行分片 MP4 多路复用器，以便多路复用器崩溃不会影响您的录制。需要捆绑的 cap-muxer 二进制文件。"
 			}
 		}
 	},
 	"feedbackPage": {
 		"title": "问题反馈",
-		"description": "帮助我们改进 Cap：提交反馈或报告 Bug。我们会尽快处理。"
+		"description": "帮助我们改进 Cap：提交反馈或报告 Bug。我们会尽快处理。",
+		"placeholder": "告诉我们您对 Cap 的看法...",
+		"submit": "提交反馈",
+		"submitting": "提交中...",
+		"success": "感谢您的反馈！",
+		"error": "提交反馈失败",
+		"debugInfo": "调试信息",
+		"debugDescription": "上传您的日志以帮助我们诊断 Cap 的问题。不包含个人信息。",
+		"uploadLogs": "上传日志",
+		"uploading": "上传中...",
+		"uploadSuccess": "日志上传成功",
+		"uploadError": "上传日志失败",
+		"systemInfo": "系统信息",
+		"loadingSystemInfo": "正在加载系统信息...",
+		"os": "操作系统",
+		"captureSupport": "采集支持",
+		"screenCapture": "屏幕采集",
+		"supported": "支持",
+		"notSupported": "不支持",
+		"availableEncoders": "可用编码器",
+		"desktopOnly": "日志上传仅在桌面应用中可用",
+		"diagnosticsDesktopOnly": "系统诊断仅在桌面应用中可用。",
+		"joinCommunity": "加入社区",
+		"joinCommunityDescription": "有问题、想分享想法或只是想聊聊？加入 Cap 的 Discord 社区。",
+		"joinDiscord": "加入 Discord"
 	},
 	"integrationsPage": {
 		"title": "集成",
 		"description": "配置集成以扩展 Cap 的功能并连接第三方服务。",
 		"apps": {
+			"googleDrive": {
+				"name": "Google Drive",
+				"description": "连接 Google Drive 用于新的分享链接上传。Cap 会将新视频存储在您 Drive 中的一个私密 Cap 文件夹中，并通过 Cap 继续进行正常的访问检查。"
+			},
 			"s3Config": {
 				"name": "S3 配置",
 				"description": "连接您自己的 S3 存储桶以完全控制数据存储。所有新的共享链接上传将自动上传到您配置的 S3 存储桶，确保您对内容保持完全的所有权和控制权。非常适合需要数据主权和自定义存储策略的组织。"
@@ -346,7 +483,8 @@
 		},
 		"buttons": {
 			"upgradeToPro": "升级到 Pro",
-			"configure": "配置"
+			"configure": "配置",
+			"managedBy": "由组织管理"
 		}
 	},
 	"s3ConfigPage": {
@@ -387,7 +525,8 @@
 			"testing": "正在测试...",
 			"save": "保存",
 			"saving": "正在保存..."
-		}
+		},
+		"managedBy": "由您的组织管理：{{name}}"
 	},
 	"recordingsOverlay": {
 		"action": {
@@ -434,7 +573,7 @@
 			"cameraPreview": "显示摄像头预览",
 			"mic": "麦克风",
 			"micLocked": "麦克风 (在此次录制中已锁定)",
-			"noMic": "无麦克风",
+			"noMic": "禁用麦克风",
 			"systemAudio": {
 				"record": "录制系统音频",
 				"noAudio": "不录制系统音频",
@@ -442,7 +581,7 @@
 			},
 			"webcam": "网络摄像头",
 			"webcamLocked": "网络摄像头 (在此次录制中已锁定)",
-			"noWebcam": "无网络摄像头"
+			"noWebcam": "禁用摄像头"
 		},
 		"confirm": {
 			"restartTitle": "确认重新录制",
@@ -516,6 +655,15 @@
 			"clip": {
 				"label": "片段"
 			},
+			"audio": {
+				"addAudio": "添加音频"
+			},
+			"captions": {
+				"noCaptions": "暂无字幕"
+			},
+			"keyboard": {
+				"noKeyboardEvents": "暂无键盘事件"
+			},
 			"zoom": {
 				"placeholder": "点击添加缩放片段",
 				"description": "(平滑缩放重要区域)",
@@ -543,7 +691,8 @@
 				"hideCamera": "隐藏摄像头",
 				"default": "默认"
 			},
-			"addTrack": "添加轨道"
+			"addTrack": "添加轨道",
+			"deleteTrack": "删除轨道"
 		},
 		"sidebar": {
 			"background": "背景",
@@ -713,7 +862,9 @@
 			"addAtCurrentTime": "在当前位置添加",
 			"startTime": "开始时间",
 			"endTime": "结束时间",
-			"text": "字幕文本"
+			"text": "字幕文本",
+			"regenerated": "字幕已重新生成！",
+			"regenerateFailed": "重新生成字幕失败"
 		},
 		"export": {
 			"title": "导出",
@@ -747,6 +898,10 @@
 				"web": "网页",
 				"potato": "低画质"
 			},
+			"optimizeFileSize": "优化文件大小",
+			"exportCursorOnly": "仅导出光标",
+			"bitsPerPixel": "每像素位数",
+			"forceFfmpegDecoder": "强制使用 FFmpeg 解码器",
 			"actions": {
 				"signInToShare": "登录以分享",
 				"exportToFile": "导出到文件",
@@ -875,6 +1030,66 @@
 			"full": "全屏",
 			"reset": "重置",
 			"save": "保存"
+		},
+		"audioLibrary": {
+			"addAudio": "添加音频",
+			"importFailed": "导入音频文件失败",
+			"addTrackFailed": "添加音轨失败",
+			"changeTrack": "点击切换音轨"
+		},
+		"clipsSidebar": {
+			"noClips": "暂无片段",
+			"noClipsDescription": "录制或导入片段后会在此显示。",
+			"clipImported": "片段已导入",
+			"clipsImported": "已导入 {{count}} 个片段",
+			"importVideo": "导入视频",
+			"clips": "片段"
+		},
+		"keyboardTab": {
+			"fontFamily": "字体",
+			"textColor": "文字颜色",
+			"backgroundColor": "背景颜色",
+			"backgroundOpacity": "背景不透明度",
+			"fadeDuration": "淡出时长",
+			"lingerDuration": "停留时长",
+			"groupingThreshold": "分组阈值",
+			"showModifierKeys": "显示修饰键",
+			"showSpecialKeys": "显示特殊按键",
+			"uppercase": "大写",
+			"enabledDescription": "在视频上显示键盘叠加层"
+		},
+		"organization": {
+			"brandingUpdated": "组织品牌已更新",
+			"unsupportedLogo": "不支持的 Logo 文件类型",
+			"logoTooLarge": "Logo 文件必须小于 1MB"
+		},
+		"performance": {
+			"copiedToClipboard": "性能统计已复制到剪贴板"
+		},
+		"transcript": {
+			"title": "转录文本",
+			"noTranscript": "暂无转录文本"
+		},
+		"brandColors": {
+			"title": "品牌颜色"
+		},
+		"configSidebar": {
+			"wallpaperImportFailed": "无法导入桌面壁纸"
+		},
+		"errorScreen": {
+			"needsRecovery": "录制需要恢复",
+			"unableToOpen": "无法打开录制",
+			"automaticRecovery": "自动恢复",
+			"recoveryDescription": "Cap 可以尝试自动恢复您的录制。这将从可用的片段数据重建录制。",
+			"recoverRecording": "恢复录制",
+			"recovering": "正在恢复...",
+			"recoveryFailed": "恢复失败：{{error}}",
+			"manualInvestigation": "手动排查",
+			"manualDescription": "您可以打开录制文件夹直接查看原始文件。",
+			"openFolder": "打开文件夹",
+			"closeWindow": "关闭窗口",
+			"tipMac": "提示：右键点击并选择「显示包裹内容」以查看 .cap 包内容。",
+			"tipOther": "提示：在文件夹内双击以浏览内容。"
 		}
 	},
 	"screenshotEditor": {
@@ -969,6 +1184,22 @@
 		"30": "30 FPS",
 		"60": "60 FPS（推荐）",
 		"120": "120 FPS"
+	},
+	"modeSelector": {
+		"instant": {
+			"label": "即时模式",
+			"description": "无需渲染 — 边录边传，停止录制后即可分享链接。"
+		},
+		"studio": {
+			"label": "工作室模式",
+			"description": "以最高质量录制，稍后本地渲染。完成后打开 Cap 编辑器。"
+		},
+		"screenshot": {
+			"label": "截图模式",
+			"description": "捕获并标注静态图片。"
+		},
+		"qualitySettings": "画质设置",
+		"recordingModeInfo": "录制模式信息"
 	},
 	"notifications": {
 		"micDisconnected": {
@@ -1114,9 +1345,432 @@
 		"reload": "重新加载",
 		"close": "关闭"
 	},
-	"changelogPage": {
-		"title": "更新日志",
-		"localMode": "开发模式下无法直接加载远程更新日志。请前往 GitHub 查看最新更新。",
-		"viewOnGitHub": "在 GitHub 查看发布记录"
+	"instantPreview": {
+		"title": "即时录制预览",
+		"noRecording": "没有选中的录制",
+		"selectFromList": "请从右侧列表选择一个录制",
+		"openFolder": "打开文件夹",
+		"export": "导出",
+		"exportSuccess": "导出成功！",
+		"exportFailed": "导出失败：{{error}}",
+		"recordingList": "录制列表",
+		"totalRecordings": "共 {{count}} 个录制",
+		"noRecordings": "暂无录制",
+		"unnamed": "未命名"
+	},
+	"onboarding": {
+		"welcome": "欢迎使用 Cap",
+		"tagline": "由您掌控的精美屏幕录制。",
+		"getStarted": "开始使用",
+		"clickHereOrPress": "点击这里，或按",
+		"stopped": "已停止",
+		"continueToCap": "进入 Cap",
+		"startUsingCap": "开始使用 Cap",
+		"continue": "继续",
+		"permissionsRequired": "需要授权",
+		"permissionsDescription": "Cap 需要相关权限才能正常运行。",
+		"grantPermission": "授予权限",
+		"granted": "已授权",
+		"openSettings": "打开设置",
+		"restartRequired": "需要重启",
+		"restartMessage": "在系统设置中添加 Cap 后，您需要重启应用以使权限生效。",
+		"restartOk": "已授权，立即重启",
+		"restartCancel": "稍后，我还需设置",
+		"selectMode": "选择录制模式",
+		"modeDescription": "选择您希望的录制方式。您稍后可以随时更改。",
+		"skipOnboarding": "跳过引导",
+		"studioModeFeature": "全质量本地录制",
+		"editorFeature": "内置编辑器与特效",
+		"backgroundsFeature": "自定义背景与边距",
+		"exportFeature": "准备好后导出或分享",
+		"permissions": {
+			"screenRecording": {
+				"name": "屏幕录制",
+				"description": "当 macOS 询问时点击允许，或在系统设置中选择 Cap。授权后需重启应用。"
+			},
+			"accessibility": {
+				"name": "辅助功能",
+				"description": "在录制期间，Cap 会在本地收集鼠标活动，以生成自动缩放片段。"
+			},
+			"microphone": {
+				"name": "麦克风",
+				"description": "录制 Caps 中的音频需要此权限。"
+			},
+			"camera": {
+				"name": "摄像头",
+				"description": "录制 Caps 中的摄像头画面需要此权限。"
+			}
+		},
+		"modes": {
+			"instant": {
+				"title": "即时模式",
+				"tagline": "几秒内录制并分享",
+				"description": "边录边传，停止录制后立即获得分享链接 — 无需等待。",
+				"feature1": "即时分享链接",
+				"feature2": "后台上传",
+				"feature3": "AI 转录与摘要",
+				"feature4": "浏览器播放"
+			},
+			"studio": {
+				"title": "工作室模式",
+				"tagline": "专业编辑工具",
+				"description": "以最高质量本地录制，使用内置编辑器添加背景、边距、光标效果等。",
+				"feature1": "全质量本地录制",
+				"feature2": "内置编辑器与特效",
+				"feature3": "自定义背景与边距",
+				"feature4": "准备好后导出或分享"
+			},
+			"screenshot": {
+				"title": "截图模式",
+				"tagline": "即时捕获并美化",
+				"description": "一键截图，添加标注和精美背景，即时分享或复制。",
+				"feature1": "即时快捷键捕获",
+				"feature2": "标注与绘图工具",
+				"feature3": "精美背景",
+				"feature4": "复制、保存或分享"
+			}
+		},
+		"mockupSteps": {
+			"instant": { "step1": "录制", "step2": "停止", "step3": "分享链接" },
+			"studio": { "step1": "录制", "step2": "编辑", "step3": "导出" },
+			"screenshot": { "step1": "选择区域", "step2": "美化", "step3": "复制" }
+		},
+		"mockupExporting": "导出中...",
+		"mockupExportComplete": "导出完成！",
+		"mockupStyle": "样式",
+		"mockupBackground": "背景",
+		"mockupCapEditor": "Cap 编辑器",
+		"mockupSelected": "已选择",
+		"oneAppEveryWorkflow": "一款应用，全场景覆盖",
+		"oneAppEveryWorkflowDescription": "无论您需要快速分享、工作室画质还是快速截图——Cap 都有对应的模式。",
+		"switchModesAnytime": "随时切换模式",
+		"switchModesAnytimeDescription": "在 Cap 主窗口中一键切换录制模式。",
+		"restartAccessibilityMessage": "在系统设置中为 Cap 启用辅助功能后，macOS 可能会一直显示为已拒绝，直到您重启应用。",
+		"faq": {
+			"title": "常见问题",
+			"subtitle": "上手所需的一切信息。",
+			"whereStored": "我的录制文件存储在哪里？",
+			"whereStoredAnswer": "所有录制文件都存储在本地计算机上。在即时模式下，它们也会上传到 Cap 云端以便于分享。您可以在设置中管理存储。",
+			"canChangeShortcuts": "我以后可以更改快捷键吗？",
+			"canChangeShortcutsAnswer": "随时前往设置 → 快捷键来自定义所有键盘快捷键。",
+			"howSharingWorks": "分享是如何工作的？",
+			"howSharingWorksAnswer": "在即时模式下，停止录制后会自动获得一个分享链接。在工作室模式下，导出编辑后的视频并通过 Cap 云端分享或保存到本地。",
+			"whatsTheDifference": "即时模式和工作室模式有什么区别？",
+			"whatsTheDifferenceAnswer": "即时模式边录边传——停止录制后立即获得分享链接。工作室模式以全质量本地录制，让您在分享前使用背景、特效等进行编辑。",
+			"isFree": "Cap 是免费的吗？",
+			"isFreeAnswer": "Cap 个人使用免费。团队和商业用途，请查看我们的",
+			"pricingPlans": "定价方案"
+		},
+		"favoriteSetups": {
+			"keyboardShortcuts": {
+				"title": "键盘快捷键",
+				"description": "录制、截图和切换模式的全局快捷键"
+			},
+			"customS3": {
+				"title": "自定义 S3 存储",
+				"description": "连接您自己的 S3 兼容存储桶，完全掌控您的录制文件"
+			},
+			"customDomain": {
+				"title": "自定义域名",
+				"description": "使用您自己的域名作为分享链接，代替 cap.link"
+			},
+			"recordingPreferences": {
+				"title": "录制偏好",
+				"description": "帧率、画质、倒计时、光标特效等"
+			}
+		},
+		"mockupStudioMode": "工作室模式",
+		"mockupInstantMode": "即时模式",
+		"makeCapYours": "打造属于你的 Cap",
+		"makeCapYoursDescription": "从快捷键到存储，全部可以自定义。Cap 适应你的工作流程。",
+		"changeAnyTimeInSettings": "随时可以在设置中更改这些"
+	},
+	"cliPage": {
+		"title": "命令行",
+		"description": "安装 Cap 命令行工具，用于终端、AI 代理、脚本和本地自动化。",
+		"installed": "已安装",
+		"notInstalled": "未安装",
+		"installCli": "安装 CLI",
+		"installing": "正在安装...",
+		"repair": "修复",
+		"repairing": "正在修复...",
+		"remove": "移除",
+		"removing": "正在移除...",
+		"installSuccess": "Cap CLI 已安装",
+		"installFailed": "安装 CLI 失败",
+		"uninstallSuccess": "Cap CLI 已移除",
+		"uninstallFailed": "移除 CLI 失败",
+		"copiedToClipboard": "已复制到剪贴板",
+		"retry": "重试",
+		"command": "命令",
+		"target": "目标",
+		"loadError": "无法加载 CLI 状态：{{error}}",
+		"descriptionDetail": "桌面应用会安装一个本地 <code>cap</code> 命令，指向捆绑的 CLI。",
+		"pathInstruction": "将 <code>{{path}}</code> 添加到 PATH 以在新终端中使用 <code>cap</code>。",
+		"pathInstructionConfigured": "已将 <code>cap</code> 添加到 PATH。请重启终端使用，或立即运行以下命令：",
+		"copy": "复制"
+	},
+	"transcriptionPage": {
+		"title": "转录",
+		"description": "添加名称、拼写、领域和大写偏好，以便字幕生成时参考。",
+		"rememberedTerms": "已记忆的词汇",
+		"rememberedTermsDescription": "逐个添加词汇以减少拼写和格式错误。",
+		"addTerm": "添加词汇",
+		"add": "添加",
+		"clear": "清空",
+		"saving": "正在保存...",
+		"saved": "已保存",
+		"activeHints": "活跃提示",
+		"item": "项",
+		"items": "项",
+		"hintsNote": "这些提示会在编辑器中生成字幕时应用。"
+	},
+	"googleDrivePage": {
+		"title": "Google Drive",
+		"connection": "连接",
+		"connectionDescription": "Google Drive 会将新上传的文件存储到您的 Drive 中一个私密的 Cap 文件夹。现有的 Cap 托管和 S3 视频将继续使用其当前存储。",
+		"connected": "已连接",
+		"notConnected": "未连接",
+		"activeForUploads": "新上传将使用此存储",
+		"connectedNotActive": "已连接但未激活",
+		"connectDrive": "连接 Google Drive",
+		"opening": "正在打开...",
+		"waiting": "等待中...",
+		"refresh": "刷新",
+		"refreshing": "正在刷新...",
+		"storage": "存储",
+		"remaining": "剩余",
+		"driveFiles": "Drive 文件",
+		"trash": "回收站",
+		"useDrive": "使用 Google Drive",
+		"active": "已激活",
+		"useS3": "使用 S3",
+		"test": "测试",
+		"testing": "测试中...",
+		"disconnect": "断开连接",
+		"testSuccess": "Google Drive 连接正常",
+		"testSuccessEmail": "Google Drive 连接正常，账户：{{email}}",
+		"testFailed": "Google Drive 连接测试失败",
+		"disconnected": "Google Drive 已断开连接",
+		"connectFailed": "启动 Google Drive 连接失败",
+		"disconnectFailed": "断开 Google Drive 连接失败",
+		"waitTimeout": "请在浏览器中完成 Google Drive 连接，然后返回此处刷新。",
+		"usageFormat": "已用 {{usage}} / {{limit}}",
+		"usageOnly": "已用 {{usage}}",
+		"cached": "缓存",
+		"updated": "已更新",
+		"managedBy": "由您的组织管理：{{name}}"
+	},
+	"automationsPage": {
+		"title": "自动化",
+		"description": "当 Cap 中发生事件时自动执行操作。规则会与 Cap CLI 共享。",
+		"saveFailed": "保存自动化失败",
+		"testSuccess": "此设备支持所有操作",
+		"testFailed": "测试自动化失败",
+		"unsupportedActions": "{{count}} 个操作在此处不受支持：{{actions}}",
+		"noAutomations": "暂无自动化",
+		"pickTemplate": "选择下方模板即可一键开始，或从头创建自己的自动化。",
+		"startFromScratch": "从头创建",
+		"newAutomation": "新建自动化",
+		"defaultAutomationName": "{{trigger}}自动化",
+		"templateAdded": "已添加“{{name}}”",
+		"whenThisHappens": "当此事件发生时",
+		"onlyRunIf": "仅当满足条件时运行",
+		"thenDoThis": "则执行此操作",
+		"deleteRule": "删除规则",
+		"deleteConfirm": "确定要删除此自动化吗？",
+		"disabled": "已禁用",
+		"enabled": "已启用",
+		"testing": "测试中...",
+		"testAutomation": "测试自动化",
+		"addCondition": "添加条件",
+		"addAction": "添加操作",
+		"skippedHere": "此处跳过",
+		"noEffect": "此操作对选定的触发器无效。",
+		"conditionNeverMatches": "此条件永远不会匹配选定的触发器。",
+		"runsForEvery": "每次{{trigger}}时都会运行。",
+		"noPresets": "暂无预设 — 请先在编辑器中创建一个。",
+		"noActions": "暂无操作",
+		"copyLink": "复制链接到剪贴板",
+		"openInBrowser": "在浏览器中打开",
+		"runThroughShell": "通过 Shell 运行",
+		"folder": "文件夹",
+		"filenameTemplate": "文件名模板（可选）",
+		"browse": "浏览",
+		"source": "来源",
+		"format": "格式",
+		"resolution": "分辨率",
+		"frameRate": "帧率",
+		"compression": "压缩",
+		"destinationFolder": "目标文件夹（可选，留空 = 项目文件夹）",
+		"projectFolder": "项目文件夹",
+		"preset": "预设",
+		"method": "方法",
+		"url": "URL",
+		"fieldTitle": "标题",
+		"body": "正文",
+		"bodyTemplate": "正文模板（可选）",
+		"program": "程序",
+		"arguments": "参数（空格分隔）",
+		"organizationId": "组织 ID（可选）",
+		"moveUp": "上移",
+		"moveDown": "下移",
+		"removeAction": "移除操作",
+		"loadMore": "加载更多",
+		"notSupportedTitle": "此设备不支持；将被跳过",
+		"templates": "模板",
+		"templatesDescription": "一键添加现成的自动化。之后可以随意调整。",
+		"notificationReadyBody": "您的录制已可分享。",
+		"clipboardSource": {
+			"original": "原始捕获",
+			"rendered": "已编辑/渲染"
+		},
+		"none": "无",
+		"templateItems": {
+			"copyScreenshot": {
+				"name": "自动复制新截图到剪贴板",
+				"description": "截图后立刻可以粘贴使用。"
+			},
+			"ocrScreenshot": {
+				"name": "提取截图中的文字",
+				"description": "Cap 读取截图中的文字并为您复制。"
+			},
+			"saveScreenshot": {
+				"name": "将截图保存到文件夹",
+				"description": "每张新截图直接发送到您选择的文件夹。"
+			},
+			"revealScreenshot": {
+				"name": "跳转到每张新截图",
+				"description": "截图后立即在文件管理器中打开。"
+			},
+			"exportStudio": {
+				"name": "录制完成后自动导出",
+				"description": "工作室录制结束后自动渲染为 MP4。"
+			},
+			"uploadShare": {
+				"name": "上传并获取分享链接",
+				"description": "完成录制后，链接已在剪贴板中等候。"
+			},
+			"notifyUpload": {
+				"name": "上传完成时通知我",
+				"description": "录制可分享时收到桌面通知提醒。"
+			},
+			"webhookShare": {
+				"name": "分享时通知 Slack",
+				"description": "将分享链接发送到 Slack、Discord 或您自己的 webhook。"
+			}
+		},
+		"matchAll": "全部匹配",
+		"matchAny": "匹配任意",
+		"captureTargetDisplay": "显示器",
+		"captureTargetWindow": "窗口",
+		"captureTargetArea": "区域",
+		"recordingModeStudio": "工作室",
+		"recordingModeInstant": "即时",
+		"httpMethodPost": "POST",
+		"httpMethodPut": "PUT",
+		"httpMethodGet": "GET",
+		"formatMp4": "MP4",
+		"formatGif": "GIF",
+		"formatMov": "MOV",
+		"compressionMaximum": "最高画质",
+		"compressionSocial": "社交",
+		"compressionWeb": "网页",
+		"compressionPotato": "最低画质",
+		"resolution720p": "720p",
+		"resolution1080p": "1080p",
+		"resolution1440p": "1440p",
+		"resolution4k": "4K",
+		"fieldName": "名称",
+		"testDescription": "检查此设备上支持哪些操作。不会运行自动化。",
+		"checkCompatibility": "检查兼容性",
+		"dangerousWarning": "此自动化会运行命令或发送网络请求。请仅使用您信任的值——它们会以您的权限自动执行。",
+		"removeCondition": "移除条件",
+		"collapse": "折叠",
+		"edit": "编辑",
+		"resolutionLabel": "分辨率"
+	},
+	"triggers": {
+		"screenshotTaken": "截图完成",
+		"studioRecordingFinished": "工作室录制结束",
+		"instantRecordingFinished": "即时录制结束",
+		"recordingStarted": "录制开始",
+		"uploadCompleted": "上传完成",
+		"videoImported": "视频已导入",
+		"recordingDeleted": "录制已删除"
+	},
+	"triggerLabels": {
+		"screenshotTaken": "截图完成后",
+		"studioRecordingFinished": "工作室录制完成后",
+		"instantRecordingFinished": "即时录制完成后",
+		"recordingStarted": "录制开始时",
+		"uploadCompleted": "上传完成后",
+		"videoImported": "视频导入后",
+		"recordingDeleted": "录制删除后"
+	},
+	"triggerNouns": {
+		"screenshotTaken": "截图",
+		"studioRecordingFinished": "工作室录制",
+		"instantRecordingFinished": "即时录制",
+		"recordingStarted": "录制开始",
+		"uploadCompleted": "上传",
+		"videoImported": "导入",
+		"recordingDeleted": "删除"
+	},
+	"actionPhrases": {
+		"copyToClipboard": "复制到剪贴板",
+		"saveToLocation": "保存到文件夹",
+		"export": "导出",
+		"upload": "上传并复制链接",
+		"revealInFileManager": "在文件管理器中显示",
+		"openFile": "打开文件",
+		"recognizeTextToClipboard": "复制文字 (OCR)",
+		"notify": "通知",
+		"openEditor": "打开编辑器",
+		"skipEditor": "跳过编辑器",
+		"applyPreset": "应用预设",
+		"runCommand": "运行命令",
+		"webhook": "发送 Webhook",
+		"deleteLocalFiles": "删除本地文件"
+	},
+	"actionLabels": {
+		"copyToClipboard": "复制到剪贴板",
+		"saveToLocation": "保存到位置",
+		"export": "按配置导出",
+		"upload": "上传 + 复制链接",
+		"revealInFileManager": "在文件管理器中显示",
+		"openFile": "打开文件",
+		"runCommand": "运行命令",
+		"webhook": "发送 Webhook",
+		"recognizeTextToClipboard": "识别文字 (OCR) 到剪贴板",
+		"notify": "显示通知",
+		"openEditor": "打开编辑器",
+		"skipEditor": "跳过编辑器（无界面）",
+		"applyPreset": "应用编辑器预设",
+		"deleteLocalFiles": "删除本地文件"
+	},
+	"conditionLabels": {
+		"captureTargetIs": "捕获目标为",
+		"recordingModeIs": "录制模式为",
+		"durationAtLeast": "时长至少（秒）",
+		"durationAtMost": "时长至多（秒）",
+		"windowTitleContains": "窗口标题包含",
+		"organizationIs": "组织为"
+	},
+	"actionNouns": {
+		"copyToClipboard": "剪贴板",
+		"saveToLocation": "文件夹",
+		"export": "导出",
+		"upload": "上传",
+		"revealInFileManager": "显示",
+		"openFile": "打开",
+		"recognizeTextToClipboard": "文字",
+		"notify": "通知",
+		"openEditor": "编辑器",
+		"skipEditor": "跳过编辑器",
+		"applyPreset": "预设",
+		"runCommand": "命令",
+		"webhook": "Webhook",
+		"deleteLocalFiles": "删除"
 	}
 }

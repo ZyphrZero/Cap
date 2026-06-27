@@ -1,14 +1,14 @@
 import { Button } from "@cap/ui-solid";
 import { useNavigate } from "@solidjs/router";
-import { createResource, For, onMount } from "solid-js";
+import { createResource, For } from "solid-js";
 import IconLucideDatabase from "~icons/lucide/database";
 
 import "@total-typescript/ts-reset/filter-boolean";
 import { t } from "~/components/I18nProvider";
-import { authStore } from "~/store";
-import { createSelectedOrganization } from "~/utils/organization-branding";
+import { generalSettingsStore } from "~/store";
+import { createStoredSelectedOrganizationId } from "~/utils/organization-branding";
+import { hasDesktopProAccess } from "~/utils/plans";
 import { commands } from "~/utils/tauri";
-import { apiClient, protectedHeaders } from "~/utils/web-api";
 import { Section, SectionCard, SettingsPageContent } from "../Setting";
 
 const GoogleDriveIcon = (props: { class?: string }) => (
@@ -47,50 +47,31 @@ const GoogleDriveIcon = (props: { class?: string }) => (
 
 export default function AppsTab() {
 	const navigate = useNavigate();
-	const auth = authStore.createQuery();
-	const organizationSelection = createSelectedOrganization();
-	const [storage] = createResource(
-		() => organizationSelection.selectedOrganizationId(),
-		async (orgId) => {
-			if (!orgId) return null;
-			const response = await apiClient.desktop.getStorageIntegrations({
-				query: { orgId },
-				headers: await protectedHeaders(),
-			});
+	const organizationSelection = createStoredSelectedOrganizationId();
+	const [generalSettings] = createResource(() => generalSettingsStore.get());
 
-			if (response.status !== 200) return null;
-			return response.body;
-		},
-	);
-
-	const isPro = () => auth.data?.plan?.upgraded;
-	const managedByOrganization = () => storage()?.managedByOrganization ?? null;
-
-	onMount(() => {
-		void commands.checkUpgradedAndUpdate();
-	});
+	const isPro = () =>
+		hasDesktopProAccess(organizationSelection.auth(), generalSettings());
 
 	const apps = [
 		{
-			name: "Google Drive",
-			description:
-				"Connect Google Drive for new shareable link uploads. Cap stores new videos in a private Cap folder in your Drive and continues serving them through Cap after normal access checks.",
+			name: t("integrationsPage.apps.googleDrive.name"),
+			description: t("integrationsPage.apps.googleDrive.description"),
 			icon: GoogleDriveIcon,
 			url: "/settings/integrations/google-drive-config",
 			pro: true,
 		},
 		{
-			name: "S3 Config",
-			description:
-				"Connect your own S3 bucket for complete control over your data storage. All new shareable link uploads will be automatically uploaded to your configured S3 bucket, ensuring you maintain complete ownership and control over your content. Perfect for organizations requiring data sovereignty and custom storage policies.",
+			name: t("integrationsPage.apps.s3Config.name"),
+			description: t("integrationsPage.apps.s3Config.description"),
 			icon: IconLucideDatabase,
 			url: "/settings/integrations/s3-config",
+			pro: true,
 		},
 	];
 
 	const handleAppClick = async (app: (typeof apps)[number]) => {
 		try {
-			if (managedByOrganization()) return;
 			if (app.pro && !isPro()) {
 				await commands.showWindow("Upgrade");
 				return;
@@ -105,8 +86,8 @@ export default function AppsTab() {
 		<div class="cap-settings-page flex flex-col h-full custom-scroll">
 			<SettingsPageContent>
 				<Section
-					title="Integrations"
-					description="Configure integrations to extend Cap's functionality and connect with third-party services."
+					title={t("integrationsPage.title")}
+					description={t("integrationsPage.description")}
 				>
 					<div class="space-y-3">
 						<For each={apps}>
@@ -120,14 +101,11 @@ export default function AppsTab() {
 										<Button
 											size="sm"
 											variant="primary"
-											disabled={!!managedByOrganization()}
 											onClick={() => handleAppClick(app)}
 										>
-											{managedByOrganization()
-												? "Managed by your organization"
-												: app.pro && !isPro()
-													? "Upgrade to Pro"
-													: "Configure"}
+											{app.pro && !isPro()
+												? t("integrationsPage.buttons.upgradeToPro")
+												: t("integrationsPage.buttons.configure")}
 										</Button>
 									</div>
 									<p class="text-xs leading-snug text-gray-10">

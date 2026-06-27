@@ -2,7 +2,6 @@ import { Button } from "@cap/ui-solid";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	type ComponentProps,
@@ -19,6 +18,7 @@ import CaptionControlsMacOS from "~/components/titlebar/controls/CaptionControls
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { trackEvent } from "~/utils/analytics";
 import { commands } from "~/utils/tauri";
+import { getTauriOsType } from "~/utils/tauri-runtime";
 import { initializeTitlebar } from "~/utils/titlebar-state";
 import { useEditorContext } from "./context";
 import OrganizationDropdown from "./OrganizationDropdown";
@@ -87,6 +87,8 @@ export function Header() {
 		return "type" in d && d.type === "clips" && d.open;
 	});
 
+	const osType = getTauriOsType();
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -96,8 +98,8 @@ export function Header() {
 				data-tauri-drag-region
 				class={cx("flex flex-row flex-1 gap-2 items-center px-4 h-full")}
 			>
-				{ostype() === "macos" && <div class="h-full w-16" />}
-				{ostype() === "linux" && <CaptionControlsMacOS class="mr-1" />}
+				{osType === "macos" && <div class="h-full w-16" />}
+				{osType === "linux" && <CaptionControlsMacOS class="mr-1" />}
 				<EditorButton
 					onClick={async () => {
 						clearTimelineSelection();
@@ -155,7 +157,7 @@ export function Header() {
 				data-tauri-drag-region
 				class={cx(
 					"flex-1 h-full flex flex-row items-center gap-2 pl-2",
-					ostype() !== "windows" && "pr-2",
+					osType !== "windows" && "pr-2",
 				)}
 			>
 				<EditorButton
@@ -245,7 +247,7 @@ export function Header() {
 					<UploadIcon class="size-4" />
 					Export
 				</button>
-				{ostype() === "windows" && <CaptionControlsWindows11 />}
+				{osType === "windows" && <CaptionControlsWindows11 />}
 			</div>
 		</div>
 	);

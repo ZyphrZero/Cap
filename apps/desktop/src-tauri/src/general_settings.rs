@@ -214,7 +214,7 @@ pub struct GeneralSettingsStore {
     pub camera_window_positions_by_monitor_name: BTreeMap<String, WindowPosition>,
     #[serde(default = "default_true")]
     pub has_completed_onboarding: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub enable_telemetry: bool,
     #[serde(default)]
     pub out_of_process_muxer: bool,
@@ -312,7 +312,7 @@ impl Default for GeneralSettingsStore {
             camera_window_position: None,
             camera_window_positions_by_monitor_name: BTreeMap::new(),
             has_completed_onboarding: false,
-            enable_telemetry: true,
+            enable_telemetry: false,
             out_of_process_muxer: cap_recording::DEFAULT_OUT_OF_PROCESS_MUXER,
         }
     }
@@ -539,5 +539,17 @@ mod tests {
 
         assert!(!changed);
         assert_eq!(excluded_windows.len(), len);
+    }
+
+    #[test]
+    fn defaults_telemetry_to_disabled() {
+        assert!(!GeneralSettingsStore::default().enable_telemetry);
+    }
+
+    #[test]
+    fn deserializes_missing_telemetry_as_disabled() {
+        let settings: GeneralSettingsStore = serde_json::from_value(json!({})).unwrap();
+
+        assert!(!settings.enable_telemetry);
     }
 }

@@ -1,63 +1,76 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { TOptions } from "i18next";
 import {
 	batch,
 	createContext,
-	createMemo,
 	createSignal,
+	onCleanup,
 	onMount,
+	type ParentProps,
 	useContext,
 } from "solid-js";
 import i18next, {
+	defaultLanguage,
 	getCurrentLanguage,
+	getStoredLanguage,
 	changeLanguage as i18nChangeLanguage,
+	type LanguageCode,
+	languageStorageKey,
+	resolveLanguage,
 } from "../utils/i18n";
+import { isTauriRuntime } from "../utils/tauri-runtime";
 
 interface I18nContextType {
-	t: (key: string, options?: any) => string;
-	changeLanguage: (lng: string) => Promise<void>;
-	currentLanguage: () => string;
+	t: (key: string, options?: TOptions) => string;
+	changeLanguage: (lng: LanguageCode) => Promise<void>;
+	currentLanguage: () => LanguageCode;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
-// Global signal to trigger re-renders when language changes
 const [languageVersion, setLanguageVersion] = createSignal(0);
 
-export function I18nProvider(props: { children: any }) {
+export function I18nProvider(props: ParentProps) {
 	const [currentLanguage, setCurrentLanguage] = createSignal(
 		getCurrentLanguage(),
 	);
 
-	const changeLanguage = async (lng: string) => {
-		await i18nChangeLanguage(lng);
+	const syncLanguage = (lng: string) => {
+		const nextLanguage = resolveLanguage(lng);
+		if (currentLanguage() === nextLanguage) return;
+
 		batch(() => {
-			setCurrentLanguage(lng);
+			setCurrentLanguage(nextLanguage);
 			setLanguageVersion((v) => v + 1);
-			localStorage.setItem("language", lng);
 		});
 	};
 
-	onMount(() => {
-		// 强制使用中文作为默认语言（中文定制版）
-		const savedLanguage = localStorage.getItem("language");
-		// 如果没有保存的语言设置，或者保存的是英文，则强制设置为中文
-		if (!savedLanguage || savedLanguage === "en") {
-			changeLanguage("zh");
-		} else if (savedLanguage && savedLanguage !== getCurrentLanguage()) {
-			changeLanguage(savedLanguage);
+	const changeLanguage = async (lng: LanguageCode) => {
+		await i18nChangeLanguage(lng);
+		localStorage.setItem(languageStorageKey, lng);
+		syncLanguage(lng);
+		if (isTauriRuntime()) {
+			await invoke("set_tray_language", { language: lng });
 		}
+	};
 
-		// Listen for language changes from i18next
-		i18next.on("languageChanged", (lng) => {
-			batch(() => {
-				setCurrentLanguage(lng);
-				setLanguageVersion((v) => v + 1);
-			});
+	onMount(() => {
+		const handleLanguageChanged = (lng: string) => {
+			syncLanguage(lng);
+		};
+
+		i18next.on("languageChanged", handleLanguageChanged);
+		onCleanup(() => {
+			i18next.off("languageChanged", handleLanguageChanged);
 		});
+
+		const savedLanguage = getStoredLanguage() ?? defaultLanguage;
+		if (savedLanguage !== getCurrentLanguage()) {
+			void changeLanguage(savedLanguage);
+		}
 	});
 
-	// Create a reactive t function that depends on languageVersion
-	const tFn = (key: string, options?: any): string => {
-		// Access languageVersion to create dependency
+	const tFn = (key: string, options?: TOptions): string => {
 		languageVersion();
 		return i18next.t(key, options) as string;
 	};
@@ -81,10 +94,7 @@ export function useI18n() {
 	return context;
 }
 
-// Reactive t function that can be used outside of components
-// Note: For full reactivity when language changes, components should re-render
-export function t(key: string, options?: any): string {
-	// Access languageVersion to create dependency in reactive contexts
+export function t(key: string, options?: TOptions): string {
 	languageVersion();
 	return i18next.t(key, options) as string;
 }

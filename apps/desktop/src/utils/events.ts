@@ -2,12 +2,15 @@ import { createEventListenerMap } from "@solid-primitives/event-listener";
 import type { UseQueryResult } from "@tanstack/solid-query";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { events } from "./tauri";
+import { isTauriRuntime } from "./tauri-runtime";
 
 export function createQueryInvalidate<T extends UseQueryResult>(
 	query: T,
 	event: keyof typeof events,
 ) {
 	onMount(() => {
+		if (!isTauriRuntime()) return;
+
 		const cleanup = events[event].listen(() => query.refetch());
 		onCleanup(() => cleanup.then((c) => c()));
 	});

@@ -1,5 +1,6 @@
 import { Popover } from "@kobalte/core/popover";
 import { batch } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import IconCapPadding from "~icons/cap/padding";
 import { useScreenshotEditorContext } from "../context";
 import { EditorButton, Slider } from "../ui";

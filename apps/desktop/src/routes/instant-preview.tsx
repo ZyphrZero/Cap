@@ -2,6 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { cx } from "cva";
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import { commands } from "~/utils/tauri";
 
 // 从窗口初始化脚本获取项目路径
@@ -48,7 +49,9 @@ export default function InstantPreview() {
 					instantRecordings.push({
 						path,
 						prettyName:
-							meta.pretty_name || path.split(/[/\\]/).pop() || "未命名",
+							meta.pretty_name ||
+							path.split(/[/\\]/).pop() ||
+							t("instantPreview.unnamed"),
 						thumbnailPath: `${path}/screenshots/display.jpg`,
 					});
 				}
@@ -106,7 +109,7 @@ export default function InstantPreview() {
 
 		try {
 			const recording = currentRecording();
-			const rawName = recording?.prettyName || "录制";
+			const rawName = recording?.prettyName || t("instantPreview.unnamed");
 			// 清理文件名中的非法字符
 			const suggestedName = sanitizeFileName(rawName);
 			const savePath = await commands.saveFileDialog(
@@ -118,10 +121,10 @@ export default function InstantPreview() {
 			const outputPath = `${path}/content/output.mp4`;
 			await commands.copyFileToPath(outputPath, savePath);
 
-			alert("导出成功！");
+			alert(t("instantPreview.exportSuccess"));
 		} catch (e) {
 			console.error("Export failed:", e);
-			alert("导出失败：" + e);
+			alert(t("instantPreview.exportFailed", { error: String(e) }));
 		}
 	};
 
@@ -160,7 +163,7 @@ export default function InstantPreview() {
 					class="h-10 flex items-center justify-between px-4 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
 					data-tauri-drag-region
 				>
-					<span class="text-sm font-medium">即时录制预览</span>
+					<span class="text-sm font-medium">{t("instantPreview.title")}</span>
 					<button
 						onClick={handleClose}
 						class="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -187,8 +190,8 @@ export default function InstantPreview() {
 						when={videoSrc()}
 						fallback={
 							<div class="text-gray-400 text-center">
-								<p>没有选中的录制</p>
-								<p class="text-sm mt-2">请从右侧列表选择一个录制</p>
+								<p>{t("instantPreview.noRecording")}</p>
+								<p class="text-sm mt-2">{t("instantPreview.selectFromList")}</p>
 							</div>
 						}
 					>
@@ -285,13 +288,13 @@ export default function InstantPreview() {
 								onClick={handleOpenFolder}
 								class="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
 							>
-								打开文件夹
+								{t("instantPreview.openFolder")}
 							</button>
 							<button
 								onClick={handleExport}
 								class="px-4 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded font-medium transition-colors"
 							>
-								导出
+								{t("instantPreview.export")}
 							</button>
 						</div>
 					</div>
@@ -301,9 +304,13 @@ export default function InstantPreview() {
 			{/* 右侧：录制列表 */}
 			<div class="w-72 bg-gray-100 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col">
 				<div class="p-3 border-b border-gray-200 dark:border-gray-700">
-					<h3 class="text-sm font-medium">录制列表</h3>
+					<h3 class="text-sm font-medium">
+						{t("instantPreview.recordingList")}
+					</h3>
 					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-						共 {recordings()?.length || 0} 个录制
+						{t("instantPreview.totalRecordings", {
+							count: recordings()?.length || 0,
+						})}
 					</p>
 				</div>
 
@@ -312,7 +319,7 @@ export default function InstantPreview() {
 						when={recordings()?.length}
 						fallback={
 							<div class="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
-								暂无录制
+								{t("instantPreview.noRecordings")}
 							</div>
 						}
 					>

@@ -1,10 +1,11 @@
 import { Button } from "@cap/ui-solid";
 import { createMutation } from "@tanstack/solid-query";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import { Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { commands } from "~/utils/tauri";
+import { getTauriOsType } from "~/utils/tauri-runtime";
 import IconAlertTriangle from "~icons/lucide/alert-triangle";
 import IconFolder from "~icons/lucide/folder";
 import IconLoaderCircle from "~icons/lucide/loader-circle";
@@ -21,7 +22,8 @@ export function EditorErrorScreen(props: {
 	projectPath: string;
 }) {
 	const needsRecovery = () => isRecoveryNeededError(props.error);
-	const isMac = () => ostype() === "macos";
+	const osType = getTauriOsType();
+	const isMac = () => osType === "macos";
 
 	const recoverMutation = createMutation(() => ({
 		mutationFn: async () => {
@@ -46,7 +48,7 @@ export function EditorErrorScreen(props: {
 			>
 				{isMac() && <div class="h-full w-16" />}
 				<div data-tauri-drag-region class="flex-1 h-full" />
-				{ostype() === "windows" && <CaptionControlsWindows11 />}
+				{osType === "windows" && <CaptionControlsWindows11 />}
 			</div>
 
 			<div class="flex-1 flex items-center justify-center p-8">
@@ -67,11 +69,10 @@ export function EditorErrorScreen(props: {
 						<div class="bg-gray-2 border border-gray-4 rounded-xl p-4 space-y-4">
 							<div class="space-y-2">
 								<h3 class="font-medium text-gray-12 text-sm">
-									Automatic Recovery
+									{t("editor.errorScreen.automaticRecovery")}
 								</h3>
 								<p class="text-xs text-gray-11">
-									Cap can attempt to recover your recording automatically. This
-									will reconstruct the recording from available segment data.
+									{t("editor.errorScreen.recoveryDescription")}
 								</p>
 							</div>
 
@@ -98,10 +99,12 @@ export function EditorErrorScreen(props: {
 							<Show when={recoverMutation.error}>
 								<div class="bg-red-2 border border-red-6 rounded-lg p-3">
 									<p class="text-red-11 text-xs">
-										Recovery failed:{" "}
-										{recoverMutation.error instanceof Error
-											? recoverMutation.error.message
-											: String(recoverMutation.error)}
+										{t("editor.errorScreen.recoveryFailed", {
+											error:
+												recoverMutation.error instanceof Error
+													? recoverMutation.error.message
+													: String(recoverMutation.error),
+										})}
 									</p>
 								</div>
 							</Show>
@@ -111,11 +114,10 @@ export function EditorErrorScreen(props: {
 					<div class="bg-gray-2 border border-gray-4 rounded-xl p-4 space-y-4">
 						<div class="space-y-2">
 							<h3 class="font-medium text-gray-12 text-sm">
-								Manual Investigation
+								{t("editor.errorScreen.manualInvestigation")}
 							</h3>
 							<p class="text-xs text-gray-11">
-								You can open the recording folder to inspect the raw files
-								directly.
+								{t("editor.errorScreen.manualDescription")}
 							</p>
 
 							<div class="bg-gray-3 rounded-lg p-3 space-y-2">
@@ -126,14 +128,12 @@ export function EditorErrorScreen(props: {
 									when={isMac()}
 									fallback={
 										<p class="text-xs text-gray-10 italic">
-											Tip: Double-click inside the folder to browse the
-											contents.
+											{t("editor.errorScreen.tipOther")}
 										</p>
 									}
 								>
 									<p class="text-xs text-gray-10 italic">
-										Tip: Right-click and select "Show Enclosing Folder" to see
-										the .cap bundle contents.
+										{t("editor.errorScreen.tipMac")}
 									</p>
 								</Show>
 							</div>
@@ -141,7 +141,7 @@ export function EditorErrorScreen(props: {
 
 						<Button onClick={handleOpenFolder} variant="outline" class="w-full">
 							<IconFolder class="size-4 mr-2" />
-							Open Folder
+							{t("editor.errorScreen.openFolder")}
 						</Button>
 					</div>
 
@@ -151,7 +151,7 @@ export function EditorErrorScreen(props: {
 							onClick={() => window.close()}
 							class="text-sm text-gray-10 hover:text-gray-11 transition-colors"
 						>
-							Close Window
+							{t("editor.errorScreen.closeWindow")}
 						</button>
 					</div>
 				</div>

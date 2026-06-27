@@ -2,7 +2,6 @@ import { createElementBounds } from "@solid-primitives/bounds";
 import { createEventListener } from "@solid-primitives/event-listener";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
-import { platform } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	batch,
@@ -22,9 +21,11 @@ import toast from "solid-toast";
 
 import "./styles.css";
 
+import { t } from "~/components/I18nProvider";
 import { defaultCaptionSettings } from "~/store/captions";
 import { defaultKeyboardSettings } from "~/store/keyboard";
 import { commands } from "~/utils/tauri";
+import { getTauriPlatform } from "~/utils/tauri-runtime";
 import type { AudioTrackSegment } from "../audio";
 import {
 	applyCaptionResultToProject,
@@ -882,7 +883,7 @@ export function Timeline(props: {
 
 						if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) {
 							delta = e.deltaX;
-						} else if (platform() === "macos") {
+						} else if (getTauriPlatform() === "macos") {
 							delta = e.shiftKey ? e.deltaX : e.deltaY;
 						} else {
 							delta = e.deltaY;
@@ -1128,7 +1129,7 @@ function TrackRow(props: {
 							props.onDelete?.();
 						}}
 						onMouseDown={(e) => e.stopPropagation()}
-						title="Delete track"
+						title={t("editor.timeline.deleteTrack")}
 					>
 						<IconCapTrash class="size-4" />
 					</button>

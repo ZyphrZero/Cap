@@ -20,7 +20,6 @@ import {
 	readDir,
 	writeFile,
 } from "@tauri-apps/plugin-fs";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	batch,
@@ -73,6 +72,7 @@ import {
 	type XY,
 	type ZoomSegment,
 } from "~/utils/tauri";
+import { getTauriOsType } from "~/utils/tauri-runtime";
 import IconLucideBoxSelect from "~icons/lucide/box-select";
 import IconLucideColumns2 from "~icons/lucide/columns-2";
 import IconLucideEyeOff from "~icons/lucide/eye-off";
@@ -257,7 +257,7 @@ const WALLPAPER_NAMES = [
 const CURRENT_DESKTOP_BACKGROUND_ID = "current-desktop-background";
 const CURRENT_DESKTOP_BACKGROUND_BASENAME = "current-desktop-background";
 const getCurrentDesktopBackgroundLabel = () => {
-	const os = ostype();
+	const os = getTauriOsType();
 	if (os === "macos") return "This Mac";
 	if (os === "windows") return "This PC";
 	return "This device";

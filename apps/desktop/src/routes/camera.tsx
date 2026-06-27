@@ -37,6 +37,7 @@ import {
 	getDefaultCameraWindowState,
 	normalizeBackgroundBlurMode,
 } from "~/components/CameraPreviewChrome";
+import { t } from "~/components/I18nProvider";
 import { generalSettingsStore } from "~/store";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import { createCameraMutation } from "~/utils/queries";

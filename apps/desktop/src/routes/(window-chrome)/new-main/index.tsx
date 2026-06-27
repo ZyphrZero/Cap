@@ -52,6 +52,7 @@ import {
 	importVideoFromPicker,
 	showImportError,
 } from "~/utils/importMedia";
+import { isDesktopLicensePro } from "~/utils/plans";
 import {
 	createCameraMutation,
 	createCurrentRecordingQuery,
@@ -76,6 +77,7 @@ import {
 	type ScreenCaptureTarget,
 	type UploadProgress,
 } from "~/utils/tauri";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import IconCapLogoFull from "~icons/cap/logo-full";
 import IconCapLogoFullDark from "~icons/cap/logo-full-dark";
 import IconLucideAppWindowMac from "~icons/lucide/app-window-mac";
@@ -96,7 +98,6 @@ import {
 	useRecordingOptions,
 } from "../OptionsContext";
 import CameraSelect from "./CameraSelect";
-import ChangelogButton from "./ChangeLogButton";
 import MicrophoneSelect from "./MicrophoneSelect";
 import ModeInfoPanel from "./ModeInfoPanel";
 import SystemAudio from "./SystemAudio";
@@ -373,8 +374,8 @@ function CameraListItem(props: {
 			<button
 				type="button"
 				disabled={props.disabled}
-				title="Device settings"
-				aria-label="Device settings"
+				title={t("deviceSettingsTooltip")}
+				aria-label={t("deviceSettingsTooltip")}
 				onPointerDown={(event) => event.stopPropagation()}
 				onClick={(event) => {
 					event.preventDefault();
@@ -935,7 +936,9 @@ function DeviceListPanel(props: DeviceListPanelProps) {
 				>
 					<IconLucideCircleOff class="size-4 shrink-0" />
 					<span class="truncate flex-1">
-						{props.variant === "camera" ? "No Camera" : "No Microphone"}
+						{props.variant === "camera"
+							? t("recording.noCamera")
+							: t("recording.noMicrophone")}
 					</span>
 					<Show when={isNoneSelected()}>
 						<IconLucideCheck class="size-4 shrink-0" />
@@ -1091,24 +1094,24 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 			: props.variant === "window"
 				? t("recording.search.windows")
 				: props.variant === "recording"
-					? "Search recordings"
+					? t("recording.search.recordings")
 					: props.variant === "screenshot"
-						? "Search screenshots"
+						? t("recording.search.screenshots")
 						: props.variant === "camera"
-							? "Search cameras"
-							: "Search microphones";
+							? t("recording.search.cameras")
+							: t("recording.search.microphones");
 	const noResultsMessage =
 		props.variant === "display"
 			? t("recording.search.noDisplays")
 			: props.variant === "window"
 				? t("recording.search.noWindows")
 				: props.variant === "recording"
-					? "No matching recordings"
+					? t("recording.search.noRecordings")
 					: props.variant === "screenshot"
-						? "No matching screenshots"
+						? t("recording.search.noScreenshots")
 						: props.variant === "camera"
-							? "No matching cameras"
-							: "No matching microphones";
+							? t("recording.search.noCameras")
+							: t("recording.search.noMicrophones");
 
 	const handleVideoImport = async () => {
 		try {
@@ -1307,7 +1310,9 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 							}
 							disabled={cameraProps.disabled}
 							emptyMessage={
-								trimmedSearch() ? noResultsMessage : "No cameras found"
+								trimmedSearch()
+									? noResultsMessage
+									: t("recording.search.noCameras")
 							}
 							permissions={cameraProps.permissions}
 							deviceSettings={cameraProps.deviceSettings}
@@ -1365,7 +1370,9 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 							onSettingsRequested={(mic) => handleSettingsTargetChange(mic)}
 							disabled={micProps.disabled}
 							emptyMessage={
-								trimmedSearch() ? noResultsMessage : "No microphones found"
+								trimmedSearch()
+									? noResultsMessage
+									: t("recording.search.noMicrophones")
 							}
 							permissions={micProps.permissions}
 							deviceSettings={micProps.deviceSettings}
@@ -1446,7 +1453,9 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 								>
 									<IconLucideImport class="size-3.5" />
 									<span>
-										{props.variant === "screenshot" ? "Import image" : "Import"}
+										{props.variant === "screenshot"
+											? t("recordingsPage.actions.import")
+											: t("recordingsPage.actions.import")}
 									</span>
 								</Button>
 							</Show>
@@ -1550,7 +1559,7 @@ export default function () {
 
 function MainWindowHelpButton() {
 	return (
-		<Tooltip content={<span>Help & Tour</span>}>
+		<Tooltip content={<span>{t("common.helpTour")}</span>}>
 			<button
 				type="button"
 				onClick={() => {
@@ -1726,7 +1735,7 @@ function Page() {
 		if (pickerActive && !hasHidden && !recording) {
 			setHasHiddenMainWindowForPicker(true);
 			setShouldRevealMainWindowAfterPicker(!editorPicker);
-			void getCurrentWindow().hide();
+			if (isTauriRuntime()) void getCurrentWindow().hide();
 		} else if (pickerActive && hasHidden) {
 			setShouldRevealMainWindowAfterPicker(!editorPicker);
 		} else if (recording) {
@@ -1745,9 +1754,11 @@ function Page() {
 				shouldRevealMainWindow &&
 				!(wasRecordingForPicker && lastRecordingMode === "studio")
 			) {
-				const currentWindow = getCurrentWindow();
-				void currentWindow.show();
-				void currentWindow.setFocus();
+				if (isTauriRuntime()) {
+					const currentWindow = getCurrentWindow();
+					void currentWindow.show();
+					void currentWindow.setFocus();
+				}
 			}
 		}
 
@@ -1756,11 +1767,12 @@ function Page() {
 	onCleanup(() => {
 		if (!hasHiddenMainWindowForPicker()) return;
 		setHasHiddenMainWindowForPicker(false);
-		if (shouldRevealMainWindowAfterPicker()) void getCurrentWindow().show();
+		if (shouldRevealMainWindowAfterPicker() && isTauriRuntime())
+			void getCurrentWindow().show();
 	});
 
 	const handleMouseEnter = () => {
-		getCurrentWindow().setFocus();
+		if (isTauriRuntime()) getCurrentWindow().setFocus();
 	};
 
 	const [displayMenuOpen, setDisplayMenuOpen] = createSignal(false);
@@ -2079,6 +2091,13 @@ function Page() {
 			__CAP__?: { initialTargetMode?: RecordingTargetMode | null };
 		};
 		const targetMode = __CAP__?.initialTargetMode ?? null;
+
+		if (!isTauriRuntime()) {
+			setOptions({ targetMode: null, targetModeSource: null });
+			setCanRevealMainWindow(true);
+			return;
+		}
+
 		const currentWindow = getCurrentWindow();
 
 		currentWindow.setSize(
@@ -2468,7 +2487,7 @@ function Page() {
 								onClick={() => {
 									toggleTargetMode("display");
 								}}
-								name="Display"
+								name={t("recording.display")}
 								class="flex-1 rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pl-5"
 							/>
 							<TargetDropdownButton
@@ -2489,7 +2508,7 @@ function Page() {
 									});
 								}}
 								aria-haspopup="menu"
-								aria-label="Choose display"
+								aria-label={t("recording.search.displays")}
 							/>
 						</div>
 						<div
@@ -2506,7 +2525,7 @@ function Page() {
 								onClick={() => {
 									toggleTargetMode("window");
 								}}
-								name="Window"
+								name={t("modes.window")}
 								class="flex-1 rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pl-5"
 							/>
 							<TargetDropdownButton
@@ -2527,7 +2546,7 @@ function Page() {
 									});
 								}}
 								aria-haspopup="menu"
-								aria-label="Choose window"
+								aria-label={t("recording.search.windows")}
 							/>
 						</div>
 					</div>
@@ -2539,7 +2558,7 @@ function Page() {
 							onClick={() => {
 								toggleTargetMode("area");
 							}}
-							name="Area"
+							name={t("recording.area")}
 							class="flex-1"
 						/>
 						<TargetTypeButton
@@ -2549,7 +2568,7 @@ function Page() {
 							onClick={() => {
 								toggleTargetMode("camera");
 							}}
-							name="Camera Only"
+							name={t("recording.cameraOnly")}
 							class="flex-1"
 						/>
 					</div>
@@ -2559,24 +2578,26 @@ function Page() {
 		</Transition>
 	);
 
-	const startSignInCleanup = listen("start-sign-in", async () => {
-		const abort = new AbortController();
-		for (const win of await getAllWebviewWindows()) {
-			if (win.label.startsWith("target-select-overlay")) {
-				await win.setIgnoreCursorEvents(true);
-				await win.hide();
-			}
-		}
+	const startSignInCleanup = isTauriRuntime()
+		? listen("start-sign-in", async () => {
+				const abort = new AbortController();
+				for (const win of await getAllWebviewWindows()) {
+					if (win.label.startsWith("target-select-overlay")) {
+						await win.setIgnoreCursorEvents(true);
+						await win.hide();
+					}
+				}
 
-		await signIn.mutateAsync(abort).catch(() => {});
+				await signIn.mutateAsync(abort).catch(() => {});
 
-		for (const win of await getAllWebviewWindows()) {
-			if (win.label.startsWith("target-select-overlay")) {
-				await win.setIgnoreCursorEvents(false);
-				await win.show();
-			}
-		}
-	});
+				for (const win of await getAllWebviewWindows()) {
+					if (win.label.startsWith("target-select-overlay")) {
+						await win.setIgnoreCursorEvents(false);
+						await win.show();
+					}
+				}
+			})
+		: Promise.resolve(() => {});
 	onCleanup(() => startSignInCleanup.then((cb) => cb()));
 
 	return (
@@ -2592,10 +2613,14 @@ function Page() {
 					<MainWindowHelpButton />
 					<div class="flex-1 min-h-9 min-w-0" data-tauri-drag-region />
 					<div class="flex gap-1 items-center shrink-0" data-tauri-drag-region>
-						<Tooltip content={<span>Settings</span>}>
+						<Tooltip content={<span>{t("common.settings")}</span>}>
 							<button
 								type="button"
 								onClick={async () => {
+									if (!isTauriRuntime()) {
+										window.location.href = "/settings/general";
+										return;
+									}
 									await commands.showWindow({ Settings: { page: "general" } });
 									getCurrentWindow().hide();
 								}}
@@ -2642,7 +2667,6 @@ function Page() {
 								<IconLucideSquarePlay class="transition-colors text-gray-11 size-4 hover:text-gray-12" />
 							</button>
 						</Tooltip>
-						<ChangelogButton />
 						{import.meta.env.DEV && (
 							<button
 								type="button"
@@ -2675,12 +2699,12 @@ function Page() {
 						<ErrorBoundary fallback={null}>
 							<Suspense>
 								<Show
-									when={license.data?.type !== "pro"}
+									when={!isDesktopLicensePro(license.data)}
 									fallback={
 										<span class="text-[0.6rem] ml-2 rounded-lg border border-gray-5 px-1 py-0.5 bg-(--blue-400) text-gray-1 dark:text-gray-12">
 											{license.data?.type === "commercial"
-												? "Commercial"
-												: "Pro"}
+												? t("recording.commercial")
+												: t("recording.pro")}
 										</span>
 									}
 								>

@@ -1,6 +1,7 @@
-import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
+import { getTauriOsType } from "~/utils/tauri-runtime";
+import IconCapLogo from "~icons/cap/logo";
 
 const DEFAULT_TIMELINE_HEIGHT = 260;
 const MIN_PLAYER_HEIGHT = 336;
@@ -26,6 +27,8 @@ function SkeletonButton(props: { class?: string; width?: string }) {
 }
 
 function HeaderSkeleton() {
+	const osType = getTauriOsType();
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -35,7 +38,7 @@ function HeaderSkeleton() {
 				data-tauri-drag-region
 				class="flex flex-row flex-1 gap-2 items-center px-4 h-full"
 			>
-				{ostype() === "macos" && <div class="h-full w-16" />}
+				{osType === "macos" && <div class="h-full w-16" />}
 				<SkeletonButton />
 				<SkeletonButton />
 				<SkeletonPulse class="h-5 w-32" />
@@ -56,14 +59,14 @@ function HeaderSkeleton() {
 				data-tauri-drag-region
 				class={cx(
 					"flex-1 h-full flex flex-row items-center gap-2 pl-2",
-					ostype() !== "windows" && "pr-2",
+					osType !== "windows" && "pr-2",
 				)}
 			>
 				<SkeletonButton />
 				<SkeletonButton />
 				<div data-tauri-drag-region class="flex-1 h-full" />
 				<SkeletonPulse class="h-[40px] w-[100px] rounded-lg" />
-				{ostype() === "windows" && <CaptionControlsWindows11 />}
+				{osType === "windows" && <CaptionControlsWindows11 />}
 			</div>
 		</div>
 	);
@@ -84,19 +87,14 @@ function PlayerToolbarSkeleton() {
 	);
 }
 
-import { t } from "~/components/I18nProvider";
-
 function VideoPreviewSkeleton() {
 	return (
 		<div class="relative flex-1 flex justify-center items-center">
 			<div class="relative w-full h-full flex justify-center items-center p-4">
-				<div class="relative bg-gray-3 dark:bg-gray-4 rounded-lg w-full max-w-[85%] aspect-video flex flex-col gap-4 items-center justify-center">
+				<div class="relative bg-gray-3 dark:bg-gray-4 rounded-lg w-full max-w-[85%] aspect-video flex items-center justify-center">
 					<div class="animate-spin grayscale opacity-60">
 						<IconCapLogo class="size-16 text-gray-6" />
 					</div>
-					<p class="text-gray-11 font-medium text-sm animate-pulse">
-						{t("editor.initializing")}
-					</p>
 				</div>
 			</div>
 		</div>

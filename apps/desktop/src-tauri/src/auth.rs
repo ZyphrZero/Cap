@@ -8,6 +8,7 @@ use web_api::ManagerExt;
 
 use crate::{
     api::{self, Organization},
+    general_settings::GeneralSettingsStore,
     web_api,
 };
 
@@ -118,6 +119,14 @@ impl AuthStore {
             Some(plan) => plan.upgraded || plan.manual,
             None => false,
         }
+    }
+
+    pub fn has_pro_access(&self, app: &AppHandle) -> bool {
+        self.is_upgraded()
+            || GeneralSettingsStore::get(app)
+                .ok()
+                .flatten()
+                .is_some_and(|settings| settings.commercial_license.is_some())
     }
 
     pub fn set(app: &AppHandle, value: Option<Self>) -> Result<(), String> {

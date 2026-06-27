@@ -12,6 +12,7 @@ import {
 } from "solid-js";
 import toast from "solid-toast";
 
+import { t } from "~/components/I18nProvider";
 import { commands, type ImportedAudioTrack } from "~/utils/tauri";
 import { AUDIO_IMPORT_EXTENSIONS } from "./audio";
 import { useEditorContext } from "./context";
@@ -158,7 +159,7 @@ export function AudioLibraryPanel(props: {
 			commit(await commands.addAudioLibraryTrack(id));
 		} catch (error) {
 			console.error("Failed to add audio track", error);
-			toast.error("Failed to add audio track");
+			toast.error(t("editor.audioLibrary.addTrackFailed"));
 		} finally {
 			setBusyId(null);
 		}
@@ -176,7 +177,7 @@ export function AudioLibraryPanel(props: {
 			commit(await commands.importAudioTrackFile(selected));
 		} catch (error) {
 			console.error("Failed to import audio file", error);
-			toast.error("Failed to import audio file");
+			toast.error(t("editor.audioLibrary.importFailed"));
 		} finally {
 			setUploading(false);
 		}

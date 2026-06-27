@@ -45,6 +45,10 @@ describe("general-settings", () => {
 		});
 	});
 
+	it("defaults telemetry to disabled", () => {
+		expect(deriveGeneralSettings(null).enableTelemetry).toBe(false);
+	});
+
 	it("preserves explicit disabled recording enhancements", () => {
 		expect(
 			deriveGeneralSettings({

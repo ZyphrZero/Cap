@@ -5,7 +5,9 @@ import { type OsType, type as ostype } from "@tauri-apps/plugin-os";
 import * as shell from "@tauri-apps/plugin-shell";
 import { createResource, createSignal, For, Show } from "solid-js";
 import toast from "solid-toast";
+import { t } from "~/components/I18nProvider";
 import { commands, type SystemDiagnostics } from "~/utils/tauri";
+import { isTauriRuntime } from "~/utils/tauri-runtime";
 import { apiClient, protectedHeaders } from "~/utils/web-api";
 import { Section, SettingsPageContent } from "./Setting";
 
@@ -43,6 +45,14 @@ const FAQ_ITEMS = [
 ];
 
 const getFeedbackOs = (): Extract<OsType, "macos" | "windows" | "linux"> => {
+	if (!isTauriRuntime()) {
+		const platform =
+			typeof navigator === "undefined" ? "" : navigator.platform.toLowerCase();
+		if (platform.includes("mac")) return "macos";
+		if (platform.includes("linux")) return "linux";
+		return "windows";
+	}
+
 	const os = ostype();
 	if (os === "macos" || os === "windows" || os === "linux") return os;
 	throw new Error(`Unsupported OS for feedback submission: ${os}`);
@@ -50,7 +60,7 @@ const getFeedbackOs = (): Extract<OsType, "macos" | "windows" | "linux"> => {
 
 const sendFeedbackAction = action(async (feedback: string) => {
 	const response = await apiClient.desktop.submitFeedback({
-		body: { feedback, os: getFeedbackOs(), version: await getVersion() },
+		body: { feedback, os: getFeedbackOs(), version: await getAppVersion() },
 		headers: await protectedHeaders(),
 	});
 
@@ -59,12 +69,19 @@ const sendFeedbackAction = action(async (feedback: string) => {
 });
 
 async function fetchDiagnostics(): Promise<SystemDiagnostics | null> {
+	if (!isTauriRuntime()) return null;
+
 	try {
 		return await commands.getSystemDiagnostics();
 	} catch (error) {
 		console.error("Failed to fetch diagnostics:", error);
 		return null;
 	}
+}
+
+async function getAppVersion() {
+	if (!isTauriRuntime()) return "web-preview";
+	return getVersion();
 }
 
 export default function FeedbackTab() {
@@ -77,12 +94,17 @@ export default function FeedbackTab() {
 	const sendFeedback = useAction(sendFeedbackAction);
 
 	const handleUploadLogs = async () => {
+		if (!isTauriRuntime()) {
+			toast.error("Log upload is only available in the desktop app");
+			return;
+		}
+
 		setUploadingLogs(true);
 		try {
 			await commands.uploadLogs();
-			toast.success("Logs uploaded successfully");
+			toast.success(t("feedbackPage.uploadSuccess"));
 		} catch (error) {
-			toast.error("Failed to upload logs");
+			toast.error(t("feedbackPage.uploadError"));
 			console.error("Failed to upload logs:", error);
 		} finally {
 			setUploadingLogs(false);
@@ -93,8 +115,8 @@ export default function FeedbackTab() {
 		<div class="cap-settings-page flex flex-col w-full h-full custom-scroll">
 			<SettingsPageContent>
 				<Section
-					title="Feedback"
-					description="Help us improve Cap by submitting feedback or reporting bugs. We'll get right on it."
+					title={t("settings.feedback")}
+					description={t("feedbackPage.description")}
 				>
 					<form
 						class="space-y-4"
@@ -108,7 +130,7 @@ export default function FeedbackTab() {
 								<textarea
 									value={feedback()}
 									onInput={(event) => setFeedback(event.currentTarget.value)}
-									placeholder="Tell us what you think about Cap..."
+									placeholder={t("feedbackPage.placeholder")}
 									required
 									minLength={10}
 									class="p-2 w-full h-32 text-[13px] rounded-md border transition-colors duration-200 resize-none bg-gray-2 placeholder:text-gray-10 border-gray-3 text-primary focus:outline-hidden focus:ring-1 focus:ring-gray-8 hover:border-gray-6"
@@ -122,7 +144,7 @@ export default function FeedbackTab() {
 							)}
 
 							{submission.result?.success && (
-								<p class="text-sm text-primary">Thank you for your feedback!</p>
+								<p class="text-sm text-primary">{t("feedbackPage.success")}</p>
 							)}
 
 							<Button
@@ -132,7 +154,9 @@ export default function FeedbackTab() {
 								disabled={feedback().trim().length < 4}
 								class="mt-2"
 							>
-								{submission.pending ? "Submitting..." : "Submit Feedback"}
+								{submission.pending
+									? t("feedbackPage.submitting")
+									: t("feedbackPage.submit")}
 							</Button>
 						</fieldset>
 					</form>
@@ -182,11 +206,17 @@ export default function FeedbackTab() {
 				</Section>
 
 				<Section
-					title="Join the Community"
-					description="Have questions, want to share ideas, or just hang out? Join the Cap Discord community."
+					title={t("feedbackPage.joinCommunity")}
+					description={t("feedbackPage.joinCommunityDescription")}
 				>
 					<Button
-						onClick={() => shell.open("https://cap.link/discord")}
+						onClick={() => {
+							if (isTauriRuntime()) {
+								void shell.open("https://cap.link/discord");
+							} else {
+								window.open("https://cap.link/discord", "_blank", "noopener");
+							}
+						}}
 						size="md"
 						variant="gray"
 					>
@@ -195,8 +225,8 @@ export default function FeedbackTab() {
 				</Section>
 
 				<Section
-					title="Debug Information"
-					description="Upload your logs to help us diagnose issues with Cap. No personal information is included."
+					title={t("feedbackPage.debugInfo")}
+					description={t("feedbackPage.debugDescription")}
 				>
 					<Button
 						onClick={handleUploadLogs}
@@ -204,16 +234,20 @@ export default function FeedbackTab() {
 						variant="gray"
 						disabled={uploadingLogs()}
 					>
-						{uploadingLogs() ? "Uploading..." : "Upload Logs"}
+						{uploadingLogs()
+							? t("feedbackPage.uploading")
+							: t("feedbackPage.uploadLogs")}
 					</Button>
 				</Section>
 
-				<Section title="System Information">
+				<Section title={t("feedbackPage.systemInfo")}>
 					<Show
 						when={!diagnostics.loading && diagnostics()}
 						fallback={
 							<p class="text-xs leading-relaxed text-gray-10">
-								Loading system information...
+								{diagnostics.loading
+									? t("feedbackPage.loadingSystemInfo")
+									: "System diagnostics are only available in the desktop app."}
 							</p>
 						}
 					>
@@ -244,7 +278,9 @@ export default function FeedbackTab() {
 									<Show when={osVersion}>
 										{(ver) => (
 											<div class="space-y-1">
-												<p class="text-gray-11 font-medium">Operating System</p>
+												<p class="text-gray-11 font-medium">
+													{t("feedbackPage.os")}
+												</p>
 												<p class="text-gray-10 bg-gray-2 px-2 py-1.5 rounded-sm font-mono text-xs">
 													{ver().displayName}
 												</p>
@@ -253,7 +289,9 @@ export default function FeedbackTab() {
 									</Show>
 
 									<div class="space-y-1">
-										<p class="text-gray-11 font-medium">Capture Support</p>
+										<p class="text-gray-11 font-medium">
+											{t("feedbackPage.captureSupport")}
+										</p>
 										<div class="flex gap-2 flex-wrap">
 											<span
 												class={`px-2 py-1 rounded text-xs ${
@@ -262,15 +300,19 @@ export default function FeedbackTab() {
 														: "bg-red-500/20 text-red-400"
 												}`}
 											>
-												Screen Capture:{" "}
-												{captureSupported ? "Supported" : "Not Supported"}
+												{t("feedbackPage.screenCapture")}:{" "}
+												{captureSupported
+													? t("feedbackPage.supported")
+													: t("feedbackPage.notSupported")}
 											</span>
 										</div>
 									</div>
 
 									<Show when={availableEncoders.length > 0}>
 										<div class="space-y-1">
-											<p class="text-gray-11 font-medium">Available Encoders</p>
+											<p class="text-gray-11 font-medium">
+												{t("feedbackPage.availableEncoders")}
+											</p>
 											<div class="flex gap-1.5 flex-wrap">
 												<For each={availableEncoders}>
 													{(encoder) => (
