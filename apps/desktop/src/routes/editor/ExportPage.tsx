@@ -6,6 +6,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { remove } from "@tauri-apps/plugin-fs";
+import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	createEffect,
@@ -41,7 +42,6 @@ import {
 	type FramesRendered,
 	type UploadProgress,
 } from "~/utils/tauri";
-import { getTauriOsType } from "~/utils/tauri-runtime";
 import { type RenderState, useEditorContext } from "./context";
 import { RESOLUTION_OPTIONS } from "./Header";
 import { Dialog, Field } from "./ui";
@@ -212,7 +212,7 @@ export function ExportPage() {
 	const auth = authStore.createQuery();
 	const organizationSelection = createSelectedOrganization();
 	const organisations = organizationSelection.organizations;
-	const osType = getTauriOsType();
+	const osType = ostype();
 
 	const hasTransparentBackground = () => {
 		const backgroundSource =
@@ -547,16 +547,16 @@ export function ExportPage() {
 		isMovCursorOnlyExport() ? "mov" : settings.format === "Gif" ? "gif" : "mp4";
 	const exportedAssetLabel = () =>
 		isMovCursorOnlyExport()
-			? "Cursor track"
+			? t("editor.export.assets.cursorTrack")
 			: settings.format === "Gif"
 				? "GIF"
-				: "Recording";
+				: t("editor.export.assets.recording");
 	const exportMediumLabel = () =>
 		isMovCursorOnlyExport()
-			? "cursor track"
+			? t("editor.export.assets.cursorTrackLower")
 			: settings.format === "Gif"
 				? "GIF"
-				: "video";
+				: t("editor.export.assets.video");
 
 	const handleCancel = async () => {
 		if (
@@ -616,7 +616,11 @@ export function ExportPage() {
 		},
 		onSuccess() {
 			setExportState({ type: "done" });
-			toast.success(`${exportedAssetLabel()} exported to clipboard`);
+			toast.success(
+				t("editor.export.messages.exportedToClipboard", {
+					type: exportedAssetLabel(),
+				}),
+			);
 		},
 	}));
 
@@ -674,7 +678,11 @@ export function ExportPage() {
 			setExportState({ type: "idle" });
 		},
 		onSuccess() {
-			toast.success(`${exportedAssetLabel()} exported to file`);
+			toast.success(
+				t("editor.export.messages.exportedToFile", {
+					type: exportedAssetLabel(),
+				}),
+			);
 		},
 	}));
 
@@ -710,7 +718,6 @@ export function ExportPage() {
 				}
 
 				const uploadChannel = new Channel<UploadProgress>((progress) => {
-					console.log("Upload progress:", progress);
 					setExportState(
 						produce((state) => {
 							if (state.type !== "uploading") return;
@@ -729,8 +736,6 @@ export function ExportPage() {
 
 				setExportState({ type: "uploading", progress: 0 });
 
-				console.log({ organizationId: settings.organizationId });
-
 				const result = meta().sharing
 					? await commands.uploadExportedVideo(
 							projectPath,
@@ -746,11 +751,11 @@ export function ExportPage() {
 						);
 
 				if (result === "NotAuthenticated")
-					throw new Error("You need to sign in to share recordings");
+					throw new Error(t("editor.export.messages.authRequired"));
 				else if (result === "PlanCheckFailed")
-					throw new Error("Failed to verify your subscription status");
+					throw new Error(t("editor.export.messages.planCheckFailed"));
 				else if (result === "UpgradeRequired")
-					throw new Error("This feature requires an upgraded plan");
+					throw new Error(t("editor.export.messages.upgradeRequired"));
 			} finally {
 				await releaseExportSession();
 			}
@@ -831,8 +836,8 @@ export function ExportPage() {
 												<IconLucideImage class="size-12 text-gray-8" />
 												<span class="text-sm">
 													{previewUnavailable()
-														? "Preview unavailable"
-														: "Generating preview..."}
+														? t("editor.export.previewUnavailable")
+														: t("editor.export.generatingPreview")}
 												</span>
 											</div>
 										}
@@ -848,7 +853,7 @@ export function ExportPage() {
 								<>
 									<img
 										src={url()}
-										alt="Export preview"
+										alt={t("editor.export.previewAlt")}
 										class="relative z-0 w-full h-full object-contain"
 									/>
 									<Show when={previewLoading()}>
@@ -944,7 +949,7 @@ export function ExportPage() {
 						class="flex flex-none gap-2 items-center px-4 w-full h-16 text-sm font-medium border-b transition-colors text-gray-12 border-gray-3 hover:bg-gray-3"
 					>
 						<IconCapMoveLeft class="size-4 text-gray-11" />
-						Back to editor
+						{t("editor.export.backToEditor")}
 					</button>
 					<div class="flex-1 overflow-y-auto p-4 space-y-5">
 						<Field
@@ -961,8 +966,8 @@ export function ExportPage() {
 										const disabledReason = () =>
 											isDisabled()
 												? cursorOnly()
-													? "Cursor-only exports can only be saved to a file or clipboard"
-													: "Transparent exports can only be saved to a file or clipboard"
+													? t("editor.export.cursorOnlyLinkDisabled")
+													: t("editor.export.transparentLinkDisabled")
 												: undefined;
 										const button = (
 											<button
@@ -1070,12 +1075,12 @@ export function ExportPage() {
 
 										const disabledReason = () =>
 											cursorOnly()
-												? "Cursor-only export always uses transparent MOV"
+												? t("editor.export.cursorOnlyFormatDisabled")
 												: option.value === "Mp4" && requiresTransparentExport()
-													? "MP4 doesn't support transparency"
+													? t("editor.export.noMp4Transparency")
 													: option.value === "Gif" &&
 															settings.exportTo === "link"
-														? "Links require MP4 format"
+														? t("editor.export.linksRequireMp4")
 														: undefined;
 
 										const button = (
@@ -1260,9 +1265,11 @@ export function ExportPage() {
 										/>
 									</div>
 									<div class="text-left">
-										<span class="block">Optimize file size</span>
+										<span class="block">
+											{t("editor.export.optimizeFileSize")}
+										</span>
 										<span class="text-[10px] text-gray-9">
-											Re-encodes with software for much smaller files (slower)
+											{t("editor.export.optimizeFileSizeDescription")}
 										</span>
 									</div>
 								</button>
@@ -1270,7 +1277,7 @@ export function ExportPage() {
 						</Show>
 
 						<Field
-							name="Advanced Options"
+							name={t("editor.export.advancedOptions")}
 							icon={<IconLucideSparkles class="size-4" />}
 						>
 							<button
@@ -1283,7 +1290,11 @@ export function ExportPage() {
 								)}
 								onClick={() => setAdvancedMode(!advancedMode())}
 							>
-								<span>{advancedMode() ? "Hide options" : "Show options"}</span>
+								<span>
+									{advancedMode()
+										? t("editor.export.hideOptions")
+										: t("editor.export.showOptions")}
+								</span>
 								<IconCapChevronDown
 									class={cx(
 										"size-4 transition-transform",
@@ -1315,10 +1326,11 @@ export function ExportPage() {
 											/>
 										</div>
 										<div class="text-left">
-											<span class="block">Export cursor only</span>
+											<span class="block">
+												{t("editor.export.exportCursorOnly")}
+											</span>
 											<span class="text-[10px] text-gray-9">
-												Keeps the same cursor motion and clicks on a transparent
-												background
+												{t("editor.export.exportCursorOnlyDescription")}
 											</span>
 										</div>
 									</button>
@@ -1329,11 +1341,10 @@ export function ExportPage() {
 												<IconLucideAlertTriangle class="mt-0.5 size-4 shrink-0 text-amber-11" />
 												<div class="text-left">
 													<p class="text-xs font-medium text-amber-11">
-														Warning
+														{t("editor.export.warning")}
 													</p>
 													<p class="text-[10px] text-amber-11">
-														Exports as a transparent MOV. Files are large and
-														best for compositing or editing.
+														{t("editor.export.cursorOnlyWarning")}
 													</p>
 												</div>
 											</div>
@@ -1343,7 +1354,9 @@ export function ExportPage() {
 									<Show when={settings.format === "Mp4" && !cursorOnly()}>
 										<div class="space-y-2 border-t border-gray-4 pt-3">
 											<div class="flex items-center justify-between text-xs">
-												<span class="text-gray-11">Bits per pixel</span>
+												<span class="text-gray-11">
+													{t("editor.export.bitsPerPixel")}
+												</span>
 												<span class="text-gray-12 font-medium tabular-nums">
 													{compressionBpp().toFixed(2)}
 												</span>
@@ -1370,12 +1383,12 @@ export function ExportPage() {
 												class="w-full h-1.5 bg-gray-4 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-9 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
 											/>
 											<div class="flex justify-between text-[10px] text-gray-9">
-												<span>0.02 (tiny)</span>
-												<span>0.50 (huge)</span>
+												<span>{t("editor.export.tinyBitrate")}</span>
+												<span>{t("editor.export.hugeBitrate")}</span>
 											</div>
 											<Show when={isCustomBpp()}>
 												<p class="text-[10px] text-amber-11 mt-1">
-													Using custom bitrate
+													{t("editor.export.usingCustomBitrate")}
 												</p>
 											</Show>
 
@@ -1385,7 +1398,7 @@ export function ExportPage() {
 														type="button"
 														role="switch"
 														aria-checked={forceFfmpegDecoder()}
-														aria-label="Force FFmpeg decoder"
+														aria-label={t("editor.export.forceFfmpegDecoder")}
 														class="flex items-center gap-2 text-xs text-gray-11 hover:text-gray-12 transition-colors w-full"
 														onClick={() =>
 															setForceFfmpegDecoder(!forceFfmpegDecoder())
@@ -1409,9 +1422,13 @@ export function ExportPage() {
 															/>
 														</div>
 														<div class="text-left">
-															<span class="block">Force FFmpeg decoder</span>
+															<span class="block">
+																{t("editor.export.forceFfmpegDecoder")}
+															</span>
 															<span class="text-[10px] text-gray-9">
-																Skip hardware decoder (auto-fallback enabled)
+																{t(
+																	"editor.export.forceFfmpegDecoderDescription",
+																)}
 															</span>
 														</div>
 													</button>
@@ -1429,7 +1446,7 @@ export function ExportPage() {
 							<div class="flex flex-col items-center gap-2.5">
 								<SignInButton class="w-full justify-center">
 									<IconCapLink class="size-4" />
-									<span>{t("signInToShare")}</span>
+									<span>{t("editor.export.actions.signInToShare")}</span>
 								</SignInButton>
 							</div>
 						) : (
@@ -1447,19 +1464,19 @@ export function ExportPage() {
 									{settings.exportTo === "file" && (
 										<>
 											<IconCapFile class="size-5" />
-											Export to File
+											{t("editor.export.actions.exportToFile")}
 										</>
 									)}
 									{settings.exportTo === "clipboard" && (
 										<>
 											<IconCapCopy class="size-5" />
-											Export to Clipboard
+											{t("editor.export.actions.exportToClipboard")}
 										</>
 									)}
 									{settings.exportTo === "link" && (
 										<>
 											<IconCapLink class="size-5" />
-											Export to Link
+											{t("editor.export.actions.exportToLink")}
 										</>
 									)}
 								</Button>
@@ -1493,7 +1510,7 @@ export function ExportPage() {
 							{(url) => (
 								<img
 									src={url()}
-									alt="Export preview full size"
+									alt={t("editor.export.previewFullAlt")}
 									class="w-full h-full object-contain"
 								/>
 							)}
@@ -1507,7 +1524,9 @@ export function ExportPage() {
 							{(est) => {
 								return (
 									<span>
-										Estimated size: {est().estimatedSizeMb.toFixed(1)} MB
+										{t("editor.export.estimatedSizeWithValue", {
+											size: est().estimatedSizeMb.toFixed(1),
+										})}
 									</span>
 								);
 							}}
@@ -1549,8 +1568,10 @@ export function ExportPage() {
 													<ActiveExport
 														heading={
 															renderState.type === "rendering"
-																? `Rendering ${exportMediumLabel()}`
-																: "Preparing export"
+																? t("editor.export.status.rendering", {
+																		type: exportMediumLabel(),
+																	})
+																: t("editor.export.status.preparingExport")
 														}
 														state={renderState}
 														onCancel={handleCancel}
@@ -1558,12 +1579,16 @@ export function ExportPage() {
 												)}
 											</Match>
 											<Match when={copyState.type === "copying"}>
-												<ActiveExport heading="Copying to clipboard" />
+												<ActiveExport
+													heading={t("editor.export.status.copying")}
+												/>
 											</Match>
 											<Match when={copyState.type === "done"}>
 												<CompletedExport
-													title={t("copiedToClipboardTitle")}
-													subtitle={`Your ${exportMediumLabel()} is ready to paste`}
+													title={t("editor.export.status.copied")}
+													subtitle={t("editor.export.status.readyToPaste", {
+														type: exportMediumLabel(),
+													})}
 												/>
 											</Match>
 										</Switch>
@@ -1588,8 +1613,10 @@ export function ExportPage() {
 													<ActiveExport
 														heading={
 															renderState.type === "rendering"
-																? `Rendering ${exportMediumLabel()}`
-																: "Preparing export"
+																? t("editor.export.status.rendering", {
+																		type: exportMediumLabel(),
+																	})
+																: t("editor.export.status.preparingExport")
 														}
 														state={renderState}
 														onCancel={handleCancel}
@@ -1597,12 +1624,16 @@ export function ExportPage() {
 												)}
 											</Match>
 											<Match when={saveState.type === "copying"}>
-												<ActiveExport heading="Saving to file" />
+												<ActiveExport
+													heading={t("editor.export.status.savingToFile")}
+												/>
 											</Match>
 											<Match when={saveState.type === "done"}>
 												<CompletedExport
-													title={t("exportCompleteTitle")}
-													subtitle={`Your ${exportMediumLabel()} is ready`}
+													title={t("editor.export.status.exportComplete")}
+													subtitle={t("editor.export.status.ready", {
+														type: exportMediumLabel(),
+													})}
 												/>
 											</Match>
 										</Switch>
@@ -1621,7 +1652,7 @@ export function ExportPage() {
 											>
 												{(uploading) => (
 													<ActiveExport
-														heading="Uploading"
+														heading={t("editor.export.status.uploading")}
 														percent={uploading.progress}
 													/>
 												)}
@@ -1638,8 +1669,10 @@ export function ExportPage() {
 													<ActiveExport
 														heading={
 															renderState.type === "rendering"
-																? `Rendering ${exportMediumLabel()}`
-																: "Preparing export"
+																? t("editor.export.status.rendering", {
+																		type: exportMediumLabel(),
+																	})
+																: t("editor.export.status.preparingExport")
 														}
 														state={renderState}
 														onCancel={handleCancel}
@@ -1648,8 +1681,8 @@ export function ExportPage() {
 											</Match>
 											<Match when={uploadState.type === "done"}>
 												<CompletedExport
-													title={t("uploadCompleteTitle")}
-													subtitle="Your Cap has been uploaded successfully"
+													title={t("editor.export.status.uploadComplete")}
+													subtitle={t("editor.export.status.uploadSuccess")}
 												/>
 											</Match>
 										</Switch>
@@ -1682,7 +1715,7 @@ export function ExportPage() {
 													) : (
 														<IconLucideCheck class="transition-colors duration-200 text-gray-1 size-4 svgpathanimation group-hover:text-gray-12" />
 													)}
-													<p>Copy Link</p>
+													<p>{t("editor.export.actions.copyLink")}</p>
 												</Button>
 												<a href={link()} target="_blank" rel="noreferrer">
 													<Button
@@ -1690,7 +1723,7 @@ export function ExportPage() {
 														class="flex gap-2 justify-center items-center"
 													>
 														<IconCapLink class="transition-colors duration-200 text-gray-1 size-4 group-hover:text-gray-12" />
-														<p>Open Link</p>
+														<p>{t("editor.export.actions.openLink")}</p>
 													</Button>
 												</a>
 											</div>
@@ -1724,7 +1757,9 @@ export function ExportPage() {
 														}, 2000);
 														await commands.copyVideoToClipboard(path);
 														toast.success(
-															`${exportedAssetLabel()} copied to clipboard`,
+															t("editor.export.messages.exportedToClipboard", {
+																type: exportedAssetLabel(),
+															}),
 														);
 													}
 												}}
@@ -1748,16 +1783,17 @@ export function ExportPage() {
 										}}
 									>
 										<IconCapMoveLeft class="size-4" />
-										Back to editor
+										{t("editor.export.backToEditor")}
 									</Button>
 								</div>
 							</Show>
 
 							<Show when={exportState.type !== "done"}>
 								<p class="max-w-sm text-xs leading-relaxed text-center text-gray-11">
-									<span class="font-semibold text-gray-12">Tip:</span> Use
-									Instant Mode for your next recording to record and upload on
-									the fly, with no exporting required.
+									<span class="font-semibold text-gray-12">
+										{t("editor.export.tipLabel")}
+									</span>{" "}
+									{t("editor.export.instantModeTip")}
 								</p>
 							</Show>
 						</div>
@@ -1837,14 +1873,15 @@ function ActiveExport(props: {
 					{(rendered) => (
 						<p class="text-sm tabular-nums text-gray-11">
 							{rendered().renderedCount.toLocaleString()} /{" "}
-							{rendered().totalFrames.toLocaleString()} frames
+							{rendered().totalFrames.toLocaleString()}{" "}
+							{t("editor.export.frames")}
 						</p>
 					)}
 				</Show>
 			</div>
 			<Show when={props.onCancel}>
 				<Button variant="gray" size="sm" onClick={() => props.onCancel?.()}>
-					Cancel
+					{t("behaviours.cancel")}
 				</Button>
 			</Show>
 		</div>

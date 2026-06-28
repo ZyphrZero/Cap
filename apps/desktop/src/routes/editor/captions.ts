@@ -1,4 +1,5 @@
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { arch, type as osType } from "@tauri-apps/plugin-os";
 
 import { defaultCaptionSettings } from "~/store/captions";
 import {
@@ -10,7 +11,6 @@ import {
 	type SegmentRecordings,
 	type TimelineSegment,
 } from "~/utils/tauri";
-import { getTauriArch, getTauriOsType } from "~/utils/tauri-runtime";
 export const DEFAULT_CAPTION_MODEL = "best";
 export const DEFAULT_WHISPER_CAPTION_MODEL = "small";
 export const DEFAULT_CAPTION_LANGUAGE = "auto";
@@ -44,7 +44,7 @@ function clampCaptionSegmentWords(segment: CaptionSegment): CaptionSegment {
 }
 
 export function supportsParakeetTranscription() {
-	return !(getTauriOsType() === "macos" && getTauriArch() === "x86_64");
+	return !(osType() === "macos" && arch() === "x86_64");
 }
 
 export function resolveCaptionModel(model: string | null | undefined) {

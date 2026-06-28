@@ -1,4 +1,5 @@
 import { createMemo, createUniqueId, For, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import type { OrganizationBrandColorSwatch } from "~/utils/organization-branding";
 import { BrandColorsDropdown } from "./BrandColorsDropdown";
 import { hexToRgb, RgbInput } from "./color-utils";
@@ -130,7 +131,9 @@ export function GradientEditor(props: {
 
 					<div class="flex gap-3 items-end">
 						<div class="flex-1 min-w-0">
-							<span class="text-[11px] text-gray-10 mb-1 block">From</span>
+							<span class="text-[11px] text-gray-10 mb-1 block">
+								{t("editor.gradient.from")}
+							</span>
 							<div class="flex flex-col gap-2">
 								<RgbInput
 									value={src().from}
@@ -145,7 +148,9 @@ export function GradientEditor(props: {
 							</div>
 						</div>
 						<div class="flex-1 min-w-0">
-							<span class="text-[11px] text-gray-10 mb-1 block">To</span>
+							<span class="text-[11px] text-gray-10 mb-1 block">
+								{t("editor.gradient.to")}
+							</span>
 							<div class="flex flex-col gap-2">
 								<RgbInput
 									value={src().to}
@@ -163,7 +168,10 @@ export function GradientEditor(props: {
 
 					<div class="w-full border-t border-dashed border-gray-5 my-1" />
 
-					<Subfield name="Angle" class="gap-4 items-center">
+					<Subfield
+						name={t("editor.gradient.angle")}
+						class="gap-4 items-center"
+					>
 						<div class="flex flex-1 gap-3 items-center">
 							<Slider
 								class="flex-1"
@@ -184,7 +192,7 @@ export function GradientEditor(props: {
 
 					<div class="w-full border-t border-dashed border-gray-5 my-1" />
 
-					<Subfield name="Noise">
+					<Subfield name={t("editor.gradient.noise")}>
 						<div class="w-[120px]">
 							<Slider
 								value={[noiseIntensity()]}
@@ -202,7 +210,7 @@ export function GradientEditor(props: {
 					</Subfield>
 
 					<Show when={noiseIntensity() > 0}>
-						<Subfield name="Grain Scale">
+						<Subfield name={t("editor.gradient.grainScale")}>
 							<div class="w-[120px]">
 								<Slider
 									value={[noiseScale()]}
@@ -232,7 +240,7 @@ export function GradientEditor(props: {
 									to: randomColor(),
 								});
 							}}
-							title="Randomize"
+							title={t("editor.gradient.randomize")}
 						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"

@@ -84,29 +84,43 @@ interface LanguageOption {
 const MODEL_OPTIONS: ModelOption[] = [
 	{
 		name: "best",
-		label: "Recommended",
+		get label() {
+			return t("editor.captions.models.recommended");
+		},
 		modelName: "parakeet-tdt-0.6b-v3 int8",
 		size: "~640MB",
-		description: "Best balance for most recordings",
+		get description() {
+			return t("editor.captions.models.recommendedDescription");
+		},
 	},
 	{
 		name: "best-max",
-		label: "High Accuracy",
+		get label() {
+			return t("editor.captions.models.highAccuracy");
+		},
 		modelName: "parakeet-tdt-0.6b-v3",
 		size: "~2.4GB",
-		description: "Larger download, higher accuracy",
+		get description() {
+			return t("editor.captions.models.highAccuracyDescription");
+		},
 	},
 	{
 		name: "small",
 		modelName: "whisper.cpp small",
-		label: "Small",
+		get label() {
+			return t("editor.captions.models.small");
+		},
 		size: "466MB",
-		description: "Smallest download",
+		get description() {
+			return t("editor.captions.models.smallDescription");
+		},
 	},
 	{
 		name: "medium",
 		modelName: "whisper.cpp medium",
-		label: "Medium",
+		get label() {
+			return t("editor.captions.models.medium");
+		},
 		size: "1.5GB",
 		get description() {
 			return t("editor.captions.slowerMoreAccurate");
@@ -115,36 +129,162 @@ const MODEL_OPTIONS: ModelOption[] = [
 ];
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
-	{ code: "auto", label: "Auto Detect" },
-	{ code: "en", label: "English" },
-	{ code: "es", label: "Spanish" },
-	{ code: "fr", label: "French" },
-	{ code: "de", label: "German" },
-	{ code: "it", label: "Italian" },
-	{ code: "pt", label: "Portuguese" },
-	{ code: "nl", label: "Dutch" },
-	{ code: "pl", label: "Polish" },
-	{ code: "ru", label: "Russian" },
-	{ code: "sk", label: "Slovak" },
-	{ code: "tr", label: "Turkish" },
-	{ code: "ja", label: "Japanese" },
-	{ code: "ko", label: "Korean" },
-	{ code: "zh", label: "Chinese" },
-	{ code: "ar", label: "Arabic" },
-	{ code: "hi", label: "Hindi" },
-	{ code: "bn", label: "Bengali" },
-	{ code: "ta", label: "Tamil" },
-	{ code: "te", label: "Telugu" },
-	{ code: "mr", label: "Marathi" },
-	{ code: "gu", label: "Gujarati" },
-	{ code: "pa", label: "Punjabi" },
-	{ code: "ur", label: "Urdu" },
-	{ code: "fa", label: "Persian" },
-	{ code: "he", label: "Hebrew" },
-	{ code: "ar", label: "Arabic" },
-	{ code: "hi", label: "Hindi" },
-	{ code: "bn", label: "Bengali" },
-	{ code: "ta", label: "Tamil" },
+	{
+		code: "auto",
+		get label() {
+			return t("editor.captions.languages.auto");
+		},
+	},
+	{
+		code: "en",
+		get label() {
+			return t("editor.captions.languages.en");
+		},
+	},
+	{
+		code: "es",
+		get label() {
+			return t("editor.captions.languages.es");
+		},
+	},
+	{
+		code: "fr",
+		get label() {
+			return t("editor.captions.languages.fr");
+		},
+	},
+	{
+		code: "de",
+		get label() {
+			return t("editor.captions.languages.de");
+		},
+	},
+	{
+		code: "it",
+		get label() {
+			return t("editor.captions.languages.it");
+		},
+	},
+	{
+		code: "pt",
+		get label() {
+			return t("editor.captions.languages.pt");
+		},
+	},
+	{
+		code: "nl",
+		get label() {
+			return t("editor.captions.languages.nl");
+		},
+	},
+	{
+		code: "pl",
+		get label() {
+			return t("editor.captions.languages.pl");
+		},
+	},
+	{
+		code: "ru",
+		get label() {
+			return t("editor.captions.languages.ru");
+		},
+	},
+	{
+		code: "sk",
+		get label() {
+			return t("editor.captions.languages.sk");
+		},
+	},
+	{
+		code: "tr",
+		get label() {
+			return t("editor.captions.languages.tr");
+		},
+	},
+	{
+		code: "ja",
+		get label() {
+			return t("editor.captions.languages.ja");
+		},
+	},
+	{
+		code: "ko",
+		get label() {
+			return t("editor.captions.languages.ko");
+		},
+	},
+	{
+		code: "zh",
+		get label() {
+			return t("editor.captions.languages.zh");
+		},
+	},
+	{
+		code: "ar",
+		get label() {
+			return t("editor.captions.languages.ar");
+		},
+	},
+	{
+		code: "hi",
+		get label() {
+			return t("editor.captions.languages.hi");
+		},
+	},
+	{
+		code: "bn",
+		get label() {
+			return t("editor.captions.languages.bn");
+		},
+	},
+	{
+		code: "ta",
+		get label() {
+			return t("editor.captions.languages.ta");
+		},
+	},
+	{
+		code: "te",
+		get label() {
+			return t("editor.captions.languages.te");
+		},
+	},
+	{
+		code: "mr",
+		get label() {
+			return t("editor.captions.languages.mr");
+		},
+	},
+	{
+		code: "gu",
+		get label() {
+			return t("editor.captions.languages.gu");
+		},
+	},
+	{
+		code: "pa",
+		get label() {
+			return t("editor.captions.languages.pa");
+		},
+	},
+	{
+		code: "ur",
+		get label() {
+			return t("editor.captions.languages.ur");
+		},
+	},
+	{
+		code: "fa",
+		get label() {
+			return t("editor.captions.languages.fa");
+		},
+	},
+	{
+		code: "he",
+		get label() {
+			return t("editor.captions.languages.he");
+		},
+	},
 ];
 
 const STYLE_PRESET_KEYS = new Set<keyof EditorCaptionSettings>([
@@ -608,14 +748,14 @@ export function CaptionsTab(props: {
 				setEditorState("timeline", "tracks", "caption", true);
 				setEditorState("captions", "isStale", false);
 
-				toast.success("Captions generated successfully!");
+				toast.success(t("editor.captions.generateSuccess"));
 			} else {
 				toast.error(t("editor.captions.noCaptionsGenerated"));
 			}
 		} catch (error) {
 			console.error("Error generating captions:", error);
 			const errorMessage = getCaptionGenerationErrorMessage(error);
-			toast.error(`Failed to generate captions: ${errorMessage}`);
+			toast.error(t("editor.captions.generateFailed", { error: errorMessage }));
 		} finally {
 			setIsGenerating(false);
 		}
@@ -628,11 +768,18 @@ export function CaptionsTab(props: {
 	);
 
 	return (
-		<Field name="Captions" icon={<IconCapMessageBubble />} badge="Beta">
+		<Field
+			name={t("editor.captions.title")}
+			icon={<IconCapMessageBubble />}
+			badge={t("common.beta")}
+		>
 			<div class="flex flex-col gap-4">
 				<div class="space-y-6 transition-all duration-200">
 					<div class="space-y-4">
-						<Subfield name="Model" class="items-start">
+						<Subfield
+							name={t("editor.captions.modelShort")}
+							class="items-start"
+						>
 							<KSelect<string>
 								options={availableModelOptions().map((model) => model.name)}
 								value={selectedModel()}
@@ -690,7 +837,8 @@ export function CaptionsTab(props: {
 									<div class="min-w-0 flex-1 text-left">
 										<div class="flex items-center gap-1.5">
 											<span class="truncate font-medium">
-												{selectedModelOption()?.label || "Select a model"}
+												{selectedModelOption()?.label ||
+													t("editor.captions.selectModel")}
 											</span>
 											<Show when={selectedModelOption()}>
 												<Tooltip
@@ -738,12 +886,11 @@ export function CaptionsTab(props: {
 
 						<Show when={!supportsParakeetTranscription()}>
 							<p class="text-xs text-gray-10">
-								Parakeet caption models are unavailable on Intel Macs. Whisper
-								models remain available.
+								{t("editor.captions.parakeetUnavailable")}
 							</p>
 						</Show>
 
-						<Subfield name="Language">
+						<Subfield name={t("editor.captions.language")}>
 							<KSelect<string>
 								options={LANGUAGE_OPTIONS.map((l) => l.code)}
 								value={selectedLanguage()}
@@ -859,7 +1006,10 @@ export function CaptionsTab(props: {
 							!hasCaptions() && "opacity-50 pointer-events-none",
 						)}
 					>
-						<Field name="Style" icon={<IconCapMessageBubble />}>
+						<Field
+							name={t("editor.captions.style")}
+							icon={<IconCapMessageBubble />}
+						>
 							<div class="grid grid-cols-2 gap-2">
 								<For each={CAPTION_STYLE_PRESETS}>
 									{(preset) => (
@@ -885,17 +1035,20 @@ export function CaptionsTab(props: {
 								<Show when={selectedPresetId() === "custom"}>
 									<div class="flex flex-col gap-1.5 rounded-lg border border-blue-9 p-1.5 text-left ring-1 ring-blue-9">
 										<div class="flex h-12 items-center justify-center rounded-md bg-gray-2 text-xs text-gray-10">
-											Custom
+											{t("editor.captions.fontWeights.custom")}
 										</div>
 										<span class="px-0.5 text-xs font-medium text-gray-12">
-											Custom
+											{t("editor.captions.fontWeights.custom")}
 										</span>
 									</div>
 								</Show>
 							</div>
 						</Field>
 
-						<Field name="Font Settings" icon={<IconCapMessageBubble />}>
+						<Field
+							name={t("editor.captions.fontSettings")}
+							icon={<IconCapMessageBubble />}
+						>
 							<div class="space-y-3">
 								<div class="flex flex-col gap-2">
 									<span class="text-gray-11 text-sm">
@@ -965,7 +1118,9 @@ export function CaptionsTab(props: {
 								</div>
 
 								<div class="flex items-center justify-between">
-									<span class="text-gray-11 text-sm">Uppercase</span>
+									<span class="text-gray-11 text-sm">
+										{t("editor.captions.uppercase")}
+									</span>
 									<Toggle
 										checked={getSetting("uppercase")}
 										onChange={(checked) =>
@@ -995,7 +1150,9 @@ export function CaptionsTab(props: {
 
 								<Show when={getSetting("activeWordHighlight")}>
 									<div class="flex flex-col gap-2">
-										<span class="text-gray-11 text-sm">Highlight Style</span>
+										<span class="text-gray-11 text-sm">
+											{t("editor.captions.highlightStyle")}
+										</span>
 										<KSelect<string>
 											options={CAPTION_HIGHLIGHT_STYLE_OPTIONS.map(
 												(o) => o.value,
@@ -1051,7 +1208,9 @@ export function CaptionsTab(props: {
 								</Show>
 
 								<div class="flex flex-col gap-2">
-									<span class="text-gray-11 text-sm">Text Color</span>
+									<span class="text-gray-11 text-sm">
+										{t("editor.captions.textColor")}
+									</span>
 									<HexColorInput
 										value={getSetting("color")}
 										brandColorSwatches={props.brandColorSwatches}
@@ -1067,7 +1226,9 @@ export function CaptionsTab(props: {
 						>
 							<div class="space-y-3">
 								<div class="flex flex-col gap-2">
-									<span class="text-gray-11 text-sm">Background Color</span>
+									<span class="text-gray-11 text-sm">
+										{t("editor.captions.backgroundColor")}
+									</span>
 									<HexColorInput
 										value={getSetting("backgroundColor")}
 										brandColorSwatches={props.brandColorSwatches}
@@ -1157,7 +1318,9 @@ export function CaptionsTab(props: {
 						>
 							<div class="space-y-3">
 								<div class="flex flex-col gap-2">
-									<span class="text-gray-11 text-sm">Animation Style</span>
+									<span class="text-gray-11 text-sm">
+										{t("editor.captions.animationStyle")}
+									</span>
 									<KSelect<string>
 										options={CAPTION_ANIMATION_OPTIONS.map((o) => o.value)}
 										value={getSetting("animation")}
@@ -1209,7 +1372,9 @@ export function CaptionsTab(props: {
 									</KSelect>
 								</div>
 								<div class="flex flex-col gap-2">
-									<span class="text-gray-11 text-sm">Highlight Color</span>
+									<span class="text-gray-11 text-sm">
+										{t("editor.captions.highlightColor")}
+									</span>
 									<HexColorInput
 										value={getSetting("highlightColor")}
 										brandColorSwatches={props.brandColorSwatches}
@@ -1323,13 +1488,13 @@ export function CaptionsTab(props: {
 						{(() => {
 							return (
 								<Field
-									name="Selected Caption Override"
+									name={t("editor.keyboardTab.selectedSegmentOverride")}
 									icon={<IconCapMessageBubble />}
 								>
 									<Show when={selectedCaptionSegment()}>
 										{(seg) => (
 											<div class="space-y-3">
-												<Subfield name="Start Time">
+												<Subfield name={t("editor.captions.startTime")}>
 													<Input
 														type="number"
 														value={seg().start.toFixed(2)}
@@ -1344,7 +1509,7 @@ export function CaptionsTab(props: {
 														}
 													/>
 												</Subfield>
-												<Subfield name="End Time">
+												<Subfield name={t("editor.captions.endTime")}>
 													<Input
 														type="number"
 														value={seg().end.toFixed(2)}
@@ -1357,7 +1522,7 @@ export function CaptionsTab(props: {
 														}
 													/>
 												</Subfield>
-												<Subfield name="Caption Text">
+												<Subfield name={t("editor.captions.text")}>
 													<Input
 														type="text"
 														value={seg().text}
@@ -1374,7 +1539,9 @@ export function CaptionsTab(props: {
 														}
 													/>
 												</Subfield>
-												<Subfield name="Fade Duration Override">
+												<Subfield
+													name={t("editor.captions.fadeDurationOverride")}
+												>
 													<Slider
 														value={[
 															(seg().fadeDurationOverride ??

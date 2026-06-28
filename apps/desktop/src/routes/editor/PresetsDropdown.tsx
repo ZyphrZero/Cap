@@ -85,22 +85,24 @@ export function PresetsDropdown() {
 															applyPreset();
 														}}
 													>
-														Apply
+														{t("editor.presets.apply")}
 													</DropdownItem>
 													<DropdownItem
 														onSelect={async () => {
 															await presets.saveToPreset(i(), project);
 															toast.success(
-																`Saved settings to "${preset.name}"`,
+																t("editor.presets.savedSettings", {
+																	name: preset.name,
+																}),
 															);
 														}}
 													>
-														Save settings to preset
+														{t("editor.presets.saveSettings")}
 													</DropdownItem>
 													<DropdownItem
 														onSelect={() => presets.setDefault(i())}
 													>
-														Set as default
+														{t("editor.presets.setDefault")}
 													</DropdownItem>
 													<DropdownItem
 														onSelect={() =>
@@ -111,7 +113,7 @@ export function PresetsDropdown() {
 															})
 														}
 													>
-														Rename
+														{t("editor.presets.rename")}
 													</DropdownItem>
 													<DropdownItem
 														onClick={() =>
@@ -122,7 +124,7 @@ export function PresetsDropdown() {
 															})
 														}
 													>
-														Delete
+														{t("editor.presets.delete")}
 													</DropdownItem>
 												</MenuItemList>
 											</KDropdownMenu.Portal>

@@ -2,6 +2,7 @@ import { createElementBounds } from "@solid-primitives/bounds";
 import { createEventListener } from "@solid-primitives/event-listener";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
+import { platform } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	batch,
@@ -25,7 +26,6 @@ import { t } from "~/components/I18nProvider";
 import { defaultCaptionSettings } from "~/store/captions";
 import { defaultKeyboardSettings } from "~/store/keyboard";
 import { commands } from "~/utils/tauri";
-import { getTauriPlatform } from "~/utils/tauri-runtime";
 import type { AudioTrackSegment } from "../audio";
 import {
 	applyCaptionResultToProject,
@@ -77,49 +77,65 @@ type TrackDefinition = {
 const trackDefinitions: TrackDefinition[] = [
 	{
 		type: "clip",
-		label: t("editor.timeline.clip.label"),
+		get label() {
+			return t("editor.timeline.clip.label");
+		},
 		icon: trackIcons.clip,
 		locked: true,
 	},
 	{
 		type: "caption",
-		label: "Captions",
+		get label() {
+			return t("editor.timeline.captions.label");
+		},
 		icon: trackIcons.caption,
 		locked: false,
 	},
 	{
 		type: "keyboard",
-		label: "Keyboard",
+		get label() {
+			return t("editor.timeline.keyboard.label");
+		},
 		icon: trackIcons.keyboard,
 		locked: false,
 	},
 	{
 		type: "text",
-		label: t("editor.timeline.text.label"),
+		get label() {
+			return t("editor.timeline.text.label");
+		},
 		icon: trackIcons.text,
 		locked: false,
 	},
 	{
 		type: "mask",
-		label: t("editor.timeline.mask.label"),
+		get label() {
+			return t("editor.timeline.mask.label");
+		},
 		icon: trackIcons.mask,
 		locked: false,
 	},
 	{
 		type: "audio",
-		label: "Audio",
+		get label() {
+			return t("editor.timeline.audio.label");
+		},
 		icon: trackIcons.audio,
 		locked: false,
 	},
 	{
 		type: "zoom",
-		label: t("editor.timeline.zoom.label"),
+		get label() {
+			return t("editor.timeline.zoom.label");
+		},
 		icon: trackIcons.zoom,
 		locked: true,
 	},
 	{
 		type: "scene",
-		label: t("editor.timeline.scene.label"),
+		get label() {
+			return t("editor.timeline.scene.label");
+		},
 		icon: trackIcons.scene,
 		locked: false,
 	},
@@ -487,7 +503,9 @@ export function Timeline(props: {
 		const menu = await Menu.new({
 			items: [
 				await MenuItem.new({
-					text: `Delete ${type} track`,
+					text: t("editor.timeline.deleteNamedTrack", {
+						type: t(`editor.timeline.${type}.label`),
+					}),
 					action: () => handleDeleteTrackLane(type, laneIndex),
 				}),
 			],
@@ -752,9 +770,7 @@ export function Timeline(props: {
 			);
 
 			if (result.segments.length < 1) {
-				toast.error(
-					"No captions were generated. The audio might be too quiet or unclear.",
-				);
+				toast.error(t("editor.captions.noCaptionsGenerated"));
 				return;
 			}
 
@@ -771,11 +787,11 @@ export function Timeline(props: {
 
 			setEditorState("timeline", "tracks", "caption", true);
 			setEditorState("captions", "isStale", false);
-			toast.success("Captions generated successfully!");
+			toast.success(t("editor.captions.generateSuccess"));
 		} catch (error) {
 			console.error("Error generating captions:", error);
 			const errorMessage = getCaptionGenerationErrorMessage(error);
-			toast.error(`Failed to generate captions: ${errorMessage}`);
+			toast.error(t("editor.captions.generateFailed", { error: errorMessage }));
 		} finally {
 			setEditorState("captions", "isGenerating", false);
 		}
@@ -883,7 +899,7 @@ export function Timeline(props: {
 
 						if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) {
 							delta = e.deltaX;
-						} else if (getTauriPlatform() === "macos") {
+						} else if (platform() === "macos") {
 							delta = e.shiftKey ? e.deltaX : e.deltaY;
 						} else {
 							delta = e.deltaY;
@@ -969,7 +985,11 @@ export function Timeline(props: {
 						}}
 					>
 						<div class="flex flex-col gap-2 min-h-full">
-							<TrackRow icon={trackIcons.clip} label="Video" type="clip">
+							<TrackRow
+								icon={trackIcons.clip}
+								label={t("editor.timeline.video.label")}
+								type="clip"
+							>
 								<ClipTrack
 									ref={setTimelineRef}
 									handleUpdatePlayhead={handleUpdatePlayhead}
@@ -978,7 +998,7 @@ export function Timeline(props: {
 							<Show when={captionTrackVisible()}>
 								<TrackRow
 									icon={trackIcons.caption}
-									label="Captions"
+									label={t("editor.timeline.captions.label")}
 									type="caption"
 									onDelete={() => handleDeleteSingleTrack("caption")}
 								>
@@ -995,7 +1015,7 @@ export function Timeline(props: {
 							<Show when={keyboardTrackVisible()}>
 								<TrackRow
 									icon={trackIcons.keyboard}
-									label="Keyboard"
+									label={t("editor.timeline.keyboard.label")}
 									type="keyboard"
 									onDelete={() => handleDeleteSingleTrack("keyboard")}
 								>
@@ -1011,7 +1031,7 @@ export function Timeline(props: {
 								{(laneIndex) => (
 									<TrackRow
 										icon={trackIcons.text}
-										label="Text"
+										label={t("editor.timeline.text.label")}
 										type="text"
 										onDelete={() => handleDeleteTrackLane("text", laneIndex)}
 										onContextMenu={(e) =>
@@ -1032,7 +1052,7 @@ export function Timeline(props: {
 								{(laneIndex) => (
 									<TrackRow
 										icon={trackIcons.mask}
-										label="Mask"
+										label={t("editor.timeline.mask.label")}
 										type="mask"
 										onDelete={() => handleDeleteTrackLane("mask", laneIndex)}
 										onContextMenu={(e) =>
@@ -1053,7 +1073,7 @@ export function Timeline(props: {
 								{(laneIndex) => (
 									<TrackRow
 										icon={trackIcons.audio}
-										label="Audio"
+										label={t("editor.timeline.audio.label")}
 										type="audio"
 										onDelete={() => handleDeleteTrackLane("audio", laneIndex)}
 										onContextMenu={(e) =>
@@ -1071,7 +1091,11 @@ export function Timeline(props: {
 									</TrackRow>
 								)}
 							</For>
-							<TrackRow icon={trackIcons.zoom} label="Zoom" type="zoom">
+							<TrackRow
+								icon={trackIcons.zoom}
+								label={t("editor.timeline.zoom.label")}
+								type="zoom"
+							>
 								<ZoomTrack
 									onDragStateChanged={(v) => {
 										zoomSegmentDragState = v;
@@ -1080,7 +1104,11 @@ export function Timeline(props: {
 								/>
 							</TrackRow>
 							<Show when={sceneTrackVisible()}>
-								<TrackRow icon={trackIcons.scene} label="Scene" type="scene">
+								<TrackRow
+									icon={trackIcons.scene}
+									label={t("editor.timeline.scene.label")}
+									type="scene"
+								>
 									<SceneTrack
 										onDragStateChanged={(v) => {
 											sceneSegmentDragState = v;

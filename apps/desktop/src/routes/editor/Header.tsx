@@ -2,6 +2,7 @@ import { Button } from "@cap/ui-solid";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import {
 	type ComponentProps,
@@ -18,7 +19,6 @@ import CaptionControlsMacOS from "~/components/titlebar/controls/CaptionControls
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { trackEvent } from "~/utils/analytics";
 import { commands } from "~/utils/tauri";
-import { getTauriOsType } from "~/utils/tauri-runtime";
 import { initializeTitlebar } from "~/utils/titlebar-state";
 import { useEditorContext } from "./context";
 import OrganizationDropdown from "./OrganizationDropdown";
@@ -87,7 +87,11 @@ export function Header() {
 		return "type" in d && d.type === "clips" && d.open;
 	});
 
-	const osType = getTauriOsType();
+	const osType = ostype();
+	const customDomainData = createMemo(() => {
+		if (customDomain.status !== "success") return null;
+		return customDomain.data ?? null;
+	});
 
 	return (
 		<div
@@ -115,7 +119,6 @@ export function Header() {
 					onClick={() => {
 						clearTimelineSelection();
 
-						console.log({ path: `${editorInstance.path}/` });
 						revealItemInDir(`${editorInstance.path}/`);
 					}}
 					tooltipText={t("editor.header.openBundleTooltip")}
@@ -185,7 +188,7 @@ export function Header() {
 					leftIcon={<IconCapRedo class="w-5" />}
 				/>
 				<div data-tauri-drag-region class="flex-1 h-full" />
-				<Show when={customDomain.data}>
+				<Show when={customDomainData()}>
 					<ShareButton />
 				</Show>
 				<Button
@@ -201,7 +204,7 @@ export function Header() {
 					}}
 				>
 					<IconCapClapperboard class="size-4" />
-					Clips
+					{t("editor.clipsSidebar.clips")}
 				</Button>
 				<Show when={hasTranscript()}>
 					<Button
@@ -222,7 +225,9 @@ export function Header() {
 						>
 							<IconLucideArrowLeft class="size-4" />
 						</Show>
-						{isTranscriptOpen() ? "Back" : "Transcript"}
+						{isTranscriptOpen()
+							? t("common.back")
+							: t("editor.transcript.title")}
 					</Button>
 				</Show>
 				<button
@@ -245,7 +250,7 @@ export function Header() {
 					}}
 				>
 					<UploadIcon class="size-4" />
-					Export
+					{t("editor.header.export")}
 				</button>
 				{osType === "windows" && <CaptionControlsWindows11 />}
 			</div>

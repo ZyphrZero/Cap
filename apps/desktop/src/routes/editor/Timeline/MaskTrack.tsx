@@ -309,9 +309,9 @@ export function MaskTrack(props: {
 						fallback={<div class="w-full rounded-xl bg-transparent" />}
 					>
 						<div class="text-center text-sm text-(--text-tertiary) flex flex-col justify-center items-center inset-0 w-full bg-gray-3/20 dark:bg-gray-3/10 hover:bg-gray-3/30 dark:hover:bg-gray-3/20 transition-colors rounded-xl pointer-events-none">
-							<div>Click to add a mask</div>
+							<div>{t("editor.timeline.mask.placeholder")}</div>
 							<div class="text-[10px] text-(--text-tertiary)/40 mt-0.5">
-								(Combine sensitive blur or highlight masks)
+								{t("editor.timeline.mask.description")}
 							</div>
 						</div>
 					</Show>

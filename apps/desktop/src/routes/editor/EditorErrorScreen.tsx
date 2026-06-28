@@ -1,11 +1,11 @@
 import { Button } from "@cap/ui-solid";
 import { createMutation } from "@tanstack/solid-query";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { type as ostype } from "@tauri-apps/plugin-os";
 import { Show } from "solid-js";
 import { t } from "~/components/I18nProvider";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { commands } from "~/utils/tauri";
-import { getTauriOsType } from "~/utils/tauri-runtime";
 import IconAlertTriangle from "~icons/lucide/alert-triangle";
 import IconFolder from "~icons/lucide/folder";
 import IconLoaderCircle from "~icons/lucide/loader-circle";
@@ -22,7 +22,7 @@ export function EditorErrorScreen(props: {
 	projectPath: string;
 }) {
 	const needsRecovery = () => isRecoveryNeededError(props.error);
-	const osType = getTauriOsType();
+	const osType = ostype();
 	const isMac = () => osType === "macos";
 
 	const recoverMutation = createMutation(() => ({
@@ -59,8 +59,8 @@ export function EditorErrorScreen(props: {
 						</div>
 						<h2 class="text-xl font-semibold text-gray-12">
 							{needsRecovery()
-								? "Recording Needs Recovery"
-								: "Unable to Open Recording"}
+								? t("editor.errorScreen.needsRecovery")
+								: t("editor.errorScreen.unableToOpen")}
 						</h2>
 						<p class="text-sm text-gray-11">{props.error}</p>
 					</div>
@@ -87,12 +87,12 @@ export function EditorErrorScreen(props: {
 									fallback={
 										<>
 											<IconRefreshCw class="size-4 mr-2" />
-											Recover Recording
+											{t("editor.errorScreen.recoverRecording")}
 										</>
 									}
 								>
 									<IconLoaderCircle class="size-4 mr-2 animate-spin" />
-									Recovering...
+									{t("editor.errorScreen.recovering")}
 								</Show>
 							</Button>
 

@@ -1,6 +1,6 @@
+import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
-import { getTauriOsType } from "~/utils/tauri-runtime";
 import IconCapLogo from "~icons/cap/logo";
 
 const DEFAULT_TIMELINE_HEIGHT = 260;
@@ -27,8 +27,6 @@ function SkeletonButton(props: { class?: string; width?: string }) {
 }
 
 function HeaderSkeleton() {
-	const osType = getTauriOsType();
-
 	return (
 		<div
 			data-tauri-drag-region
@@ -38,7 +36,7 @@ function HeaderSkeleton() {
 				data-tauri-drag-region
 				class="flex flex-row flex-1 gap-2 items-center px-4 h-full"
 			>
-				{osType === "macos" && <div class="h-full w-16" />}
+				{ostype() === "macos" && <div class="h-full w-16" />}
 				<SkeletonButton />
 				<SkeletonButton />
 				<SkeletonPulse class="h-5 w-32" />
@@ -59,14 +57,14 @@ function HeaderSkeleton() {
 				data-tauri-drag-region
 				class={cx(
 					"flex-1 h-full flex flex-row items-center gap-2 pl-2",
-					osType !== "windows" && "pr-2",
+					ostype() !== "windows" && "pr-2",
 				)}
 			>
 				<SkeletonButton />
 				<SkeletonButton />
 				<div data-tauri-drag-region class="flex-1 h-full" />
 				<SkeletonPulse class="h-[40px] w-[100px] rounded-lg" />
-				{osType === "windows" && <CaptionControlsWindows11 />}
+				{ostype() === "windows" && <CaptionControlsWindows11 />}
 			</div>
 		</div>
 	);

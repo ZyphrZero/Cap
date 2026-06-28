@@ -2,6 +2,7 @@ import { createEventListenerMap } from "@solid-primitives/event-listener";
 import { cx } from "cva";
 import { createMemo, createRoot, createSignal, For, Show } from "solid-js";
 import { produce } from "solid-js/store";
+import { t } from "~/components/I18nProvider";
 
 import { type AudioTrackSegment, MIN_AUDIO_SEGMENT_DURATION } from "../audio";
 import { useEditorContext } from "../context";
@@ -421,7 +422,9 @@ export function AudioTrack(props: {
 						>
 							<IconLucidePlus class="size-3.5" />
 						</span>
-						<span class="font-medium">Add audio</span>
+						<span class="font-medium">
+							{t("editor.timeline.audio.addAudio")}
+						</span>
 					</button>
 				}
 			>

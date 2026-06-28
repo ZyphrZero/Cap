@@ -11,6 +11,7 @@
 		"dark": "深色",
 		"select": "选择",
 		"cancel": "取消",
+		"beta": "测试版",
 		"save": "保存",
 		"delete": "删除",
 		"confirm": "确认",
@@ -652,23 +653,32 @@
 	"editor": {
 		"initializing": "正在初始化编辑器...",
 		"timeline": {
+			"video": {
+				"label": "视频"
+			},
 			"clip": {
-				"label": "片段"
+				"label": "片段",
+				"segmentWithIndex": "片段 {{index}}"
 			},
 			"audio": {
+				"label": "音频",
 				"addAudio": "添加音频"
 			},
 			"captions": {
+				"label": "字幕",
 				"noCaptions": "暂无字幕"
 			},
 			"keyboard": {
-				"noKeyboardEvents": "暂无键盘事件"
+				"label": "键盘",
+				"noKeyboardEvents": "暂无键盘事件",
+				"description": "录制按键或从录制内容生成"
 			},
 			"zoom": {
 				"placeholder": "点击添加缩放片段",
 				"description": "(平滑缩放重要区域)",
 				"label": "缩放",
-				"generate": "从点击处生成缩放片段"
+				"generate": "从点击处生成缩放片段",
+				"generating": "正在生成..."
 			},
 			"text": {
 				"placeholder": "点击添加文本",
@@ -689,10 +699,25 @@
 				"label": "场景",
 				"cameraOnly": "仅显示摄像头",
 				"hideCamera": "隐藏摄像头",
+				"splitScreen": "分屏",
 				"default": "默认"
 			},
 			"addTrack": "添加轨道",
-			"deleteTrack": "删除轨道"
+			"addTrackTitle": "添加轨道",
+			"addTrackDescription": "将字幕、音频、缩放等内容叠加到时间线上。",
+			"deleteTrack": "删除轨道",
+			"deleteNamedTrack": "删除{{type}}轨道",
+			"trackDescriptions": {
+				"clip": "已录制的屏幕画面。",
+				"zoom": "跟随操作的平滑缩放。",
+				"caption": "自动转录录制内容并生成屏幕字幕。",
+				"keyboard": "在屏幕上显示输入时的按键。",
+				"text": "向画布添加自定义文本叠加层和标题。",
+				"mask": "模糊或遮盖屏幕上的隐私区域。",
+				"audio": "添加背景音乐或导入自己的音频。",
+				"scene": "在屏幕和摄像头布局之间切换。",
+				"sceneUnavailable": "需要使用摄像头录制后才能使用场景。"
+			}
 		},
 		"sidebar": {
 			"background": "背景",
@@ -706,6 +731,7 @@
 			"micVolume": "麦克风音量",
 			"systemAudioVolume": "系统音频音量",
 			"muted": "已静音",
+			"showCursor": "显示光标",
 			"cursorType": "光标类型",
 			"cursorSize": "光标大小",
 			"hideWhenIdle": "空闲时隐藏",
@@ -742,6 +768,12 @@
 			"segmentSettingsNote": "这些设置仅应用于选中的片段",
 			"clipSettings": "剪辑设置",
 			"clipSettingsNote": "这些设置应用于当前剪辑的所有片段",
+			"wallpaperOptionAlt": "壁纸选项",
+			"timing": "时间",
+			"start": "开始",
+			"to": "至",
+			"end": "结束",
+			"duration": "时长",
 			"systemAudioOffset": "系统音频偏移",
 			"micOffset": "麦克风偏移",
 			"cameraOffset": "摄像头偏移",
@@ -749,17 +781,55 @@
 			"maskSegment": "遮罩 {{index}}",
 			"zoomSegment": "缩放 {{index}}",
 			"textSegmentsSelected": "已选择 {{count}} 个文本片段",
+			"captionSegmentsSelected": "已选择 {{count}} 个字幕片段",
+			"keyboardSegmentsSelected": "已选择 {{count}} 个键盘片段",
+			"audioSegmentsSelected": "已选择 {{count}} 个音频片段",
 			"maskSegmentsSelected": "已选择 {{count}} 个遮罩片段",
 			"zoomSegmentsSelected": "已选择 {{count}} 个缩放片段",
+			"sceneSegmentsSelected": "已选择 {{count}} 个场景片段",
+			"clipSegmentsSelected": "已选择 {{count}} 个片段",
 			"enabled": "启用",
 			"italic": "斜体",
 			"color": "颜色",
 			"fadeDuration": "淡入淡出时长",
+			"tilt": "倾斜",
 			"pixelation": "像素化",
 			"intensity": "强度",
 			"outsideDarkness": "外部暗度",
 			"loading": "正在加载...",
 			"clickToSelectImage": "点击选择或拖放图片",
+			"useDesktopWallpaper": "使用桌面壁纸",
+			"importing": "正在导入...",
+			"importDesktopBackground": "导入桌面背景",
+			"reimport": "重新导入",
+			"backgroundBlurOptions": {
+				"off": "关闭",
+				"light": "轻微模糊",
+				"heavy": "强模糊"
+			},
+			"sceneModes": {
+				"default": "默认",
+				"cameraOnly": "仅摄像头",
+				"hideCamera": "隐藏摄像头",
+				"splitScreen": "分屏"
+			},
+			"sceneModeDescriptions": {
+				"default": "同时显示屏幕和摄像头",
+				"cameraOnly": "仅显示摄像头画面",
+				"hideCamera": "仅显示屏幕录制画面",
+				"splitScreen": "屏幕和摄像头并排显示（竖屏时自动堆叠）"
+			},
+			"transition": "过渡",
+			"transitionIn": "进入",
+			"transitionOut": "退出",
+			"screenZoom": "屏幕缩放",
+			"screenPosition": "屏幕位置",
+			"cameraZoom": "摄像头缩放",
+			"cameraPosition": "摄像头位置",
+			"hideCursor": "隐藏光标",
+			"hotkeys": "快捷键",
+			"showHotkeys": "显示快捷键",
+			"keepOriginalSizeDuringZoom": "缩放时保持原始大小",
 			"cameraLayout": "摄像头布局",
 			"cameraLayouts": {
 				"default": "默认",
@@ -772,17 +842,25 @@
 				"hideCameraDescription": "仅显示屏幕录制画面"
 			},
 			"backgroundSources": {
+				"desktop": "桌面",
 				"wallpaper": "墙纸",
 				"image": "图片",
 				"color": "颜色",
-				"gradient": "渐变"
+				"gradient": "渐变",
+				"none": "无"
 			},
 			"backgroundThemes": {
 				"macOS": "macOS",
 				"dark": "深色",
+				"cities": "城市",
 				"blue": "蓝色",
 				"purple": "紫色",
 				"orange": "橙色"
+			},
+			"currentDesktopBackgroundLabels": {
+				"macos": "这台 Mac",
+				"windows": "这台电脑",
+				"device": "此设备"
 			},
 			"messages": {
 				"wallpaperFailed": "设置墙纸失败",
@@ -811,8 +889,12 @@
 			"animationStyles": {
 				"slow": "缓慢",
 				"slowDescription": "带有些许惯性的轻松平滑效果。",
+				"smooth": "顺滑",
+				"smoothDescription": "在点位之间加入更多缓动的柔和光标移动。",
 				"mellow": "柔和",
 				"mellowDescription": "适用于日常教程和演示的均衡平滑效果。",
+				"fast": "快速",
+				"fastDescription": "适合快速演示和剪辑的更利落移动。",
 				"custom": "自定义",
 				"customDescription": "手动调整张力、摩擦力和质量以获得完全控制。"
 			}
@@ -820,6 +902,8 @@
 		"captions": {
 			"title": "字幕",
 			"model": "语音转文本模型",
+			"modelShort": "模型",
+			"style": "样式",
 			"language": "语言",
 			"selectLanguage": "选择语言",
 			"downloadModel": "下载模型",
@@ -838,8 +922,13 @@
 			"backgroundOpacity": "背景不透明度",
 			"position": "位置",
 			"animation": "动画",
+			"animationStyle": "动画样式",
+			"highlightStyle": "高亮样式",
+			"textColor": "文字颜色",
+			"uppercase": "大写",
 			"highlightColor": "高亮颜色",
 			"fadeDuration": "淡入淡出时长",
+			"fadeDurationOverride": "淡入淡出时长覆盖",
 			"downloadSuccess": "字幕模型下载成功！",
 			"downloadFailed": "下载字幕模型失败",
 			"generateSuccess": "字幕生成成功！",
@@ -859,12 +948,64 @@
 			"exportOptions": "导出选项",
 			"exportWithSubtitles": "导出时包含字幕",
 			"segments": "字幕片段",
+			"segment": "字幕 {{index}}",
 			"addAtCurrentTime": "在当前位置添加",
 			"startTime": "开始时间",
 			"endTime": "结束时间",
 			"text": "字幕文本",
 			"regenerated": "字幕已重新生成！",
-			"regenerateFailed": "重新生成字幕失败"
+			"regenerateFailed": "重新生成字幕失败",
+			"parakeetUnavailable": "此设备不支持 Parakeet",
+			"selectModel": "选择模型",
+			"slowerMoreAccurate": "更慢，但转录更准确",
+			"models": {
+				"recommended": "推荐",
+				"recommendedDescription": "适合大多数录制的快速转录",
+				"highAccuracy": "高准确度",
+				"highAccuracyDescription": "适合较长或嘈杂录制的最佳准确度",
+				"small": "小型",
+				"smallDescription": "下载体积小，处理更快",
+				"medium": "中型"
+			},
+			"languages": {
+				"auto": "自动检测",
+				"en": "英语",
+				"es": "西班牙语",
+				"fr": "法语",
+				"de": "德语",
+				"it": "意大利语",
+				"pt": "葡萄牙语",
+				"nl": "荷兰语",
+				"pl": "波兰语",
+				"ru": "俄语",
+				"sk": "斯洛伐克语",
+				"tr": "土耳其语",
+				"ja": "日语",
+				"ko": "韩语",
+				"zh": "中文",
+				"ar": "阿拉伯语",
+				"hi": "印地语",
+				"bn": "孟加拉语",
+				"ta": "泰米尔语",
+				"te": "泰卢固语",
+				"mr": "马拉地语",
+				"gu": "古吉拉特语",
+				"pa": "旁遮普语",
+				"ur": "乌尔都语",
+				"fa": "波斯语",
+				"he": "希伯来语"
+			},
+			"fontWeights": {
+				"normal": "常规",
+				"medium": "中等",
+				"bold": "加粗",
+				"custom": "自定义"
+			}
+		},
+		"editor": {
+			"loadingFrame": "正在加载帧...",
+			"preview": "预览",
+			"renderingPreview": "正在渲染预览..."
 		},
 		"export": {
 			"title": "导出",
@@ -872,6 +1013,9 @@
 			"preview": "预览",
 			"previewNote": "这是视频中的一个渲染帧。调整下方设置以查看最终导出视频的质量。",
 			"generatingPreview": "正在生成预览...",
+			"previewUnavailable": "预览不可用",
+			"previewAlt": "导出预览",
+			"previewFullAlt": "完整尺寸导出预览",
 			"destination": "目的地",
 			"organization": "组织",
 			"file": "文件",
@@ -890,6 +1034,7 @@
 			"largerFile": "更高画质",
 			"qualityPreview": "画质预览",
 			"estimatedSize": "预计大小:",
+			"estimatedSizeWithValue": "预计大小: {{size}} MB",
 			"compression": {
 				"title": "压缩",
 				"minimal": "极小",
@@ -899,9 +1044,32 @@
 				"potato": "低画质"
 			},
 			"optimizeFileSize": "优化文件大小",
+			"optimizeFileSizeDescription": "使用软件重新编码以显著减小文件体积（较慢）",
+			"advancedOptions": "高级选项",
+			"showOptions": "显示选项",
+			"hideOptions": "隐藏选项",
 			"exportCursorOnly": "仅导出光标",
+			"exportCursorOnlyDescription": "在透明背景上保留相同的光标移动和点击效果",
+			"warning": "警告",
+			"cursorOnlyWarning": "将导出为透明 MOV。文件较大，最适合用于合成或剪辑。",
 			"bitsPerPixel": "每像素位数",
+			"usingCustomBitrate": "正在使用自定义码率",
+			"tinyBitrate": "0.02 (很小)",
+			"hugeBitrate": "0.50 (很大)",
+			"assets": {
+				"cursorTrack": "光标轨道",
+				"cursorTrackLower": "光标轨道",
+				"recording": "录制视频",
+				"video": "视频"
+			},
+			"cursorOnlyFormatDisabled": "仅光标导出始终使用透明 MOV",
+			"cursorOnlyLinkDisabled": "仅光标导出只能保存为文件或复制到剪贴板",
+			"transparentLinkDisabled": "透明背景导出只能保存为文件或复制到剪贴板",
+			"frames": "帧",
 			"forceFfmpegDecoder": "强制使用 FFmpeg 解码器",
+			"forceFfmpegDecoderDescription": "跳过硬件解码器（已启用自动回退）",
+			"tipLabel": "提示:",
+			"instantModeTip": "下次录制可使用即时模式，边录边上传，无需导出。",
 			"actions": {
 				"signInToShare": "登录以分享",
 				"exportToFile": "导出到文件",
@@ -910,18 +1078,24 @@
 				"copyLink": "复制链接",
 				"openLink": "打开链接",
 				"openFile": "打开文件",
-				"copyToClipboard": "复制到剪贴板"
+				"copyToClipboard": "复制到剪贴板",
+				"resumeExport": "继续导出",
+				"quitEditor": "退出编辑器"
 			},
 			"status": {
 				"preparing": "正在准备...",
+				"preparingExport": "正在准备导出",
+				"rendering": "正在渲染{{type}}",
 				"renderingGif": "正在渲染 GIF...",
 				"renderingVideo": "正在渲染视频...",
 				"copying": "正在复制到剪贴板...",
 				"copied": "已复制到剪贴板",
+				"readyToPaste": "您的{{type}}已准备好粘贴",
 				"exportingToFile": "正在导出到文件...",
 				"exportCompleted": "导出完成",
 				"exportComplete": "导出成功",
 				"ready": "您的 {{type}} 已准备就绪",
+				"savingToFile": "正在保存到文件",
 				"uploading": "正在上传...",
 				"uploadingProgress": "正在上传 - {{progress}}%",
 				"uploadComplete": "上传成功",
@@ -939,7 +1113,9 @@
 				"errorCopying": "复制录制失败",
 				"errorExporting": "导出录制失败: {{error}}",
 				"cancelConfirm": "您确定要取消导出吗？",
-				"cancelTitle": "取消导出"
+				"cancelTitle": "取消导出",
+				"closeConfirm": "导出正在进行中。请保持此编辑器打开以继续导出，或退出编辑器并取消导出。",
+				"closeTitle": "导出进行中"
 			},
 			"recording": "录制视频",
 			"gif": "GIF 动图",
@@ -975,6 +1151,18 @@
 			"export": "导出",
 			"confirmDelete": "您确定要删除此录制吗？"
 		},
+		"aspectRatio": {
+			"title": "宽高比",
+			"auto": "自动"
+		},
+		"gradient": {
+			"from": "起始",
+			"to": "结束",
+			"angle": "角度",
+			"noise": "噪点",
+			"grainScale": "颗粒缩放",
+			"randomize": "随机"
+		},
 		"presets": {
 			"title": "预设",
 			"none": "暂无预设",
@@ -984,6 +1172,9 @@
 			"rename": "重命名",
 			"delete": "删除",
 			"create": "创建新预设",
+			"name": "名称",
+			"saveSettings": "保存设置到预设",
+			"savedSettings": "已将设置保存到“{{name}}”",
 			"createTitle": "创建预设",
 			"renameTitle": "重命名预设",
 			"deleteTitle": "删除预设",
@@ -1024,9 +1215,42 @@
 			"uploading": "正在上传 - {{progress}}%",
 			"copied": "链接已复制到剪贴板！"
 		},
+		"textStyle": {
+			"fonts": {
+				"systemSansSerif": "系统无衬线字体",
+				"systemSerif": "系统衬线字体",
+				"systemMonospace": "系统等宽字体"
+			},
+			"positions": {
+				"manual": "手动",
+				"topLeft": "左上",
+				"topCenter": "顶部居中",
+				"topRight": "右上",
+				"bottomLeft": "左下",
+				"bottomCenter": "底部居中",
+				"bottomRight": "右下"
+			},
+			"fontWeights": {
+				"normal": "常规",
+				"medium": "中等",
+				"bold": "加粗",
+				"customValue": "自定义 ({{weight}})"
+			},
+			"animations": {
+				"none": "无",
+				"bounce": "弹跳",
+				"pop": "弹出"
+			},
+			"highlightStyles": {
+				"color": "颜色",
+				"pill": "胶囊"
+			}
+		},
 		"crop": {
 			"size": "尺寸",
 			"position": "位置",
+			"area": "裁剪区域",
+			"currentFrameAlt": "当前帧",
 			"full": "全屏",
 			"reset": "重置",
 			"save": "保存"
@@ -1035,17 +1259,65 @@
 			"addAudio": "添加音频",
 			"importFailed": "导入音频文件失败",
 			"addTrackFailed": "添加音轨失败",
-			"changeTrack": "点击切换音轨"
+			"changeTrack": "点击切换音轨",
+			"change": "更换",
+			"done": "完成",
+			"changeAudio": "更换音频",
+			"changeAudioDescription": "为此片段选择另一条音轨",
+			"addAudioDescription": "为视频添加音频、音乐或其他声音",
+			"moreCategoriesComingSoon": "更多分类即将推出",
+			"audioFilterName": "音频",
+			"pausePreview": "暂停预览",
+			"playPreview": "播放预览",
+			"useTrack": "使用音轨",
+			"addToTimeline": "添加到时间线",
+			"uploading": "正在导入...",
+			"uploadOwn": "上传自己的音频",
+			"volume": "音量",
+			"fadeIn": "淡入",
+			"fadeOut": "淡出"
 		},
 		"clipsSidebar": {
 			"noClips": "暂无片段",
 			"noClipsDescription": "录制或导入片段后会在此显示。",
+			"addingClip": "正在添加片段...",
+			"clipAdded": "片段已添加",
+			"addClipFailed": "添加片段失败: {{message}}",
+			"importingClip": "正在导入片段...",
 			"clipImported": "片段已导入",
 			"clipsImported": "已导入 {{count}} 个片段",
+			"clipImportFailed": "导入片段失败: {{message}}",
 			"importVideo": "导入视频",
-			"clips": "片段"
+			"clips": "片段",
+			"backToEditor": "返回编辑器",
+			"recordNewClip": "录制新片段",
+			"import": "导入",
+			"existingRecording": "现有录制",
+			"mp4Video": "MP4 视频...",
+			"mp4VideoFilterName": "MP4 视频",
+			"capRecordingFilterName": "Cap 录制",
+			"clip": "片段 {{index}}",
+			"split": "分割 {{index}}",
+			"clipWithDuration": "{{clip}} · {{duration}}",
+			"renameClip": "重命名片段",
+			"removeClip": "移除片段",
+			"modalDescription": "以工作室模式录制并添加到此项目。",
+			"close": "关闭",
+			"display": "显示器",
+			"window": "窗口",
+			"area": "区域",
+			"cameraOnly": "仅摄像头",
+			"chooseDisplay": "选择显示器",
+			"chooseWindow": "选择窗口",
+			"searchWindows": "搜索窗口",
+			"searchDisplays": "搜索显示器",
+			"loadDisplaysFailed": "无法加载显示器。",
+			"loadWindowsFailed": "无法加载窗口。",
+			"noMatchingDisplays": "没有匹配的显示器",
+			"noMatchingWindows": "没有匹配的窗口"
 		},
 		"keyboardTab": {
+			"showKeyboard": "显示键盘",
 			"fontFamily": "字体",
 			"textColor": "文字颜色",
 			"backgroundColor": "背景颜色",
@@ -1056,20 +1328,76 @@
 			"showModifierKeys": "显示修饰键",
 			"showSpecialKeys": "显示特殊按键",
 			"uppercase": "大写",
-			"enabledDescription": "在视频上显示键盘叠加层"
+			"enabledDescription": "在视频上显示键盘叠加层",
+			"behavior": "行为",
+			"regenerateSegments": "重新生成片段",
+			"generateSegments": "生成片段",
+			"selectedSegmentOverride": "选中片段覆盖",
+			"displayText": "显示文本",
+			"fadeDurationOverride": "淡出时长覆盖",
+			"noSegments": "暂无键盘片段",
+			"noSegmentsDescription": "可从键盘事件生成片段，或在时间线上添加。",
+			"segment": "键盘 {{index}}"
 		},
 		"organization": {
 			"brandingUpdated": "组织品牌已更新",
 			"unsupportedLogo": "不支持的 Logo 文件类型",
-			"logoTooLarge": "Logo 文件必须小于 1MB"
+			"logoTooLarge": "Logo 文件必须小于 1MB",
+			"defaultName": "组织",
+			"signIn": "登录",
+			"loading": "正在加载...",
+			"loadingOrganizations": "正在加载组织",
+			"unableToLoadOrganizations": "无法加载组织",
+			"brandingRequiresSignIn": "组织品牌需要登录",
+			"fetchingBranding": "正在从 Cap Web 获取组织品牌。",
+			"unavailableDescription": "组织品牌使用 Cap Web 的实时数据。请连接到 Cap Web 以选择组织并使用其颜色。",
+			"signInDescription": "登录后可选择组织、编辑品牌颜色，并在工作室中使用这些颜色。",
+			"upload": "上传",
+			"remove": "移除",
+			"set": "设置",
+			"retry": "重试",
+			"noOrganizations": "暂无组织",
+			"brandSettings": "品牌设置",
+			"save": "保存",
+			"saving": "正在保存...",
+			"updateFailed": "更新组织品牌失败"
+		},
+		"importProgress": {
+			"failed": "导入失败",
+			"importingVideo": "正在导入视频",
+			"messages": {
+				"adjusting": "正在调整 Cap 到刚刚好...",
+				"thinking": "正在戴上思考 Cap...",
+				"pixels": "正在整理像素...",
+				"processing": "正在处理导入...",
+				"importing": "导入正在进行中...",
+				"flipping": "正在翻转处理流程...",
+				"break": "快好了，请稍候...",
+				"capable": "正在准备精彩内容..."
+			}
 		},
 		"performance": {
-			"copiedToClipboard": "性能统计已复制到剪贴板"
+			"copiedToClipboard": "性能统计已复制到剪贴板",
+			"clickToCopyStats": "点击复制统计信息",
+			"frame": "帧:",
+			"average": "平均",
+			"range": "范围:",
+			"jitter": "抖动:",
+			"dropped": "丢帧:",
+			"playing": "播放中:",
+			"yes": "是",
+			"no": "否"
 		},
 		"transcript": {
 			"title": "转录文本",
-			"noTranscript": "暂无转录文本"
+			"noTranscript": "暂无转录文本",
+			"add": "添加",
+			"generateCaptionsFirst": "请先在编辑器中生成字幕",
+			"addCaptionAtPlayhead": "在播放头处添加字幕"
 		},
+		"resizeTimelineHeight": "调整时间线高度",
+		"resizeTranscriptPanel": "调整转录面板",
+		"dismissForSession": "本次会话不再显示",
 		"brandColors": {
 			"title": "品牌颜色"
 		},

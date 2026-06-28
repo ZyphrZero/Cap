@@ -3,13 +3,13 @@ import { ToggleButton as KToggleButton } from "@kobalte/core/toggle-button";
 import { createElementBounds } from "@solid-primitives/bounds";
 import { debounce } from "@solid-primitives/scheduled";
 import { Menu } from "@tauri-apps/api/menu";
+import { type as ostype } from "@tauri-apps/plugin-os";
 import { cx } from "cva";
 import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { t } from "~/components/I18nProvider";
 import Tooltip from "~/components/Tooltip";
 import { captionsStore } from "~/store/captions";
 import { commands } from "~/utils/tauri";
-import { getTauriOsType } from "~/utils/tauri-runtime";
 import AspectRatioSelect from "./AspectRatioSelect";
 import { CaptionOverlay } from "./CaptionOverlay";
 import { CaptionsRegenerateBadge } from "./CaptionsRegenerateBadge";
@@ -66,7 +66,7 @@ export function PlayerContent() {
 	];
 
 	const zoomHint = () =>
-		getTauriOsType() === "windows"
+		ostype() === "windows"
 			? "Hold Ctrl and scroll, or press Ctrl +/- to zoom"
 			: "Pinch, or press Cmd +/- to zoom";
 

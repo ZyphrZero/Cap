@@ -7,7 +7,6 @@ import { createStore, produce, reconcile } from "solid-js/store";
 import { t } from "~/components/I18nProvider";
 import Tooltip from "~/components/Tooltip";
 import { createProgressBar } from "~/routes/editor/utils";
-import { authStore } from "~/store";
 import { exportVideo } from "~/utils/export";
 import { commands, type UploadProgress } from "~/utils/tauri";
 import { useEditorContext } from "./context";
@@ -30,14 +29,9 @@ function ShareButton() {
 		mutationFn: async () => {
 			setUploadState({ type: "idle" });
 
-			console.log("Starting upload process...");
-
 			// Authentication and upgrade checks removed for local use
 
-			const metadata = await commands.getVideoMetadata(projectPath);
-
 			const uploadChannel = new Channel<UploadProgress>((progress) => {
-				console.log("Upload progress:", progress);
 				setUploadState(
 					produce((state) => {
 						if (state.type !== "uploading") return;
@@ -50,8 +44,6 @@ function ShareButton() {
 			setUploadState({ type: "starting" });
 
 			// Setup progress listener before starting upload
-
-			console.log("Starting actual upload...");
 
 			await exportVideo(
 				projectPath,
@@ -94,15 +86,6 @@ function ShareButton() {
 						uploadChannel,
 						null,
 					);
-
-			// Result check removed for local use - upload always continues
-			if (
-				result === "NotAuthenticated" ||
-				result === "PlanCheckFailed" ||
-				result === "UpgradeRequired"
-			) {
-				console.log("Upload requires authentication, skipping for local use");
-			}
 
 			setUploadState({ type: "link-copied" });
 
@@ -204,7 +187,7 @@ function ShareButton() {
 									)}
 								</Button>
 							</Tooltip>
-							<Tooltip content="Open link">
+							<Tooltip content={t("editor.share.openLink")}>
 								<div class="rounded-xl px-3 py-2 flex flex-row items-center gap-1.5 bg-gray-3 hover:bg-gray-4 transition-colors duration-100">
 									<a
 										href={
@@ -286,7 +269,7 @@ function ShareButton() {
 			</Show>
 			<Dialog.Root open={!upload.isIdle}>
 				<DialogContent
-					title={"Reupload Recording"}
+					title={t("editor.share.reuploadTitle")}
 					confirm={null}
 					close={null}
 					class="text-gray-12 dark:text-gray-12"

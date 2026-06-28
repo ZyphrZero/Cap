@@ -174,13 +174,21 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 		const s = stats();
 		const statsText = [
 			`FPS: ${formatFps(s.fps)}`,
-			`Frame: ${formatMs(s.avgFrameMs)}ms avg`,
-			`Range: ${formatMs(s.minFrameMs)} - ${formatMs(s.maxFrameMs)}ms`,
-			`Jitter: ±${formatMs(s.jitter)}ms`,
+			`${t("editor.performance.frame")} ${formatMs(s.avgFrameMs)}ms ${t(
+				"editor.performance.average",
+			)}`,
+			`${t("editor.performance.range")} ${formatMs(s.minFrameMs)} - ${formatMs(
+				s.maxFrameMs,
+			)}ms`,
+			`${t("editor.performance.jitter")} ±${formatMs(s.jitter)}ms`,
 			s.droppedFrames > 0
-				? `Dropped: ${s.droppedFrames}/${s.totalFrames}`
+				? `${t("editor.performance.dropped")} ${s.droppedFrames}/${s.totalFrames}`
 				: null,
-			`Playing: ${editorState.playing ? "Yes" : "No"}`,
+			`${t("editor.performance.playing")} ${
+				editorState.playing
+					? t("editor.performance.yes")
+					: t("editor.performance.no")
+			}`,
 		]
 			.filter(Boolean)
 			.join("\n");
@@ -225,7 +233,7 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 						border: "1px solid rgba(255, 255, 255, 0.15)",
 					}}
 					onClick={copyStatsToClipboard}
-					title={t("clickToCopyStats")}
+					title={t("editor.performance.clickToCopyStats")}
 				>
 					<div class="flex flex-col gap-0.5">
 						<div class="flex items-center gap-2">
@@ -237,14 +245,17 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 							</Show>
 						</div>
 						<div style={{ color: "rgba(255, 255, 255, 0.7)" }}>
-							<span>Frame: </span>
+							<span>{t("editor.performance.frame")} </span>
 							<span style={{ color: "#93c5fd" }}>
 								{formatMs(stats().avgFrameMs)}ms
 							</span>
-							<span style={{ color: "rgba(255, 255, 255, 0.4)" }}> avg</span>
+							<span style={{ color: "rgba(255, 255, 255, 0.4)" }}>
+								{" "}
+								{t("editor.performance.average")}
+							</span>
 						</div>
 						<div style={{ color: "rgba(255, 255, 255, 0.7)" }}>
-							<span>Range: </span>
+							<span>{t("editor.performance.range")} </span>
 							<span style={{ color: "#86efac" }}>
 								{formatMs(stats().minFrameMs)}
 							</span>
@@ -254,14 +265,15 @@ export function PerformanceOverlay(_props: PerformanceOverlayProps) {
 							</span>
 						</div>
 						<div style={{ color: "rgba(255, 255, 255, 0.7)" }}>
-							<span>Jitter: </span>
+							<span>{t("editor.performance.jitter")} </span>
 							<span style={{ color: jitterColor() }}>
 								±{formatMs(stats().jitter)}ms
 							</span>
 						</div>
 						<Show when={stats().droppedFrames > 0}>
 							<div style={{ color: "#f87171" }}>
-								Dropped: {stats().droppedFrames}/{stats().totalFrames}
+								{t("editor.performance.dropped")} {stats().droppedFrames}/
+								{stats().totalFrames}
 							</div>
 						</Show>
 					</div>

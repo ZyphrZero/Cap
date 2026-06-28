@@ -296,7 +296,7 @@ function Inner() {
 	});
 
 	const appendRecordedClip = async (recordingPath: string) => {
-		const toastId = toast.loading("Adding clip…");
+		const toastId = toast.loading(t("editor.clipsSidebar.addingClip"));
 		try {
 			if (editorState.playing) {
 				await commands.stopPlayback();
@@ -305,11 +305,13 @@ function Inner() {
 			await commands.setProjectConfig(serializeProjectConfiguration(project));
 			await commands.addExistingRecordingToEditor(recordingPath);
 			await commands.deleteRecordingDirectory(recordingPath).catch(() => {});
-			toast.success("Clip added", { id: toastId });
+			toast.success(t("editor.clipsSidebar.clipAdded"), { id: toastId });
 			window.location.reload();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			toast.error(`Failed to add clip: ${message}`, { id: toastId });
+			toast.error(t("editor.clipsSidebar.addClipFailed", { message }), {
+				id: toastId,
+			});
 		}
 	};
 
@@ -364,12 +366,12 @@ function Inner() {
 			closePromptOpen = true;
 			try {
 				const resumeExport = await ask(
-					"An export is currently running. Keep this editor open to continue it, or quit the editor and cancel the export.",
+					t("editor.export.messages.closeConfirm"),
 					{
-						title: "Export in Progress",
+						title: t("editor.export.messages.closeTitle"),
 						kind: "warning",
-						okLabel: "Resume Export",
-						cancelLabel: "Quit Editor",
+						okLabel: t("editor.export.actions.resumeExport"),
+						cancelLabel: t("editor.export.actions.quitEditor"),
 					},
 				);
 
@@ -680,7 +682,7 @@ function Inner() {
 											"bg-gray-3/55 dark:bg-gray-4/50": isResizingTimeline(),
 										}}
 										onMouseDown={handleTimelineResizeStart}
-										aria-label={t("resizeTimelineHeight")}
+										aria-label={t("editor.resizeTimelineHeight")}
 									>
 										<For each={TIMELINE_RESIZE_GRIP_MARKS}>
 											{() => (
@@ -720,7 +722,7 @@ function Inner() {
 									class="flex-none flex items-center justify-center cursor-col-resize select-none group z-10"
 									style={{ width: "12px" }}
 									onMouseDown={handleSplitResizeStart}
-									aria-label={t("resizeTranscriptPanel")}
+									aria-label={t("editor.resizeTranscriptPanel")}
 									role="separator"
 									aria-orientation="vertical"
 								>
@@ -813,11 +815,11 @@ function Dialogs() {
 												disabled={createPreset.isPending}
 												onClick={() => createPreset.mutate()}
 											>
-												{t("common.create")}
+												{t("editor.presets.create")}
 											</Dialog.ConfirmButton>
 										}
 									>
-										<Subfield name={t("common.name")} required />
+										<Subfield name={t("editor.presets.name")} required />
 										<Input
 											class="mt-2"
 											value={form.name}
@@ -864,11 +866,11 @@ function Dialogs() {
 												disabled={renamePreset.isPending}
 												onClick={() => renamePreset.mutate()}
 											>
-												{t("common.rename")}
+												{t("editor.presets.rename")}
 											</Dialog.ConfirmButton>
 										}
 									>
-										<Subfield name={t("common.name")} required />
+										<Subfield name={t("editor.presets.name")} required />
 										<Input
 											class="mt-2"
 											value={name()}
@@ -1171,7 +1173,7 @@ function Dialogs() {
 										<Dialog.Header>
 											<div class="flex flex-row space-x-8">
 												<div class="flex flex-row items-center space-x-3 text-gray-11">
-													<span>Size</span>
+													<span>{t("editor.crop.size")}</span>
 													<div class="w-13">
 														<BoundInput field="width" max={display.width} />
 													</div>
@@ -1181,7 +1183,7 @@ function Dialogs() {
 													</div>
 												</div>
 												<div class="flex flex-row items-center space-x-3 text-gray-11">
-													<span>Position</span>
+													<span>{t("editor.crop.position")}</span>
 													<div class="w-13">
 														<BoundInput field="x" />
 													</div>
@@ -1254,7 +1256,7 @@ function Dialogs() {
 											<div class="flex flex-row gap-3 justify-center items-stretch">
 												<div class="flex flex-col gap-2.5">
 													<span class="px-1 text-[11px] font-medium tracking-wide uppercase text-gray-10">
-														Crop area
+														{t("editor.crop.area")}
 													</span>
 													<div
 														class="overflow-hidden relative rounded-xl border shadow-sm border-gray-3 bg-gray-3"
@@ -1285,7 +1287,7 @@ function Dialogs() {
 															>
 																<img
 																	class="block w-full h-full pointer-events-none select-none"
-																	alt="Current frame"
+																	alt={t("editor.crop.currentFrameAlt")}
 																	onError={() => {
 																		const url = frameUrl();
 																		if (url) {
@@ -1306,7 +1308,7 @@ function Dialogs() {
 															<div class="flex absolute inset-0 z-40 flex-col gap-3 justify-center items-center bg-gray-3">
 																<div class="rounded-full border-2 animate-spin size-7 border-gray-5 border-t-blue-9" />
 																<span class="text-xs font-medium text-gray-10">
-																	Loading frame…
+																	{t("editor.editor.loadingFrame")}
 																</span>
 															</div>
 														</Show>
@@ -1333,7 +1335,7 @@ function Dialogs() {
 
 												<div class="flex flex-col gap-2.5">
 													<span class="px-1 text-[11px] font-medium tracking-wide uppercase text-gray-10">
-														Preview
+														{t("editor.editor.preview")}
 													</span>
 													<div
 														class="flex overflow-hidden relative justify-center items-center rounded-xl border shadow-sm border-gray-3 bg-gray-3"
@@ -1350,7 +1352,7 @@ function Dialogs() {
 															<div class="flex absolute inset-0 z-40 flex-col gap-3 justify-center items-center bg-gray-3">
 																<div class="rounded-full border-2 animate-spin size-7 border-gray-5 border-t-blue-9" />
 																<span class="text-xs font-medium text-gray-10">
-																	Rendering preview…
+																	{t("editor.editor.renderingPreview")}
 																</span>
 															</div>
 														</Show>

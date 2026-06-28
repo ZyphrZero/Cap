@@ -171,7 +171,12 @@ export function AudioLibraryPanel(props: {
 		try {
 			const selected = await open({
 				multiple: false,
-				filters: [{ name: "Audio", extensions: [...AUDIO_IMPORT_EXTENSIONS] }],
+				filters: [
+					{
+						name: t("editor.audioLibrary.audioFilterName"),
+						extensions: [...AUDIO_IMPORT_EXTENSIONS],
+					},
+				],
 			});
 			if (typeof selected !== "string") return;
 			commit(await commands.importAudioTrackFile(selected));
@@ -190,17 +195,19 @@ export function AudioLibraryPanel(props: {
 					onClick={() => props.onClose()}
 					leftIcon={<IconLucideCheck />}
 				>
-					Done
+					{t("editor.audioLibrary.done")}
 				</EditorButton>
 				<span class="text-sm text-gray-10">
-					{isReplace() ? "Change audio" : "Add audio"}
+					{isReplace()
+						? t("editor.audioLibrary.changeAudio")
+						: t("editor.audioLibrary.addAudio")}
 				</span>
 			</div>
 
 			<p class="text-xs text-gray-10">
 				{isReplace()
-					? "Pick a different track for this segment"
-					: "Add audio, music or other sounds to your video"}
+					? t("editor.audioLibrary.changeAudioDescription")
+					: t("editor.audioLibrary.addAudioDescription")}
 			</p>
 
 			<Show when={categories().length > 0}>
@@ -222,7 +229,7 @@ export function AudioLibraryPanel(props: {
 						)}
 					</For>
 					<span class="text-[11px] text-gray-9">
-						More categories coming soon
+						{t("editor.audioLibrary.moreCategoriesComingSoon")}
 					</span>
 				</div>
 			</Show>
@@ -264,7 +271,9 @@ export function AudioLibraryPanel(props: {
 											type="button"
 											class="absolute inset-0 w-full h-full"
 											aria-label={
-												isPreviewing() ? "Pause preview" : "Play preview"
+												isPreviewing()
+													? t("editor.audioLibrary.pausePreview")
+													: t("editor.audioLibrary.playPreview")
 											}
 											onClick={() => togglePreview(track.id)}
 										>
@@ -302,7 +311,11 @@ export function AudioLibraryPanel(props: {
 
 										<button
 											type="button"
-											aria-label={isReplace() ? "Use track" : "Add to timeline"}
+											aria-label={
+												isReplace()
+													? t("editor.audioLibrary.useTrack")
+													: t("editor.audioLibrary.addToTimeline")
+											}
 											class={cx(
 												"flex absolute top-1 right-1 justify-center items-center rounded-full border backdrop-blur-sm transition-all size-5",
 												"opacity-0 group-hover/tile:opacity-100",
@@ -359,7 +372,9 @@ export function AudioLibraryPanel(props: {
 					</Show>
 				</span>
 				<span class="text-[13px] font-medium text-gray-12">
-					{uploading() ? "Importing…" : "Upload your own"}
+					{uploading()
+						? t("editor.audioLibrary.uploading")
+						: t("editor.audioLibrary.uploadOwn")}
 				</span>
 				<span class="text-[11px] text-gray-9">
 					MP3, WAV, M4A, OGG, FLAC, AAC

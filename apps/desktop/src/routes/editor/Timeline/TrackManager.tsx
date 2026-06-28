@@ -1,6 +1,7 @@
 import { Popover } from "@kobalte/core/popover";
 import { cx } from "cva";
 import { For, type JSX, Show } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import type { TimelineTrackType } from "../context";
 import { CAP_TRACK_FILL_CLASS } from "./Track";
 
@@ -22,36 +23,54 @@ type TrackMeta = {
 
 const TRACK_META: Record<TimelineTrackType, TrackMeta> = {
 	clip: {
-		description: "Your recorded screen footage.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.clip");
+		},
 		unavailableHint: "",
 	},
 	zoom: {
-		description: "Smooth zoom-ins that follow the action.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.zoom");
+		},
 		unavailableHint: "",
 	},
 	caption: {
-		description: "Auto-transcribe your recording into on-screen subtitles.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.caption");
+		},
 		unavailableHint: "",
 	},
 	keyboard: {
-		description: "Display key presses on screen as you type.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.keyboard");
+		},
 		unavailableHint: "",
 	},
 	text: {
-		description: "Add custom text overlays and titles to the canvas.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.text");
+		},
 		unavailableHint: "",
 	},
 	mask: {
-		description: "Blur or black out private areas of the screen.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.mask");
+		},
 		unavailableHint: "",
 	},
 	audio: {
-		description: "Add background music or import your own audio.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.audio");
+		},
 		unavailableHint: "",
 	},
 	scene: {
-		description: "Switch layouts between your screen and camera.",
-		unavailableHint: "Record with a camera to use scenes.",
+		get description() {
+			return t("editor.timeline.trackDescriptions.scene");
+		},
+		get unavailableHint() {
+			return t("editor.timeline.trackDescriptions.sceneUnavailable");
+		},
 	},
 };
 
@@ -176,7 +195,7 @@ export function TrackManager(props: {
 				onMouseDown={(e) => e.stopPropagation()}
 			>
 				<IconLucidePlus class="size-3.5 shrink-0" />
-				<span class="truncate">Add track</span>
+				<span class="truncate">{t("editor.timeline.addTrack")}</span>
 				<IconCapChevronDown class="size-2.5 shrink-0 text-white/70 transition-transform duration-200 group-data-expanded:rotate-180" />
 			</Popover.Trigger>
 			<Popover.Portal>
@@ -189,10 +208,10 @@ export function TrackManager(props: {
 				>
 					<div class="flex flex-col gap-0.5 px-4 pt-3.5 pb-3 border-b shrink-0 border-gray-3">
 						<span class="text-[0.8125rem] font-semibold text-gray-12">
-							Add a track
+							{t("editor.timeline.addTrackTitle")}
 						</span>
 						<span class="text-[0.6875rem] leading-snug text-gray-10">
-							Layer captions, audio, zooms and more onto your timeline.
+							{t("editor.timeline.addTrackDescription")}
 						</span>
 					</div>
 					<div class="flex overflow-y-auto flex-col flex-1 gap-0.5 p-1.5 min-h-0 scrollbar-none">
@@ -214,7 +233,7 @@ export function TrackManager(props: {
 					<div class="p-1.5 border-t shrink-0 border-gray-3">
 						<Popover.CloseButton class="flex gap-1.5 justify-center items-center px-3 w-full h-9 text-[0.8125rem] font-medium rounded-lg border transition-colors duration-150 outline-hidden border-gray-4/70 bg-gray-2 text-gray-12 hover:bg-gray-3 hover:border-gray-5">
 							<IconLucideX class="size-3.5" />
-							Close
+							{t("behaviours.close")}
 						</Popover.CloseButton>
 					</div>
 				</Popover.Content>

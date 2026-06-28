@@ -1,6 +1,7 @@
 import { Button } from "@cap/ui-solid";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, Match, onCleanup, onMount, Switch } from "solid-js";
+import { t } from "~/components/I18nProvider";
 import {
 	events,
 	type VideoImportProgress as VideoImportProgressEvent,
@@ -8,14 +9,14 @@ import {
 import IconLucideAlertCircle from "~icons/lucide/alert-circle";
 
 const funMessages = [
-	"Adjusting the Cap just right...",
-	"Putting on our thinking Cap...",
-	"Cap-sizing the pixels...",
-	"Wearing our processing Cap...",
-	"Cap-tivating import in progress...",
-	"Flipping our Cap backwards...",
-	"Cap-puccino break? Almost done...",
-	"Cap-able of great things...",
+	"editor.importProgress.messages.adjusting",
+	"editor.importProgress.messages.thinking",
+	"editor.importProgress.messages.pixels",
+	"editor.importProgress.messages.processing",
+	"editor.importProgress.messages.importing",
+	"editor.importProgress.messages.flipping",
+	"editor.importProgress.messages.break",
+	"editor.importProgress.messages.capable",
 ];
 
 export type ImportProgressProps = {
@@ -78,12 +79,12 @@ export function ImportProgress(props: ImportProgressProps) {
 							</div>
 
 							<h2 class="text-lg font-medium text-gray-12 mb-2">
-								Import Failed
+								{t("editor.importProgress.failed")}
 							</h2>
 							<p class="text-sm text-gray-11 mb-6">{errorMessage()}</p>
 
 							<Button variant="gray" onClick={handleClose}>
-								Close
+								{t("common.close")}
 							</Button>
 						</div>
 					)}
@@ -126,10 +127,10 @@ export function ImportProgress(props: ImportProgressProps) {
 						</div>
 
 						<h2 class="text-lg font-medium text-gray-12 mb-2">
-							Importing Video
+							{t("editor.importProgress.importingVideo")}
 						</h2>
 						<p class="text-sm text-gray-11 animate-pulse h-5 animate-pulse-slow">
-							{funMessages[messageIndex()]}
+							{t(funMessages[messageIndex()])}
 						</p>
 					</div>
 				</Match>

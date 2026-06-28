@@ -11,6 +11,7 @@
 		"dark": "Dark",
 		"select": "Select",
 		"cancel": "Cancel",
+		"beta": "Beta",
 		"save": "Save",
 		"delete": "Delete",
 		"confirm": "Confirm",
@@ -651,23 +652,32 @@
 	"editor": {
 		"initializing": "Initializing editor...",
 		"timeline": {
+			"video": {
+				"label": "Video"
+			},
 			"clip": {
-				"label": "Clip"
+				"label": "Clip",
+				"segmentWithIndex": "Clip {{index}}"
 			},
 			"audio": {
+				"label": "Audio",
 				"addAudio": "Add audio"
 			},
 			"captions": {
+				"label": "Captions",
 				"noCaptions": "No captions"
 			},
 			"keyboard": {
-				"noKeyboardEvents": "No keyboard events"
+				"label": "Keyboard",
+				"noKeyboardEvents": "No keyboard events",
+				"description": "Record keyboard presses or generate from recording"
 			},
 			"zoom": {
 				"placeholder": "Click to add zoom segment",
 				"description": "(Smoothly zoom in on important areas)",
 				"label": "Zoom",
-				"generate": "Generate zoom segments from clicks"
+				"generate": "Generate zoom segments from clicks",
+				"generating": "Generating..."
 			},
 			"text": {
 				"placeholder": "Click to add text",
@@ -688,10 +698,25 @@
 				"label": "Scene",
 				"cameraOnly": "Camera Only",
 				"hideCamera": "Hide Camera",
+				"splitScreen": "Split Screen",
 				"default": "Default"
 			},
 			"addTrack": "Add track",
-			"deleteTrack": "Delete track"
+			"addTrackTitle": "Add a track",
+			"addTrackDescription": "Layer captions, audio, zooms and more onto your timeline.",
+			"deleteTrack": "Delete track",
+			"deleteNamedTrack": "Delete {{type}} track",
+			"trackDescriptions": {
+				"clip": "Your recorded screen footage.",
+				"zoom": "Smooth zoom-ins that follow the action.",
+				"caption": "Auto-transcribe your recording into on-screen subtitles.",
+				"keyboard": "Display key presses on screen as you type.",
+				"text": "Add custom text overlays and titles to the canvas.",
+				"mask": "Blur or black out private areas of the screen.",
+				"audio": "Add background music or import your own audio.",
+				"scene": "Switch layouts between your screen and camera.",
+				"sceneUnavailable": "Record with a camera to use scenes."
+			}
 		},
 		"sidebar": {
 			"background": "Background",
@@ -705,6 +730,7 @@
 			"micVolume": "Microphone Volume",
 			"systemAudioVolume": "System Audio Volume",
 			"muted": "Muted",
+			"showCursor": "Show cursor",
 			"cursorType": "Cursor Type",
 			"cursorSize": "Size",
 			"hideWhenIdle": "Hide When Idle",
@@ -741,6 +767,12 @@
 			"segmentSettingsNote": "These settings apply to only the selected segment",
 			"clipSettings": "Clip Settings",
 			"clipSettingsNote": "These settings apply to all segments for the current clip",
+			"wallpaperOptionAlt": "Wallpaper option",
+			"timing": "Timing",
+			"start": "Start",
+			"to": "to",
+			"end": "End",
+			"duration": "Duration",
 			"systemAudioOffset": "System Audio Offset",
 			"micOffset": "Microphone Offset",
 			"cameraOffset": "Camera Offset",
@@ -748,17 +780,55 @@
 			"maskSegment": "Mask {{index}}",
 			"zoomSegment": "Zoom {{index}}",
 			"textSegmentsSelected": "{{count}} text segments selected",
+			"captionSegmentsSelected": "{{count}} caption segments selected",
+			"keyboardSegmentsSelected": "{{count}} keyboard segments selected",
+			"audioSegmentsSelected": "{{count}} audio segments selected",
 			"maskSegmentsSelected": "{{count}} mask segments selected",
 			"zoomSegmentsSelected": "{{count}} zoom segments selected",
+			"sceneSegmentsSelected": "{{count}} scene segments selected",
+			"clipSegmentsSelected": "{{count}} clip segments selected",
 			"enabled": "Enabled",
 			"italic": "Italic",
 			"color": "Color",
 			"fadeDuration": "Fade Duration",
+			"tilt": "Tilt",
 			"pixelation": "Pixelation",
 			"intensity": "Intensity",
 			"outsideDarkness": "Outside Darkness",
 			"loading": "Loading...",
 			"clickToSelectImage": "Click to select or drag and drop image",
+			"useDesktopWallpaper": "Use the wallpaper from your desktop",
+			"importing": "Importing...",
+			"importDesktopBackground": "Import desktop background",
+			"reimport": "Re-import",
+			"backgroundBlurOptions": {
+				"off": "Off",
+				"light": "Light Blur",
+				"heavy": "Heavy Blur"
+			},
+			"sceneModes": {
+				"default": "Default",
+				"cameraOnly": "Camera Only",
+				"hideCamera": "Hide Camera",
+				"splitScreen": "Split Screen"
+			},
+			"sceneModeDescriptions": {
+				"default": "Shows both screen and camera",
+				"cameraOnly": "Shows only the camera feed",
+				"hideCamera": "Shows only the screen recording",
+				"splitScreen": "Screen and camera side by side (auto-stacks in portrait)"
+			},
+			"transition": "Transition",
+			"transitionIn": "In",
+			"transitionOut": "Out",
+			"screenZoom": "Screen Zoom",
+			"screenPosition": "Screen Position",
+			"cameraZoom": "Camera Zoom",
+			"cameraPosition": "Camera Position",
+			"hideCursor": "Hide Cursor",
+			"hotkeys": "Hotkeys",
+			"showHotkeys": "Show hotkeys",
+			"keepOriginalSizeDuringZoom": "Keep original size during zoom",
 			"cameraLayout": "Camera Layout",
 			"cameraLayouts": {
 				"default": "Default",
@@ -771,17 +841,25 @@
 				"hideCameraDescription": "Shows only the screen recording"
 			},
 			"backgroundSources": {
+				"desktop": "Desktop",
 				"wallpaper": "Wallpaper",
 				"image": "Image",
 				"color": "Color",
-				"gradient": "Gradient"
+				"gradient": "Gradient",
+				"none": "None"
 			},
 			"backgroundThemes": {
 				"macOS": "macOS",
 				"dark": "Dark",
+				"cities": "Cities",
 				"blue": "Blue",
 				"purple": "Purple",
 				"orange": "Orange"
+			},
+			"currentDesktopBackgroundLabels": {
+				"macos": "This Mac",
+				"windows": "This PC",
+				"device": "This device"
 			},
 			"messages": {
 				"wallpaperFailed": "Failed to set wallpaper",
@@ -810,8 +888,12 @@
 			"animationStyles": {
 				"slow": "Slow",
 				"slowDescription": "Relaxed easing with a gentle follow and higher inertia.",
+				"smooth": "Smooth",
+				"smoothDescription": "Soft cursor travel with extra easing between points.",
 				"mellow": "Mellow",
 				"mellowDescription": "Balanced smoothing for everyday tutorials and walkthroughs.",
+				"fast": "Fast",
+				"fastDescription": "Snappier motion for quick demos and fast edits.",
 				"custom": "Custom",
 				"customDescription": "Tune tension, friction, and mass manually for full control."
 			}
@@ -819,6 +901,8 @@
 		"captions": {
 			"title": "Captions",
 			"model": "Transcription Model",
+			"modelShort": "Model",
+			"style": "Style",
 			"language": "Language",
 			"selectLanguage": "Select a language",
 			"downloadModel": "Download Model",
@@ -837,8 +921,13 @@
 			"backgroundOpacity": "Background Opacity",
 			"position": "Position",
 			"animation": "Animation",
+			"animationStyle": "Animation Style",
+			"highlightStyle": "Highlight Style",
+			"textColor": "Text Color",
+			"uppercase": "Uppercase",
 			"highlightColor": "Highlight Color",
 			"fadeDuration": "Fade Duration",
+			"fadeDurationOverride": "Fade Duration Override",
 			"downloadSuccess": "Transcription model downloaded successfully!",
 			"downloadFailed": "Failed to download transcription model",
 			"generateSuccess": "Captions generated successfully!",
@@ -858,12 +947,64 @@
 			"exportOptions": "Export Options",
 			"exportWithSubtitles": "Export with Subtitles",
 			"segments": "Caption Segments",
+			"segment": "Caption {{index}}",
 			"addAtCurrentTime": "Add at Current Time",
 			"startTime": "Start Time",
 			"endTime": "End Time",
 			"text": "Caption Text",
 			"regenerated": "Captions regenerated!",
-			"regenerateFailed": "Failed to regenerate captions"
+			"regenerateFailed": "Failed to regenerate captions",
+			"parakeetUnavailable": "Parakeet is not available on this device",
+			"selectModel": "Select a model",
+			"slowerMoreAccurate": "Slower, more accurate transcription",
+			"models": {
+				"recommended": "Recommended",
+				"recommendedDescription": "Fast transcription for most recordings",
+				"highAccuracy": "High accuracy",
+				"highAccuracyDescription": "Best accuracy for longer or noisy recordings",
+				"small": "Small",
+				"smallDescription": "Small download with faster processing",
+				"medium": "Medium"
+			},
+			"languages": {
+				"auto": "Auto Detect",
+				"en": "English",
+				"es": "Spanish",
+				"fr": "French",
+				"de": "German",
+				"it": "Italian",
+				"pt": "Portuguese",
+				"nl": "Dutch",
+				"pl": "Polish",
+				"ru": "Russian",
+				"sk": "Slovak",
+				"tr": "Turkish",
+				"ja": "Japanese",
+				"ko": "Korean",
+				"zh": "Chinese",
+				"ar": "Arabic",
+				"hi": "Hindi",
+				"bn": "Bengali",
+				"ta": "Tamil",
+				"te": "Telugu",
+				"mr": "Marathi",
+				"gu": "Gujarati",
+				"pa": "Punjabi",
+				"ur": "Urdu",
+				"fa": "Persian",
+				"he": "Hebrew"
+			},
+			"fontWeights": {
+				"normal": "Normal",
+				"medium": "Medium",
+				"bold": "Bold",
+				"custom": "Custom"
+			}
+		},
+		"editor": {
+			"loadingFrame": "Loading frame...",
+			"preview": "Preview",
+			"renderingPreview": "Rendering preview..."
 		},
 		"export": {
 			"title": "Export",
@@ -871,6 +1012,9 @@
 			"preview": "Preview",
 			"previewNote": "This is a rendered frame from your video. Adjust the settings below to see the quality of the final exported video.",
 			"generatingPreview": "Generating preview...",
+			"previewUnavailable": "Preview unavailable",
+			"previewAlt": "Export preview",
+			"previewFullAlt": "Export preview full size",
 			"destination": "Destination",
 			"organization": "Organization",
 			"file": "File",
@@ -889,6 +1033,7 @@
 			"largerFile": "Larger file",
 			"qualityPreview": "Quality Preview",
 			"estimatedSize": "Estimated size:",
+			"estimatedSizeWithValue": "Estimated size: {{size}} MB",
 			"compression": {
 				"title": "Compression",
 				"minimal": "Minimal",
@@ -898,9 +1043,32 @@
 				"potato": "Potato"
 			},
 			"optimizeFileSize": "Optimize file size",
+			"optimizeFileSizeDescription": "Re-encodes with software for much smaller files (slower)",
+			"advancedOptions": "Advanced Options",
+			"showOptions": "Show options",
+			"hideOptions": "Hide options",
 			"exportCursorOnly": "Export cursor only",
+			"exportCursorOnlyDescription": "Keeps the same cursor motion and clicks on a transparent background",
+			"warning": "Warning",
+			"cursorOnlyWarning": "Exports as a transparent MOV. Files are large and best for compositing or editing.",
 			"bitsPerPixel": "Bits per pixel",
+			"usingCustomBitrate": "Using custom bitrate",
+			"tinyBitrate": "0.02 (tiny)",
+			"hugeBitrate": "0.50 (huge)",
+			"assets": {
+				"cursorTrack": "Cursor track",
+				"cursorTrackLower": "cursor track",
+				"recording": "Recording",
+				"video": "video"
+			},
+			"cursorOnlyFormatDisabled": "Cursor-only export always uses transparent MOV",
+			"cursorOnlyLinkDisabled": "Cursor-only exports can only be saved to a file or clipboard",
+			"transparentLinkDisabled": "Transparent exports can only be saved to a file or clipboard",
+			"frames": "frames",
 			"forceFfmpegDecoder": "Force FFmpeg decoder",
+			"forceFfmpegDecoderDescription": "Skip hardware decoder (auto-fallback enabled)",
+			"tipLabel": "Tip:",
+			"instantModeTip": "Use Instant Mode for your next recording to record and upload on the fly, with no exporting required.",
 			"actions": {
 				"signInToShare": "Sign in to share",
 				"exportToFile": "Export to File",
@@ -909,18 +1077,24 @@
 				"copyLink": "Copy Link",
 				"openLink": "Open Link",
 				"openFile": "Open File",
-				"copyToClipboard": "Copy to Clipboard"
+				"copyToClipboard": "Copy to Clipboard",
+				"resumeExport": "Resume Export",
+				"quitEditor": "Quit Editor"
 			},
 			"status": {
 				"preparing": "Preparing...",
+				"preparingExport": "Preparing export",
+				"rendering": "Rendering {{type}}",
 				"renderingGif": "Rendering GIF...",
 				"renderingVideo": "Rendering video...",
 				"copying": "Copying to clipboard...",
 				"copied": "Copied to clipboard",
+				"readyToPaste": "Your {{type}} is ready to paste",
 				"exportingToFile": "Exporting to file...",
 				"exportCompleted": "Export completed",
 				"exportComplete": "Export Complete",
 				"ready": "Your {{type}} is ready",
+				"savingToFile": "Saving to file",
 				"uploading": "Uploading...",
 				"uploadingProgress": "Uploading - {{progress}}%",
 				"uploadComplete": "Upload Complete",
@@ -938,12 +1112,15 @@
 				"errorCopying": "Failed to copy recording",
 				"errorExporting": "Failed to export recording: {{error}}",
 				"cancelConfirm": "Are you sure you want to cancel the export?",
-				"cancelTitle": "Cancel Export"
+				"cancelTitle": "Cancel Export",
+				"closeConfirm": "An export is currently running. Keep this editor open to continue it, or quit the editor and cancel the export.",
+				"closeTitle": "Export in Progress"
 			},
 			"recording": "Recording",
 			"gif": "GIF",
 			"quality": {
 				"minimal": "Minimal",
+				"maximum": "Maximum",
 				"social": "Social Media",
 				"web": "Web",
 				"potato": "Potato"
@@ -973,6 +1150,18 @@
 			"export": "Export",
 			"confirmDelete": "Are you sure you want to delete this recording?"
 		},
+		"aspectRatio": {
+			"title": "Aspect Ratio",
+			"auto": "Auto"
+		},
+		"gradient": {
+			"from": "From",
+			"to": "To",
+			"angle": "Angle",
+			"noise": "Noise",
+			"grainScale": "Grain Scale",
+			"randomize": "Randomize"
+		},
 		"presets": {
 			"title": "Presets",
 			"none": "No Presets",
@@ -982,6 +1171,9 @@
 			"rename": "Rename",
 			"delete": "Delete",
 			"create": "Create new preset",
+			"name": "Name",
+			"saveSettings": "Save settings to preset",
+			"savedSettings": "Saved settings to \"{{name}}\"",
 			"createTitle": "Create Preset",
 			"renameTitle": "Rename Preset",
 			"deleteTitle": "Delete Preset",
@@ -1022,9 +1214,42 @@
 			"uploading": "Uploading - {{progress}}%",
 			"copied": "Link copied to clipboard!"
 		},
+		"textStyle": {
+			"fonts": {
+				"systemSansSerif": "System Sans Serif",
+				"systemSerif": "System Serif",
+				"systemMonospace": "System Monospace"
+			},
+			"positions": {
+				"manual": "Manual",
+				"topLeft": "Top Left",
+				"topCenter": "Top Center",
+				"topRight": "Top Right",
+				"bottomLeft": "Bottom Left",
+				"bottomCenter": "Bottom Center",
+				"bottomRight": "Bottom Right"
+			},
+			"fontWeights": {
+				"normal": "Normal",
+				"medium": "Medium",
+				"bold": "Bold",
+				"customValue": "Custom ({{weight}})"
+			},
+			"animations": {
+				"none": "None",
+				"bounce": "Bounce",
+				"pop": "Pop"
+			},
+			"highlightStyles": {
+				"color": "Color",
+				"pill": "Pill"
+			}
+		},
 		"crop": {
 			"size": "Size",
 			"position": "Position",
+			"area": "Crop area",
+			"currentFrameAlt": "Current frame",
 			"full": "Full",
 			"reset": "Reset",
 			"save": "Save"
@@ -1033,17 +1258,65 @@
 			"addAudio": "Add audio",
 			"importFailed": "Failed to import audio file",
 			"addTrackFailed": "Failed to add audio track",
-			"changeTrack": "Tap to change track"
+			"changeTrack": "Tap to change track",
+			"change": "Change",
+			"done": "Done",
+			"changeAudio": "Change audio",
+			"changeAudioDescription": "Pick a different track for this segment",
+			"addAudioDescription": "Add audio, music or other sounds to your video",
+			"moreCategoriesComingSoon": "More categories coming soon",
+			"audioFilterName": "Audio",
+			"pausePreview": "Pause preview",
+			"playPreview": "Play preview",
+			"useTrack": "Use track",
+			"addToTimeline": "Add to timeline",
+			"uploading": "Importing...",
+			"uploadOwn": "Upload your own",
+			"volume": "Volume",
+			"fadeIn": "Fade In",
+			"fadeOut": "Fade Out"
 		},
 		"clipsSidebar": {
 			"noClips": "No clips yet",
 			"noClipsDescription": "Record or import a clip and it will show up here.",
+			"addingClip": "Adding clip...",
+			"clipAdded": "Clip added",
+			"addClipFailed": "Failed to add clip: {{message}}",
+			"importingClip": "Importing clip...",
 			"clipImported": "Clip imported",
 			"clipsImported": "{{count}} clips imported",
+			"clipImportFailed": "Failed to import clip: {{message}}",
 			"importVideo": "Import video",
-			"clips": "Clips"
+			"clips": "Clips",
+			"backToEditor": "Back to editor",
+			"recordNewClip": "Record a new clip",
+			"import": "Import",
+			"existingRecording": "Existing recording",
+			"mp4Video": "MP4 Video...",
+			"mp4VideoFilterName": "MP4 Video",
+			"capRecordingFilterName": "Cap Recording",
+			"clip": "Clip {{index}}",
+			"split": "Split {{index}}",
+			"clipWithDuration": "{{clip}} · {{duration}}",
+			"renameClip": "Rename clip",
+			"removeClip": "Remove clip",
+			"modalDescription": "Captured in Studio Mode and added to this project.",
+			"close": "Close",
+			"display": "Display",
+			"window": "Window",
+			"area": "Area",
+			"cameraOnly": "Camera Only",
+			"chooseDisplay": "Choose display",
+			"chooseWindow": "Choose window",
+			"searchWindows": "Search windows",
+			"searchDisplays": "Search displays",
+			"loadDisplaysFailed": "Unable to load displays.",
+			"loadWindowsFailed": "Unable to load windows.",
+			"noMatchingDisplays": "No matching displays",
+			"noMatchingWindows": "No matching windows"
 		},
 		"keyboardTab": {
+			"showKeyboard": "Show Keyboard",
 			"fontFamily": "Font Family",
 			"textColor": "Text Color",
 			"backgroundColor": "Background Color",
@@ -1054,20 +1327,76 @@
 			"showModifierKeys": "Show Modifier Keys",
 			"showSpecialKeys": "Show Special Keys",
 			"uppercase": "Uppercase",
-			"enabledDescription": "Show keyboard overlay on the video"
+			"enabledDescription": "Show keyboard overlay on the video",
+			"behavior": "Behavior",
+			"regenerateSegments": "Regenerate Segments",
+			"generateSegments": "Generate Segments",
+			"selectedSegmentOverride": "Selected Segment Override",
+			"displayText": "Display Text",
+			"fadeDurationOverride": "Fade Duration Override",
+			"noSegments": "No keyboard segments",
+			"noSegmentsDescription": "Generate segments from keyboard events or add them on the timeline.",
+			"segment": "Keyboard {{index}}"
 		},
 		"organization": {
 			"brandingUpdated": "Organization branding updated",
 			"unsupportedLogo": "Unsupported logo file type",
-			"logoTooLarge": "Logo file must be less than 1MB"
+			"logoTooLarge": "Logo file must be less than 1MB",
+			"defaultName": "Organization",
+			"signIn": "Sign in",
+			"loading": "Loading...",
+			"loadingOrganizations": "Loading organizations",
+			"unableToLoadOrganizations": "Unable to load organizations",
+			"brandingRequiresSignIn": "Organization branding requires sign in",
+			"fetchingBranding": "Fetching organization branding from Cap web.",
+			"unavailableDescription": "Organization branding uses live Cap web data. Connect to Cap web to select an organization and use its colors.",
+			"signInDescription": "Sign in to select an organization, edit brand colors, and use those colors in Studio.",
+			"upload": "Upload",
+			"remove": "Remove",
+			"set": "Set",
+			"retry": "Retry",
+			"noOrganizations": "No organizations",
+			"brandSettings": "Brand settings",
+			"save": "Save",
+			"saving": "Saving...",
+			"updateFailed": "Failed to update organization branding"
+		},
+		"importProgress": {
+			"failed": "Import Failed",
+			"importingVideo": "Importing Video",
+			"messages": {
+				"adjusting": "Adjusting the Cap just right...",
+				"thinking": "Putting on our thinking Cap...",
+				"pixels": "Cap-sizing the pixels...",
+				"processing": "Wearing our processing Cap...",
+				"importing": "Cap-tivating import in progress...",
+				"flipping": "Flipping our Cap backwards...",
+				"break": "Cap-puccino break? Almost done...",
+				"capable": "Cap-able of great things..."
+			}
 		},
 		"performance": {
-			"copiedToClipboard": "Performance stats copied to clipboard"
+			"copiedToClipboard": "Performance stats copied to clipboard",
+			"clickToCopyStats": "Click to copy stats",
+			"frame": "Frame:",
+			"average": "avg",
+			"range": "Range:",
+			"jitter": "Jitter:",
+			"dropped": "Dropped:",
+			"playing": "Playing:",
+			"yes": "Yes",
+			"no": "No"
 		},
 		"transcript": {
 			"title": "Transcript",
-			"noTranscript": "No transcript available"
+			"noTranscript": "No transcript available",
+			"add": "Add",
+			"generateCaptionsFirst": "Generate captions in the editor first",
+			"addCaptionAtPlayhead": "Add caption at playhead"
 		},
+		"resizeTimelineHeight": "Resize timeline height",
+		"resizeTranscriptPanel": "Resize transcript panel",
+		"dismissForSession": "Dismiss for this session",
 		"brandColors": {
 			"title": "Brand colours"
 		},

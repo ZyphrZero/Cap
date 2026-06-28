@@ -486,7 +486,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 	const importRecordingPath = async (sourcePath: string) => {
 		if (importing()) return;
 		setImporting(true);
-		const toastId = toast.loading("Importing clip…");
+		const toastId = toast.loading(t("editor.clipsSidebar.importingClip"));
 		try {
 			if (editorState.playing) {
 				await commands.stopPlayback();
@@ -494,20 +494,32 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 			}
 			await commands.setProjectConfig(serializeProjectConfiguration(project));
 			const count = await commands.addExistingRecordingToEditor(sourcePath);
-			toast.success(count === 1 ? "Clip imported" : `${count} clips imported`, {
-				id: toastId,
-			});
+			toast.success(
+				count === 1
+					? t("editor.clipsSidebar.clipImported")
+					: t("editor.clipsSidebar.clipsImported", { count }),
+				{
+					id: toastId,
+				},
+			);
 			window.location.reload();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			toast.error(`Failed to import clip: ${message}`, { id: toastId });
+			toast.error(t("editor.clipsSidebar.clipImportFailed", { message }), {
+				id: toastId,
+			});
 			setImporting(false);
 		}
 	};
 
 	const pickMp4 = async () => {
 		const path = await open({
-			filters: [{ name: "MP4 Video", extensions: ["mp4"] }],
+			filters: [
+				{
+					name: t("editor.clipsSidebar.mp4VideoFilterName"),
+					extensions: ["mp4"],
+				},
+			],
 			multiple: false,
 		});
 		if (typeof path === "string") await importRecordingPath(path);
@@ -517,7 +529,12 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 		const recordingsPath = await join(await appDataDir(), "recordings");
 		const path = await open({
 			defaultPath: recordingsPath,
-			filters: [{ name: "Cap Recording", extensions: ["cap"] }],
+			filters: [
+				{
+					name: t("editor.clipsSidebar.capRecordingFilterName"),
+					extensions: ["cap"],
+				},
+			],
 			multiple: false,
 		});
 		if (typeof path === "string") await importRecordingPath(path);
@@ -528,11 +545,11 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 		const menu = await Menu.new({
 			items: [
 				await MenuItem.new({
-					text: "Existing recording",
+					text: t("editor.clipsSidebar.existingRecording"),
 					action: () => void pickCapRecording(),
 				}),
 				await MenuItem.new({
-					text: "MP4 Video…",
+					text: t("editor.clipsSidebar.mp4Video"),
 					action: () => void pickMp4(),
 				}),
 			],
@@ -545,7 +562,8 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 	);
 	const recordedClipCount = () => editorInstance.recordings.segments.length;
 
-	const clipLabel = (index: number) => `Clip ${index + 1}`;
+	const clipLabel = (index: number) =>
+		t("editor.clipsSidebar.clip", { index: index + 1 });
 
 	const segmentClipIndex = (segment: EditorTimelineSegment, index: number) =>
 		segment.recordingSegment ??
@@ -568,7 +586,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 		const splitNumber = segmentSplitNumber(segment, index);
 		return splitNumber === 1
 			? clipLabel(segmentClipIndex(segment, index))
-			: `Split ${splitNumber - 1}`;
+			: t("editor.clipsSidebar.split", { index: splitNumber - 1 });
 	};
 
 	const displayName = (segment: EditorTimelineSegment, index: number) => {
@@ -588,7 +606,10 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 		const formattedDuration = formatClipDuration(duration);
 		const splitNumber = segmentSplitNumber(segment, index);
 		if (splitNumber > 1) {
-			return `${clipLabel(segmentClipIndex(segment, index))} · ${formattedDuration}`;
+			return t("editor.clipsSidebar.clipWithDuration", {
+				clip: clipLabel(segmentClipIndex(segment, index)),
+				duration: formattedDuration,
+			});
 		}
 		return formattedDuration;
 	};
@@ -755,7 +776,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 				class="flex flex-none gap-2 items-center px-4 w-full h-16 text-sm font-medium border-b transition-colors text-gray-12 border-gray-3 hover:bg-gray-3"
 			>
 				<IconCapMoveLeft class="size-4 text-gray-11" />
-				Back to editor
+				{t("editor.clipsSidebar.backToEditor")}
 			</button>
 
 			<div class="flex flex-col flex-1 gap-3 p-3 min-h-0">
@@ -766,7 +787,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 						onClick={() => setRecordOpen(true)}
 					>
 						<IconLucideVideo class="size-4" />
-						Record a new clip
+						{t("editor.clipsSidebar.recordNewClip")}
 					</Button>
 					<Button
 						variant="gray"
@@ -775,12 +796,14 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 						onClick={openImportMenu}
 					>
 						<IconCapCirclePlus class="size-4" />
-						Import
+						{t("editor.clipsSidebar.import")}
 					</Button>
 				</div>
 
 				<div class="flex flex-none gap-2 items-center">
-					<span class="text-sm font-medium text-gray-12">Clips</span>
+					<span class="text-sm font-medium text-gray-12">
+						{t("editor.clipsSidebar.clips")}
+					</span>
 					<Show when={recordedClipCount() > 0}>
 						<span class="rounded-md bg-gray-3 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-gray-11">
 							{recordedClipCount()}
@@ -796,9 +819,11 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 								<div class="flex justify-center items-center rounded-full size-10 bg-gray-3 text-gray-9">
 									<IconCapClapperboard class="size-5" />
 								</div>
-								<p class="text-sm font-medium text-gray-12">No clips yet</p>
+								<p class="text-sm font-medium text-gray-12">
+									{t("editor.clipsSidebar.noClips")}
+								</p>
 								<p class="max-w-[200px] text-xs text-gray-10">
-									Record or import a clip and it will show up here.
+									{t("editor.clipsSidebar.noClipsDescription")}
 								</p>
 							</div>
 						}
@@ -893,7 +918,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 														onClick={() =>
 															startRename(index(), segment.name ?? "")
 														}
-														aria-label={t("renameClip")}
+														aria-label={t("editor.clipsSidebar.renameClip")}
 														class="flex flex-none justify-center items-center rounded-md opacity-0 transition-colors size-7 text-gray-10 hover:bg-gray-5 hover:text-gray-12 group-hover:opacity-100"
 													>
 														<IconCapPencil class="size-3.5" />
@@ -903,7 +928,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 															type="button"
 															data-clip-delete
 															onClick={() => deleteClip(index())}
-															aria-label={t("removeClip")}
+															aria-label={t("editor.clipsSidebar.removeClip")}
 															class="flex flex-none justify-center items-center rounded-md opacity-0 transition-colors size-7 text-gray-10 hover:bg-red-3 hover:text-red-11 group-hover:opacity-100"
 														>
 															<IconCapTrash class="size-3.5" />
@@ -935,16 +960,16 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 								</div>
 								<div class="flex flex-col gap-0.5 min-w-0">
 									<h2 class="text-sm font-medium text-gray-12">
-										Record a new clip
+										{t("editor.clipsSidebar.recordNewClip")}
 									</h2>
 									<p class="text-xs text-gray-10">
-										Captured in Studio Mode and added to this project.
+										{t("editor.clipsSidebar.modalDescription")}
 									</p>
 								</div>
 								<button
 									type="button"
 									onClick={closeRecord}
-									aria-label="Close"
+									aria-label={t("editor.clipsSidebar.close")}
 									class="flex flex-none justify-center items-center ml-auto rounded-md transition-colors size-7 text-gray-11 hover:bg-gray-4 hover:text-gray-12"
 								>
 									<IconCapX class="size-3" />
@@ -970,7 +995,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 															selected={rawOptions.targetMode === "display"}
 															Component={IconMdiMonitor}
 															onClick={() => void openTargetMode("display")}
-															name="Display"
+															name={t("editor.clipsSidebar.display")}
 															class="flex-1 pl-5 rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
 														/>
 														<TargetDropdownButton
@@ -988,7 +1013,9 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 																});
 															}}
 															aria-haspopup="menu"
-															aria-label={t("chooseDisplay")}
+															aria-label={t(
+																"editor.clipsSidebar.chooseDisplay",
+															)}
 														/>
 													</div>
 													<div
@@ -1003,7 +1030,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 															selected={rawOptions.targetMode === "window"}
 															Component={IconLucideAppWindowMac}
 															onClick={() => void openTargetMode("window")}
-															name="Window"
+															name={t("editor.clipsSidebar.window")}
 															class="flex-1 pl-5 rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
 														/>
 														<TargetDropdownButton
@@ -1021,17 +1048,21 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 																});
 															}}
 															aria-haspopup="menu"
-															aria-label={t("chooseWindow")}
+															aria-label={t("editor.clipsSidebar.chooseWindow")}
 														/>
 													</div>
 												</div>
 												<div class="flex flex-row gap-2 items-stretch w-full">
 													{areaButton(
 														"area",
-														"Area",
+														t("editor.clipsSidebar.area"),
 														IconMaterialSymbolsScreenshotFrame2Rounded,
 													)}
-													{areaButton("camera", "Camera Only", IconLucideVideo)}
+													{areaButton(
+														"camera",
+														t("editor.clipsSidebar.cameraOnly"),
+														IconLucideVideo,
+													)}
 												</div>
 											</div>
 
@@ -1092,10 +1123,12 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 													)?.focus();
 												}}
 												class="flex h-[36px] gap-1 items-center shrink-0 rounded-md px-2 text-xs text-gray-11 transition-colors hover:text-gray-12 hover:bg-gray-4"
-												aria-label="Back"
+												aria-label={t("common.back")}
 											>
 												<IconLucideArrowLeft class="size-3 text-gray-11" />
-												<span class="font-medium text-gray-12">Back</span>
+												<span class="font-medium text-gray-12">
+													{t("common.back")}
+												</span>
 											</button>
 											<div class="relative flex-1 min-w-0 h-[36px] flex items-center">
 												<IconLucideSearch class="absolute left-2 top-[48%] -translate-y-1/2 pointer-events-none size-3 text-gray-10" />
@@ -1115,8 +1148,8 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 													}}
 													placeholder={
 														activeTargetMenu() === "window"
-															? "Search windows"
-															: "Search displays"
+															? t("editor.clipsSidebar.searchWindows")
+															: t("editor.clipsSidebar.searchDisplays")
 													}
 													autoCapitalize="off"
 													autocorrect="off"
@@ -1133,7 +1166,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 													isLoading={displayTargets.isPending}
 													errorMessage={
 														displayTargets.error
-															? "Unable to load displays."
+															? t("editor.clipsSidebar.loadDisplaysFailed")
 															: undefined
 													}
 													onSelect={(target) =>
@@ -1142,7 +1175,7 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 													highlightQuery={targetSearch().trim()}
 													emptyMessage={
 														targetSearch().trim()
-															? "No matching displays"
+															? t("editor.clipsSidebar.noMatchingDisplays")
 															: undefined
 													}
 												/>
@@ -1154,14 +1187,14 @@ function ClipsSidebarInner(props: { open: boolean; class?: string }) {
 													isLoading={windowTargets.isPending}
 													errorMessage={
 														windowTargets.error
-															? "Unable to load windows."
+															? t("editor.clipsSidebar.loadWindowsFailed")
 															: undefined
 													}
 													onSelect={(target) => void selectWindowTarget(target)}
 													highlightQuery={targetSearch().trim()}
 													emptyMessage={
 														targetSearch().trim()
-															? "No matching windows"
+															? t("editor.clipsSidebar.noMatchingWindows")
 															: undefined
 													}
 												/>
